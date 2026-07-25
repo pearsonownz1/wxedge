@@ -4,6 +4,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import app from "./app";
 import { logger } from "./lib/logger";
 import { warmCache } from "./lib/warmup";
+import { isKalshiPollingEnabled } from "./lib/kalshiApi";
 
 const rawPort = process.env["PORT"];
 
@@ -87,6 +88,17 @@ app.listen(port, (err) => {
   }
 
   logger.info({ port }, "Server listening");
+
+  // Boot-time polling visibility — a silent POLLING_ENABLED=false in the
+  // deployment env once blanked the prod board with zero log evidence.
+  logger.info(
+    {
+      kalshiPollingEnabled: isKalshiPollingEnabled(),
+      POLLING_ENABLED: process.env["POLLING_ENABLED"] ?? "(unset)",
+      NODE_ENV: process.env["NODE_ENV"] ?? "(unset)",
+    },
+    "Kalshi polling state at boot"
+  );
 
   // Pre-warm the cache after the port is bound so the first request hits
   // live data instead of waiting 2–4 s for cold NWS/Kalshi fetches.

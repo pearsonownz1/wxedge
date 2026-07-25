@@ -8,7 +8,7 @@ import {
 } from "@workspace/api-client-react";
 import { cn, formatPts, formatPct } from "@/lib/utils";
 import { Shell } from "@/components/shell";
-import { FeedBanner } from "@/components/feed-banner";
+import { FeedBanner, type FeedStatusDetail } from "@/components/feed-banner";
 
 type Filter = "All" | "Actionable" | "Locked";
 
@@ -55,7 +55,7 @@ function MarketsView() {
 
   return (
     <div className="flex-1 flex flex-col h-full bg-background overflow-hidden">
-      <FeedBanner fresh={marketData.feedFresh} timestampLst={marketData.bookSnapshotTimeLst} hideEdgeSignal feedStatusDetail={marketData.feedStatusDetail as "live" | "no_api_key" | "auth_failed" | "rate_limited" | "network_error" | "key_lacks_access" | "unavailable" | undefined} />
+      <FeedBanner fresh={marketData.feedFresh} timestampLst={marketData.bookSnapshotTimeLst} hideEdgeSignal feedStatusDetail={marketData.feedStatusDetail as FeedStatusDetail | undefined} />
       
       <div className="p-4 border-b flex items-center justify-between shrink-0 bg-card">
         <div className="flex items-center gap-2">

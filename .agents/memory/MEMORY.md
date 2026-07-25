@@ -1,4 +1,5 @@
 - [Kalshi API structure](kalshi-api.md) — fully public reads (no auth header); YYMMMDD tickers; per-station series (not KXHIGH); string dollar prices; KDFW has no series.
+- [Deployment env snapshot trap](deployment-env-snapshot.md) — deployments freeze env at publish; dev-only switches leak into prod and silently blank features; prod ignores POLLING_ENABLED=false.
 - [Postgres advisory lock keep-alive](pg-advisory-lock.md) — Replit managed PG kills idle conns (57P01 ~30s); held lock conn needs SELECT 1 every 25s or trader crash-loops.
 - [IEM data sources](iem-data-sources.md) — 3-letter station IDs (NYC not KNYC); NWS rawMessage always empty; IEM asos.py is primary METAR source; 1-min latency unknown (Phase 0 auditing).
 - [Snapshot collector](snapshot-collector.md) — PostgreSQL via @workspace/db; logSnapshots() called from warmup.ts after every warmCache(); setInterval only works on Reserved VM deployment.

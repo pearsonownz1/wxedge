@@ -44,5 +44,8 @@ timeoutMs = 20000
 [userenv.development]
 POLLING_ENABLED = "false"
 
+[userenv.production]
+POLLING_ENABLED = "true"
+
 [nix]
 channel = "stable-25_05"

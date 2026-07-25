@@ -160,18 +160,20 @@ router.get("/markets", async (req, res): Promise<void> => {
   // from the actual fetch outcome, not from whether an API key is present.
   const feedStatusDetail:
     | "live" | "auth_failed" | "rate_limited" | "network_error"
-    | "no_current_contracts" | "unavailable" =
+    | "polling_disabled" | "no_current_contracts" | "unavailable" =
     feedFresh
       ? "live"
-      : failureReason === "auth_failed"
-        ? "auth_failed"
-        : failureReason === "rate_limited"
-          ? "rate_limited"
-          : failureReason === "network_error"
-            ? "network_error"
-            : (allStaleFiltered || (anyStubData && !failureReason))
-              ? "no_current_contracts"  // 0 events with no error = markets not open yet
-              : "unavailable";
+      : failureReason === "polling_disabled"
+        ? "polling_disabled"
+        : failureReason === "auth_failed"
+          ? "auth_failed"
+          : failureReason === "rate_limited"
+            ? "rate_limited"
+            : failureReason === "network_error"
+              ? "network_error"
+              : (allStaleFiltered || (anyStubData && !failureReason))
+                ? "no_current_contracts"  // 0 events with no error = markets not open yet
+                : "unavailable";
 
   res.json({
     markets: flat,
@@ -227,9 +229,11 @@ router.get("/markets/:contractId", async (req, res): Promise<void> => {
   ];
 
   if (bracketResult.usingStubData || bracketResult.brackets.length === 0) {
+    // fetchKalshiEvents is cached — reuses the in-memory result, no extra network call.
+    const { failureReason } = await fetchKalshiEvents();
     res.status(503).json({
       error: "Live Kalshi data unavailable for this station",
-      feedStatusDetail: "key_lacks_access",
+      feedStatusDetail: failureReason ?? "unavailable",
     });
     return;
   }
@@ -279,14 +283,24 @@ router.get("/markets/:contractId", async (req, res): Promise<void> => {
     kalshiAge <= TTL.KALSHI_BOOK_MS / 1000 &&
     orderBookResult.isLive;
 
-  // Kalshi reads are public — classify by actual failure, not API key presence.
-  const feedStatusDetail: "live" | "auth_failed" | "rate_limited" | "network_error" | "no_current_contracts" | "unavailable" = feedFresh
-    ? "live"
-    : bracketResult.usingStubData && !bracketResult.usingStubData // stub from fetch failure
-      ? "unavailable"
-      : !orderBookResult.isLive
-        ? "unavailable"
-        : "no_current_contracts";
+  // Kalshi reads are public — classify by the actual fetch outcome (cached, no network).
+  const { failureReason } = await fetchKalshiEvents();
+  const feedStatusDetail:
+    | "live" | "auth_failed" | "rate_limited" | "network_error"
+    | "polling_disabled" | "no_current_contracts" | "unavailable" =
+    feedFresh
+      ? "live"
+      : failureReason === "polling_disabled"
+        ? "polling_disabled"
+        : failureReason === "auth_failed"
+          ? "auth_failed"
+          : failureReason === "rate_limited"
+            ? "rate_limited"
+            : failureReason === "network_error"
+              ? "network_error"
+              : !orderBookResult.isLive
+                ? "unavailable"
+                : "no_current_contracts";
 
   const rawStatus = getMarketStatus(targetBracket);
   const status = qualifiedStatus(

@@ -5,7 +5,7 @@ import {
 } from "@workspace/api-client-react";
 import { cn, formatPts, formatPct, formatTemp } from "@/lib/utils";
 import { Shell } from "@/components/shell";
-import { FeedBanner } from "@/components/feed-banner";
+import { FeedBanner, type FeedStatusDetail } from "@/components/feed-banner";
 import { ArrowLeft, ExternalLink, Copy, CheckCircle2 } from "lucide-react";
 import { useState } from "react";
 
@@ -53,7 +53,7 @@ ${market.disagreementBreakdown.runningHighFloorNote ? 'Floor: ' + market.disagre
 
   return (
     <Shell>
-      <FeedBanner fresh={market.feedFresh} timestampLst={market.bookSnapshotTimeLst} hideEdgeSignal feedStatusDetail={market.feedStatusDetail as "live" | "no_api_key" | "auth_failed" | "rate_limited" | "network_error" | "key_lacks_access" | "unavailable" | undefined} />
+      <FeedBanner fresh={market.feedFresh} timestampLst={market.bookSnapshotTimeLst} hideEdgeSignal feedStatusDetail={market.feedStatusDetail as FeedStatusDetail | undefined} />
       
       <div className="flex-1 bg-background overflow-auto p-8">
         <div className="max-w-5xl mx-auto space-y-8">

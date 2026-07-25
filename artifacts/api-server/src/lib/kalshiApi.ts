@@ -76,7 +76,12 @@ export interface KalshiEvent {
 }
 
 /** Why a Kalshi fetch cycle returned no live events, or null when data is live / no contracts yet. */
-export type KalshiFailureReason = "auth_failed" | "rate_limited" | "network_error" | null;
+export type KalshiFailureReason =
+  | "auth_failed"
+  | "rate_limited"
+  | "network_error"
+  | "polling_disabled"
+  | null;
 
 export interface KalshiFetchResult {
   events: KalshiEvent[];
@@ -190,10 +195,40 @@ const STATION_SERIES: Record<string, string> = {
   KPHL: "KXHIGHPHIL",
 };
 
-/** True when this process should actively poll Kalshi. Set POLLING_ENABLED=false in dev to avoid rate-limiting prod. */
-function pollingEnabled(): boolean {
+let warnedIgnoredDisableInProd = false;
+let warnedPollingDisabled = false;
+
+/**
+ * True when this process should actively poll Kalshi.
+ * Set POLLING_ENABLED=false in dev to avoid burning prod's rate-limit budget.
+ *
+ * PRODUCTION GUARD: in production an explicit POLLING_ENABLED=false is
+ * IGNORED, with a loud warning. A stale deployment env var once silently
+ * blanked the entire prod board — polling IS the production service, so a
+ * dev-only switch must never be able to turn it off there. (2026-07-25
+ * incident: deployment env retained POLLING_ENABLED=false from an earlier
+ * publish; every fetch short-circuited with no log line.)
+ *
+ * "Production" matches index.ts's IS_PRODUCTION heuristic: anything other
+ * than an explicit NODE_ENV=development. This keeps the guard alive even if
+ * a deployment leaves NODE_ENV unset.
+ */
+export function isKalshiPollingEnabled(): boolean {
   const v = process.env["POLLING_ENABLED"];
-  return v === undefined || v === "true" || v === "1";
+  const enabled = v === undefined || v === "true" || v === "1";
+  if (enabled) return true;
+
+  if (process.env["NODE_ENV"] !== "development") {
+    if (!warnedIgnoredDisableInProd) {
+      warnedIgnoredDisableInProd = true;
+      logger.warn(
+        { POLLING_ENABLED: v },
+        "POLLING_ENABLED is set to a non-true value in PRODUCTION — ignoring it and polling anyway. Remove the stale env var from the deployment settings."
+      );
+    }
+    return true;
+  }
+  return false;
 }
 
 // ─── 429 exponential backoff ───────────────────────────────────────────────────
@@ -211,8 +246,16 @@ function staleCacheTtlMs(anyRateLimited: boolean): number {
 }
 
 export async function fetchKalshiEvents(): Promise<KalshiFetchResult> {
-  if (!pollingEnabled()) {
-    return { events: [], usingStubData: false, allStaleFiltered: false, failureReason: null };
+  if (!isKalshiPollingEnabled()) {
+    if (!warnedPollingDisabled) {
+      warnedPollingDisabled = true;
+      logger.warn(
+        "Kalshi polling disabled via POLLING_ENABLED — no live market data will be fetched on this instance (dev-only switch; production ignores it)"
+      );
+    }
+    // Honest empty state: this IS a form of unavailable data, and the UI must
+    // say "polling disabled", never "no contracts today".
+    return { events: [], usingStubData: true, allStaleFiltered: false, failureReason: "polling_disabled" };
   }
 
   const key = "kalshi:events";
@@ -406,7 +449,7 @@ export async function fetchKalshiEvents(): Promise<KalshiFetchResult> {
  * Returns empty levels (isLive: false) on any failure — NO synthetic prices.
  */
 export async function fetchOrderBook(contractId: string): Promise<OrderBookResult> {
-  if (!pollingEnabled()) {
+  if (!isKalshiPollingEnabled()) {
     return { levels: [], isLive: false };
   }
 
