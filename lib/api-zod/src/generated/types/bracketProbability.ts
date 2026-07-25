@@ -25,10 +25,16 @@ export interface BracketProbability {
   upperBoundF: number | null;
   /** Model probability 0-100 */
   modelPct: number;
-  /** Kalshi implied probability 0-100 (mid-price * 100) */
-  impliedPct: number;
-  /** Net edge: model - implied - 1 (fee) */
-  edgePts: number;
+  /**
+     * Kalshi implied probability 0-100 (mid-price * 100). Null when the book is not quotable (one-sided or spread > 20¢).
+     * @nullable
+     */
+  impliedPct: number | null;
+  /**
+     * Net edge: model - implied - fee. Null when impliedPct is null.
+     * @nullable
+     */
+  edgePts: number | null;
   /** live=still possible, dead=running high eliminates it, ambiguous=near METAR rounding boundary */
   lockStatus: BracketProbabilityLockStatus;
   /** @nullable */

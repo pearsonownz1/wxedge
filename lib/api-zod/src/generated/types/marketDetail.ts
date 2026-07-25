@@ -20,7 +20,11 @@ export interface MarketDetail {
   modelPct: number;
   /** @nullable */
   askCents: number | null;
-  edgeNetPts: number;
+  /**
+     * Null when the book is not quotable.
+     * @nullable
+     */
+  edgeNetPts: number | null;
   status: MarketDetailStatus;
   disagreementBreakdown: ModelDisagreementBreakdown;
   orderBook: OrderBookLevel[];

@@ -119,14 +119,37 @@ function bracketMassAsymmetric(
 
 export type LockStatus = "live" | "dead" | "ambiguous";
 
+/** Max bid/ask spread (¢) for a book to count as real price information. */
+export const MAX_SPREAD_CENTS = 20;
+
+/**
+ * Book-quality gate: a bracket carries usable price information only when
+ * both sides are quoted and the spread is tight enough.
+ *
+ * A one-sided book ("— / 99¢") is not "the market thinks 99%" — it's
+ * "nobody's quoting". Implied %, Δ, and edge must never be derived from it.
+ */
+export function hasQuotableBook(
+  bidCents: number | null,
+  askCents: number | null
+): boolean {
+  return (
+    bidCents !== null &&
+    askCents !== null &&
+    askCents - bidCents <= MAX_SPREAD_CENTS
+  );
+}
+
 export interface BracketResult {
   contractId: string | null;
   label: string;
   lowerBoundF: number | null;
   upperBoundF: number | null;
   modelPct: number;
-  impliedPct: number;
-  edgePts: number;
+  /** NULL when the book isn't quotable — render as "—", never as a number. */
+  impliedPct: number | null;
+  /** NULL when impliedPct is NULL — no edge without a real market price. */
+  edgePts: number | null;
   lockStatus: LockStatus;
   bidCents: number | null;
   askCents: number | null;
@@ -210,8 +233,16 @@ export function buildBracketDistribution(
 
   return kalshiBrackets.map((b, i) => {
     const rawModelPct = Math.round(rawProbs[i] * normFactor * 100);
-    const impliedPct = b.impliedPct;
-    const edgePts = rawModelPct - impliedPct - kalshiFeePts(impliedPct);
+    // Junk books produce no implied probability and no edge — the numbers
+    // columns must be absent, not arithmetic over fiction.
+    const quotable = hasQuotableBook(b.bidCents, b.askCents);
+    const impliedPct = quotable ? b.impliedPct : null;
+    const edgePts =
+      impliedPct === null
+        ? null
+        : parseFloat(
+            (rawModelPct - impliedPct - kalshiFeePts(impliedPct)).toFixed(1)
+          );
     const lockStatus = getLockStatus(b.lowerBoundF, b.upperBoundF, runningHighF);
 
     return {
@@ -221,7 +252,7 @@ export function buildBracketDistribution(
       upperBoundF: b.upperBoundF,
       modelPct: rawModelPct,
       impliedPct,
-      edgePts: parseFloat(edgePts.toFixed(1)),
+      edgePts,
       lockStatus,
       bidCents: b.bidCents,
       askCents: b.askCents,
@@ -230,15 +261,25 @@ export function buildBracketDistribution(
 }
 
 export function bestEdge(brackets: BracketResult[]): BracketResult | null {
-  const live = brackets.filter((b) => b.lockStatus !== "dead");
+  // Only brackets with a real edge (quotable book) can be "best" — junk-book
+  // brackets would otherwise pollute station-level divergence numbers.
+  const live = brackets.filter(
+    (b) => b.lockStatus !== "dead" && b.edgePts !== null
+  );
   if (live.length === 0) return null;
   return live.reduce((best, b) =>
-    Math.abs(b.edgePts) > Math.abs(best.edgePts) ? b : best
+    Math.abs(b.edgePts!) > Math.abs(best.edgePts!) ? b : best
   );
 }
 
-export function getMarketStatus(b: BracketResult): "actionable" | "settled_short" | "below_threshold" | "locked" {
+export function getMarketStatus(
+  b: BracketResult
+): "actionable" | "settled_short" | "below_threshold" | "locked" | "no_data" {
   if (b.lockStatus === "dead") return "settled_short";
+  // No quotable book → no data, even when the lock status is ambiguous:
+  // "below_threshold" would imply we measured an edge and found it small,
+  // which is fiction without a real market price.
+  if (b.edgePts === null) return "no_data";
   if (b.lockStatus === "ambiguous") return "below_threshold";
   if (Math.abs(b.edgePts) >= 5) return "actionable";
   return "below_threshold";

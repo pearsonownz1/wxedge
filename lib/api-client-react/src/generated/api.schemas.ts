@@ -158,10 +158,16 @@ export interface BracketProbability {
   upperBoundF: number | null;
   /** Model probability 0-100 */
   modelPct: number;
-  /** Kalshi implied probability 0-100 (mid-price * 100) */
-  impliedPct: number;
-  /** Net edge: model - implied - 1 (fee) */
-  edgePts: number;
+  /**
+     * Kalshi implied probability 0-100 (mid-price * 100). Null when the book is not quotable (one-sided or spread > 20¢).
+     * @nullable
+     */
+  impliedPct: number | null;
+  /**
+     * Net edge: model - implied - fee. Null when impliedPct is null.
+     * @nullable
+     */
+  edgePts: number | null;
   /** live=still possible, dead=running high eliminates it, ambiguous=near METAR rounding boundary */
   lockStatus: BracketProbabilityLockStatus;
   /** @nullable */
@@ -227,6 +233,7 @@ export const MarketRowStatus = {
   settled_short: 'settled_short',
   below_threshold: 'below_threshold',
   locked: 'locked',
+  no_data: 'no_data',
 } as const;
 
 export type MarketRowLockStatus = typeof MarketRowLockStatus[keyof typeof MarketRowLockStatus];
@@ -245,13 +252,20 @@ export interface MarketRow {
   /** e.g. '91–92°' */
   bracket: string;
   modelPct: number;
-  impliedPct: number;
+  /**
+     * Null when the book is not quotable (one-sided or spread > 20¢).
+     * @nullable
+     */
+  impliedPct: number | null;
   /** @nullable */
   bidCents: number | null;
   /** @nullable */
   askCents: number | null;
-  /** model - implied - 1 (fee), signed */
-  edgeNetPts: number;
+  /**
+     * model - implied - fee, signed. Null when impliedPct is null.
+     * @nullable
+     */
+  edgeNetPts: number | null;
   status: MarketRowStatus;
   lockStatus: MarketRowLockStatus;
 }
@@ -323,6 +337,7 @@ export const MarketDetailStatus = {
   settled_short: 'settled_short',
   below_threshold: 'below_threshold',
   locked: 'locked',
+  no_data: 'no_data',
 } as const;
 
 export interface MarketDetail {
@@ -334,7 +349,11 @@ export interface MarketDetail {
   modelPct: number;
   /** @nullable */
   askCents: number | null;
-  edgeNetPts: number;
+  /**
+     * Null when the book is not quotable.
+     * @nullable
+     */
+  edgeNetPts: number | null;
   status: MarketDetailStatus;
   disagreementBreakdown: ModelDisagreementBreakdown;
   orderBook: OrderBookLevel[];

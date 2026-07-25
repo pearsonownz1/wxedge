@@ -24,12 +24,11 @@ import {
   getMarketStatus,
   runningHighFloorNote,
   lockinAmbiguityNote,
+  MAX_SPREAD_CENTS,
 } from "../lib/distribution.js";
 import { cache, TTL } from "../lib/cache.js";
 
 const router: IRouter = Router();
-
-const MAX_SPREAD_CENTS = 20;
 
 function bookSnapshotTime(): string {
   const d = new Date();
@@ -61,7 +60,7 @@ function runningHighFromObs(intradayObs: { tempF: number }[]): number {
  * approval queue tell the same truth.
  */
 function qualifiedStatus(
-  rawStatus: "actionable" | "settled_short" | "below_threshold" | "locked",
+  rawStatus: "actionable" | "settled_short" | "below_threshold" | "locked" | "no_data",
   bidCents: number | null,
   askCents: number | null,
   usingStubData: boolean
@@ -142,12 +141,15 @@ router.get("/markets", async (req, res): Promise<void> => {
     })
   );
 
-  // Flatten and sort by absolute edge (settled/dead brackets go to bottom).
+  // Flatten and sort: live rows by absolute edge first, then NO DATA rows
+  // (junk books carry no ranking information), then settled/dead at the bottom.
   const flat = allMarkets.flat();
+  const statusRank = (s: string): number =>
+    s === "settled_short" ? 2 : s === "no_data" ? 1 : 0;
   flat.sort((a, b) => {
-    if (a.status === "settled_short" && b.status !== "settled_short") return 1;
-    if (b.status === "settled_short" && a.status !== "settled_short") return -1;
-    return Math.abs(b.edgeNetPts) - Math.abs(a.edgeNetPts);
+    const rankDiff = statusRank(a.status) - statusRank(b.status);
+    if (rankDiff !== 0) return rankDiff;
+    return Math.abs(b.edgeNetPts ?? 0) - Math.abs(a.edgeNetPts ?? 0);
   });
 
   const kalshiAge = cache.ageSeconds("kalshi:events");

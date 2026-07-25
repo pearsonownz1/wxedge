@@ -44,12 +44,16 @@ export const snapshots = pgTable(
     bracketLabel:   text("bracket_label").notNull(),
     /** Model probability 0–100 (conditioned on running-high floor). */
     modelPct:       integer("model_pct").notNull(),
-    /** Kalshi YES mid-price as implied probability 0–100. */
-    impliedPct:     integer("implied_pct").notNull(),
+    /**
+     * Kalshi YES mid-price as implied probability 0–100.
+     * NULL = book not quotable (one-sided or spread > 20¢) — junk books are
+     * recorded as absent, never as fictitious probabilities.
+     */
+    impliedPct:     integer("implied_pct"),
     bidCents:       integer("bid_cents"),
     askCents:       integer("ask_cents"),
-    /** model_pct − implied_pct − kalshi_fee_pts. */
-    edgePts:        real("edge_pts").notNull(),
+    /** model_pct − implied_pct − kalshi_fee_pts. NULL when implied_pct is NULL. */
+    edgePts:        real("edge_pts"),
     lockStatus:     text("lock_status").notNull(),
     /** Age of the most recent NWS observation at poll time (seconds). NULL if unknown. */
     obsAgeS:        real("obs_age_s"),

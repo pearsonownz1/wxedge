@@ -14,4 +14,5 @@ export const MarketDetailStatus = {
   settled_short: 'settled_short',
   below_threshold: 'below_threshold',
   locked: 'locked',
+  no_data: 'no_data',
 } as const;

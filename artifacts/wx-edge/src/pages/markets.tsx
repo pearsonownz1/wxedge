@@ -118,14 +118,15 @@ function MarketsView() {
                   <td className="px-4 py-3 text-right data-mono">{formatPct(m.impliedPct)}</td>
                   <td className="px-4 py-3 text-right data-mono font-bold" style={
                     (() => {
+                      // No real book → no divergence number, neutral color.
+                      if (!marketData.feedFresh || m.impliedPct == null) return { color: "hsl(0 0% 45%)" };
                       const d = m.modelPct - m.impliedPct;
-                      if (!marketData.feedFresh) return { color: "hsl(0 0% 45%)" };
                       return d >= 0
                         ? { color: "hsl(350 85% 55%)" }
                         : { color: "oklch(0.55 0.09 250)" };
                     })()
                   }>
-                    {marketData.feedFresh
+                    {marketData.feedFresh && m.impliedPct != null
                       ? `${m.modelPct - m.impliedPct > 0 ? "+" : ""}${(m.modelPct - m.impliedPct).toFixed(1)}`
                       : "—"}
                   </td>

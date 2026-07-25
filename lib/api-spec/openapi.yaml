@@ -384,11 +384,11 @@ components:
           type: integer
           description: Model probability 0-100
         impliedPct:
-          type: integer
-          description: Kalshi implied probability 0-100 (mid-price * 100)
+          type: ["integer", "null"]
+          description: Kalshi implied probability 0-100 (mid-price * 100). Null when the book is not quotable (one-sided or spread > 20¢).
         edgePts:
-          type: number
-          description: "Net edge: model - implied - 1 (fee)"
+          type: ["number", "null"]
+          description: "Net edge: model - implied - fee. Null when impliedPct is null."
         lockStatus:
           type: string
           enum: [live, dead, ambiguous]
@@ -498,17 +498,18 @@ components:
         modelPct:
           type: integer
         impliedPct:
-          type: integer
+          type: ["integer", "null"]
+          description: Null when the book is not quotable (one-sided or spread > 20¢).
         bidCents:
           type: ["integer", "null"]
         askCents:
           type: ["integer", "null"]
         edgeNetPts:
-          type: number
-          description: model - implied - 1 (fee), signed
+          type: ["number", "null"]
+          description: model - implied - fee, signed. Null when impliedPct is null.
         status:
           type: string
-          enum: [actionable, settled_short, below_threshold, locked]
+          enum: [actionable, settled_short, below_threshold, locked, no_data]
         lockStatus:
           type: string
           enum: [live, dead, ambiguous]
@@ -623,10 +624,11 @@ components:
         askCents:
           type: ["integer", "null"]
         edgeNetPts:
-          type: number
+          type: ["number", "null"]
+          description: Null when the book is not quotable.
         status:
           type: string
-          enum: [actionable, settled_short, below_threshold, locked]
+          enum: [actionable, settled_short, below_threshold, locked, no_data]
         disagreementBreakdown:
           $ref: "#/components/schemas/ModelDisagreementBreakdown"
         orderBook:

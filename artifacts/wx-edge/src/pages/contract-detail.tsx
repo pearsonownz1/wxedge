@@ -40,7 +40,7 @@ export default function ContractDetail() {
 
   const handleCopy = () => {
     const text = `WX Edge Analysis: ${market.contractId} (${market.bracket})
-Model: ${market.modelPct.toFixed(0)}% | Ask: ${market.askCents ? market.askCents + '¢' : 'N/A'} | Edge: ${market.edgeNetPts.toFixed(1)} pts
+Model: ${market.modelPct.toFixed(0)}% | Ask: ${market.askCents ? market.askCents + '¢' : 'N/A'} | Edge: ${market.edgeNetPts != null ? market.edgeNetPts.toFixed(1) + ' pts' : '—'}
 NBM Median: ${market.disagreementBreakdown.rawNbmMedianF.toFixed(1)}°F -> Calibrated: ${market.disagreementBreakdown.calibratedMedianF.toFixed(1)}°F
 ${market.disagreementBreakdown.runningHighFloorNote ? 'Floor: ' + market.disagreementBreakdown.runningHighFloorNote : ''}`;
     navigator.clipboard.writeText(text);
@@ -261,12 +261,12 @@ ${market.disagreementBreakdown.runningHighFloorNote ? 'Floor: ' + market.disagre
                         <div className="flex-1 h-6 relative border-l pl-2 flex items-center">
                           <div className="w-full relative h-4 flex flex-col justify-center gap-[1px]">
                             <div className={cn("h-1.5 rounded-r-sm", isCurrent ? "bg-primary" : "bg-muted-foreground")} style={{ width: `${Math.max(b.modelPct, 1)}%` }} />
-                            <div className="h-1.5 bg-foreground/20 rounded-r-sm" style={{ width: `${Math.max(b.impliedPct, 1)}%` }} />
+                            <div className="h-1.5 bg-foreground/20 rounded-r-sm" style={{ width: `${Math.max(b.impliedPct ?? 0, 1)}%` }} />
                           </div>
                         </div>
                         <div className="w-16 shrink-0 text-[10px] data-mono text-muted-foreground flex flex-col justify-center">
                           <div>M {b.modelPct.toFixed(0)}%</div>
-                          <div>K {b.impliedPct.toFixed(0)}%</div>
+                          <div>K {b.impliedPct != null ? `${b.impliedPct.toFixed(0)}%` : "—"}</div>
                         </div>
                       </div>
                     );

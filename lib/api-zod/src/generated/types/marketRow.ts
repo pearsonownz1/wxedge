@@ -15,13 +15,20 @@ export interface MarketRow {
   /** e.g. '91–92°' */
   bracket: string;
   modelPct: number;
-  impliedPct: number;
+  /**
+     * Null when the book is not quotable (one-sided or spread > 20¢).
+     * @nullable
+     */
+  impliedPct: number | null;
   /** @nullable */
   bidCents: number | null;
   /** @nullable */
   askCents: number | null;
-  /** model - implied - 1 (fee), signed */
-  edgeNetPts: number;
+  /**
+     * model - implied - fee, signed. Null when impliedPct is null.
+     * @nullable
+     */
+  edgeNetPts: number | null;
   status: MarketRowStatus;
   lockStatus: MarketRowLockStatus;
 }

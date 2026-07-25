@@ -33,10 +33,12 @@ export interface SnapshotRow {
   bracket_upper_f: number | null;
   bracket_label:   string;
   model_pct:       number;
-  implied_pct:     number;
+  /** NULL when the book wasn't quotable (one-sided or spread > 20¢). */
+  implied_pct:     number | null;
   bid_cents:       number | null;
   ask_cents:       number | null;
-  edge_pts:        number;
+  /** NULL when implied_pct is NULL — no edge without a real market price. */
+  edge_pts:        number | null;
   lock_status:     string;
   /** Seconds since the most recent NWS observation; null if unavailable. */
   obs_age_s?:      number | null;
@@ -236,7 +238,8 @@ export async function getCalibrationRows(): Promise<
     bracket_upper_f: number | null;
     n:               number;
     avg_model_pct:   number;
-    avg_implied_pct: number;
+    /** NULL when every snapshot in the group had a non-quotable book (SQL AVG skips NULLs). */
+    avg_implied_pct: number | null;
     resolved_yes:    number;
   }>
 > {

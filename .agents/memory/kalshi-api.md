@@ -35,3 +35,7 @@ token was being sent. Removing the header immediately unblocked Kalshi data flow
 - `[userenv.development]` in .replit sets `POLLING_ENABLED=false` — dev only, not production
 - Production defaults to enabled (undefined → true in pollingEnabled())
 - Snapshots only get written when polling is enabled AND Kalshi returns usingStubData=false
+
+## orderbook_fp endpoint format (learned 2026-07-25)
+- `orderbook_fp.yes_dollars` / `no_dollars` are `[price, size]` tuples where BOTH values are **strings** (`"0.4000"`), sorted **ascending** by price — index 0 is the WORST level, not the best. Best yes bid = highest yes price; best ask = 100¢ − highest no price. Treating index 0 as best renders every book as a fictitious 1¢/99¢ shell.
+- Event-endpoint sentinels: `yes_bid_dollars "0.0000"` = no resting bids (not a 0¢ price); `yes_ask_dollars "1.0000"` = no resting asks. Both must map to null, or one-sided books masquerade as 0%/100% probabilities.

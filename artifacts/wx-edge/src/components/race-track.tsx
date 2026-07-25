@@ -20,7 +20,8 @@ interface Bracket {
   lowerBoundF: number | null;
   upperBoundF: number | null;
   modelPct: number;
-  impliedPct: number;
+  /** null = book not quotable — divergence renders as "—". */
+  impliedPct: number | null;
   bidCents: number | null;
   askCents: number | null;
   lockStatus: string;
@@ -58,19 +59,31 @@ export function RaceTrack({
     [brackets]
   );
 
-  // Derive fixed range from bracket bounds
+  // Derive the track range from bracket bounds AND the running high, so the
+  // race is always on screen. Open-ended zones (≤N / ≥N) get a real visual
+  // span instead of collapsing to zero width — previously the range only
+  // covered finite bounds, cropping the leading ≤ bracket (and the marker)
+  // right off the racecourse.
   const { trackMin, trackMax, totalRange } = useMemo(() => {
-    const lows = sorted
-      .map((b) => b.lowerBoundF)
-      .filter((v): v is number => v !== null);
-    const highs = sorted
-      .map((b) => b.upperBoundF)
-      .filter((v): v is number => v !== null);
-    if (!lows.length || !highs.length) return { trackMin: 80, trackMax: 110, totalRange: 30 };
-    const min = Math.min(...lows);
-    const max = Math.max(...highs);
-    return { trackMin: min, trackMax: max, totalRange: max - min };
-  }, [sorted]);
+    const OPEN_ZONE_SPAN = 4; // °F of track given to open-ended ≤/≥ zones
+    const PAD = 1; // °F breathing room around the running-high marker
+    const candidates: number[] = [];
+    for (const b of sorted) {
+      if (b.lowerBoundF !== null) candidates.push(b.lowerBoundF);
+      if (b.upperBoundF !== null) candidates.push(b.upperBoundF);
+      if (b.lowerBoundF === null && b.upperBoundF !== null)
+        candidates.push(b.upperBoundF - OPEN_ZONE_SPAN);
+      if (b.upperBoundF === null && b.lowerBoundF !== null)
+        candidates.push(b.lowerBoundF + OPEN_ZONE_SPAN);
+    }
+    if (Number.isFinite(runningHighF)) {
+      candidates.push(runningHighF - PAD, runningHighF + PAD);
+    }
+    if (!candidates.length) return { trackMin: 80, trackMax: 110, totalRange: 30 };
+    const min = Math.floor(Math.min(...candidates));
+    const max = Math.ceil(Math.max(...candidates));
+    return { trackMin: min, trackMax: max, totalRange: Math.max(max - min, 1) };
+  }, [sorted, runningHighF]);
 
   /** Convert °F to % position along track. */
   function pct(tempF: number) {
@@ -98,7 +111,9 @@ export function RaceTrack({
   );
 
   const isDead = (b: Bracket) => b.lockStatus === "dead";
-  const divDelta = (b: Bracket) => b.modelPct - b.impliedPct;
+  /** Model−market divergence; null when the book isn't quotable. */
+  const divDelta = (b: Bracket) =>
+    b.impliedPct === null ? null : b.modelPct - b.impliedPct;
 
   return (
     <div className={cn("flex flex-col gap-0", stale && "opacity-60")}>
@@ -206,7 +221,7 @@ export function RaceTrack({
             .filter((b) => !isDead(b) && b.modelPct > 0)
             .map((b) => {
               const delta = divDelta(b);
-              const isPositive = delta >= 0;
+              const isPositive = delta !== null && delta >= 0;
 
               return (
                 <div
@@ -249,30 +264,38 @@ export function RaceTrack({
                     <span
                       className="data-mono font-bold text-[11px]"
                       style={
-                        !isPositive ? { color: DIV_NEGATIVE } : undefined
+                        delta !== null && !isPositive
+                          ? { color: DIV_NEGATIVE }
+                          : undefined
                       }
                     >
-                      <span className={cn(isPositive ? "text-primary" : "")}>
-                        {isPositive ? "+" : ""}
-                        {delta.toFixed(1)}
-                      </span>
+                      {delta === null ? (
+                        <span className="text-muted-foreground">—</span>
+                      ) : (
+                        <span className={cn(isPositive ? "text-primary" : "")}>
+                          {isPositive ? "+" : ""}
+                          {delta.toFixed(1)}
+                        </span>
+                      )}
                     </span>
                   </div>
 
-                  {/* Mini divergence bar */}
+                  {/* Mini divergence bar — hidden when there's no real book */}
                   <div className="w-20 shrink-0 h-4 relative flex items-center">
                     <div className="absolute left-1/2 w-px h-full bg-border" />
-                    <div
-                      className={cn(
-                        "absolute h-2 max-w-[38px]",
-                        isPositive ? "bg-primary/70 left-1/2" : "right-1/2"
-                      )}
-                      style={{
-                        width: `${Math.min(Math.abs(delta) * 1.2, 38)}px`,
-                        backgroundColor: !isPositive ? DIV_NEGATIVE : undefined,
-                        opacity: !isPositive ? 0.7 : undefined,
-                      }}
-                    />
+                    {delta !== null && (
+                      <div
+                        className={cn(
+                          "absolute h-2 max-w-[38px]",
+                          isPositive ? "bg-primary/70 left-1/2" : "right-1/2"
+                        )}
+                        style={{
+                          width: `${Math.min(Math.abs(delta) * 1.2, 38)}px`,
+                          backgroundColor: !isPositive ? DIV_NEGATIVE : undefined,
+                          opacity: !isPositive ? 0.7 : undefined,
+                        }}
+                      />
+                    )}
                   </div>
                 </div>
               );

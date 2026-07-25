@@ -176,8 +176,12 @@ function parseKalshiMarket(market: Record<string, unknown>): {
 
   const bidStr = market["yes_bid_dollars"] as string | null | undefined;
   const askStr = market["yes_ask_dollars"] as string | null | undefined;
-  const bidCents = bidStr ? Math.round(parseFloat(bidStr) * 100) : null;
-  const askCents = askStr ? Math.round(parseFloat(askStr) * 100) : null;
+  const rawBid = bidStr ? Math.round(parseFloat(bidStr) * 100) : null;
+  const rawAsk = askStr ? Math.round(parseFloat(askStr) * 100) : null;
+  // Kalshi sentinels for an empty side: yes_bid 0¢ = no resting bids,
+  // yes_ask 100¢ = no resting asks. Treat those as "no quote", not a price.
+  const bidCents = rawBid !== null && rawBid >= 1 && rawBid <= 99 ? rawBid : null;
+  const askCents = rawAsk !== null && rawAsk >= 1 && rawAsk <= 99 ? rawAsk : null;
 
   return { label, lowerBoundF, upperBoundF, bidCents, askCents };
 }
@@ -463,22 +467,43 @@ export async function fetchOrderBook(contractId: string): Promise<OrderBookResul
     )) as Record<string, unknown>;
 
     const book = (data["orderbook_fp"] as Record<string, unknown>) ?? {};
-    const yesBids = (book["yes_dollars"] as [number, number][]) ?? [];
-    const noBids = (book["no_dollars"] as [number, number][]) ?? [];
 
-    const bidLevels: OrderBookLevel[] = yesBids.map(([price, size], i) => ({
-      priceCents: Math.round(price * 100),
-      size,
-      side: "bid" as const,
-      isBest: i === 0,
-    }));
+    // orderbook_fp levels are [price_dollars, size] tuples of STRINGS, sorted
+    // ASCENDING by price. The best bid is the HIGHEST yes price, and the best
+    // ask is 100 − the HIGHEST no price. Taking index 0 as "best" picks the
+    // 1¢ junk orders instead, rendering every book as a fictitious
+    // "1¢ / 99¢" shell (2026-07-25 board incident).
+    const parseSide = (raw: unknown): Array<{ priceDollars: number; size: number }> =>
+      (Array.isArray(raw) ? raw : [])
+        .map((lvl) => ({
+          priceDollars: parseFloat(String((lvl as unknown[])[0])),
+          size: parseFloat(String((lvl as unknown[])[1])),
+        }))
+        .filter((l) => Number.isFinite(l.priceDollars) && Number.isFinite(l.size));
 
-    const askLevels: OrderBookLevel[] = noBids.map(([price, size], i) => ({
-      priceCents: 100 - Math.round(price * 100),
-      size,
-      side: "ask" as const,
-      isBest: i === 0,
-    }));
+    const yesBids = parseSide(book["yes_dollars"]);
+    const noBids = parseSide(book["no_dollars"]);
+
+    // Best-first ordering: bids descending (highest first), asks ascending (lowest first).
+    const bidLevels: OrderBookLevel[] = yesBids
+      .map(({ priceDollars, size }) => ({
+        priceCents: Math.round(priceDollars * 100),
+        size,
+        side: "bid" as const,
+        isBest: false,
+      }))
+      .sort((a, b) => b.priceCents - a.priceCents);
+    if (bidLevels[0]) bidLevels[0].isBest = true;
+
+    const askLevels: OrderBookLevel[] = noBids
+      .map(({ priceDollars, size }) => ({
+        priceCents: 100 - Math.round(priceDollars * 100),
+        size,
+        side: "ask" as const,
+        isBest: false,
+      }))
+      .sort((a, b) => a.priceCents - b.priceCents);
+    if (askLevels[0]) askLevels[0].isBest = true;
 
     const levels = [...askLevels, ...bidLevels];
 
