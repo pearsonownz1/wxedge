@@ -182,7 +182,17 @@ const STATION_SERIES: Record<string, string> = {
   KPHL: "KXHIGHPHIL",
 };
 
+/** True when this process should actively poll Kalshi. Set POLLING_ENABLED=false in dev to avoid rate-limiting prod. */
+function pollingEnabled(): boolean {
+  const v = process.env["POLLING_ENABLED"];
+  return v === undefined || v === "true" || v === "1";
+}
+
 export async function fetchKalshiEvents(): Promise<KalshiFetchResult> {
+  if (!pollingEnabled()) {
+    return { events: [], usingStubData: false, allStaleFiltered: false };
+  }
+
   const key = "kalshi:events";
   const cached = cache.get<KalshiFetchResult>(key);
   if (cached) return cached.value;
@@ -330,6 +340,10 @@ export async function fetchKalshiEvents(): Promise<KalshiFetchResult> {
  * Returns empty levels (isLive: false) on any failure — NO synthetic prices.
  */
 export async function fetchOrderBook(contractId: string): Promise<OrderBookResult> {
+  if (!pollingEnabled()) {
+    return { levels: [], isLive: false };
+  }
+
   const key = `kalshi:book:${contractId}`;
   const cached = cache.get<OrderBookResult>(key);
   if (cached) return cached.value;
