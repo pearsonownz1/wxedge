@@ -1,0 +1,100 @@
+Goal: Upgrade the running-high from "hourly whole-degree snapshots" to the sharpest legally-public view of the settlement station: one-minute ASOS data plus tenths-of-a-degree decoded from METAR remarks. Output is a single authoritative running_high with full precision, source attribution, and honest rounding to the whole-°F value the CLI will print.
+
+Why: The CLI settles on the station's continuous record. The betting crowd watches hourly whole-degree reports. Everything between those two resolutions is informational edge — and at bracket boundaries, one tenth of a °C decides which bracket wins.
+
+Phase 0 — Latency audit (do this FIRST, half a day, no pipeline code)
+
+The one-minute feed is only an intraday edge if it arrives near-live. Measure before building:
+
+For each of the 6 stations (KNYC, KMDW, KAUS, KLAX, KPHL, KDFW):
+
+Poll IEM's 1-minute ASOS endpoint every 5 minutes for a day.
+Record: (newest observation timestamp in the response) vs (wall clock at poll).
+Produce a per-station latency table: median, p90, worst.
+
+Decision rule:
+
+Median latency ≤ 10 min ⇒ station qualifies for intraday use (running-high updates, elimination logic).
+Latency in hours ⇒ station's 1-min data is settlement-verification only (still ingest nightly; do not feed intraday logic).
+METAR remarks (Phase 2) are near-real-time regardless, so the precision play survives even if 1-min data lags.
+
+Deliverable: the latency table checked into the repo as a markdown doc. This gates the Phase 1 design.
+
+Phase 1 — One-minute ASOS ingest (IEM)
+
+Source: IEM 1-minute ASOS archive (mesonet.agron.iastate.edu — the asos1min service). Temperature fields are already °F; confirm per-station field availability (tmpf).
+
+Pipeline:
+
+Poller (same scheduler family as the Kalshi poll, but its own cadence — every 5 min for qualified stations, hourly sweep for lagging ones).
+Fetch only the window since the last stored observation (incremental, not full-day re-pulls) to be polite to IEM. Respect their usage guidance; identify with a real User-Agent + contact email. IEM is a free university service — we are guests.
+Insert into obs_minute (below). Dedupe on (station, valid_ts).
+
+Schema:
+
+sql
+CREATE TABLE obs_minute (
+  station    text NOT NULL,
+  valid_ts   timestamptz NOT NULL,
+  tmpf       numeric(5,1),          -- as served; may be whole-degree for some stations
+  source     text NOT NULL DEFAULT 'iem_1min',
+  ingested_ts timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (station, valid_ts)
+);
+
+Backfill: one job pulling the trailing 90 days for all 6 stations (rate-limited, overnight). This immediately upgrades calibration: recompute each station's historical daily max from 1-min data vs CLI to quantify how often hourly-only watchers are behind, and by how much. That number ("hourly data missed or lagged the true high on X% of days") is a presentation slide.
+
+Phase 2 — METAR remarks decoder (the precision play)
+
+Source: raw METAR text per station. Primary: NWS API (/stations/{id}/observations, rawMessage field, already being fetched for observations — extend, don't duplicate). Fallback/history: IEM's METAR archive.
+
+Decode (store all, tenths-°C as integers to avoid float drift):
+
+TxxxxXxxxx group → current temp/dewpoint in tenths °C (e.g. T03350228 → 33.5°C).
+1xxxx group → 6-hour maximum temp, tenths °C (reported at 00/06/12/18Z synoptic hours).
+2xxxx group → 6-hour minimum (ingest for completeness; lows markets someday).
+Body temp (33/22) → whole °C, kept as the coarse cross-check.
+Use the established Python metar library (or a well-tested TS port) — do NOT hand-roll the grammar. Hand-rolling METAR parsing is a rite of passage we can skip.
+
+Schema:
+
+sql
+CREATE TABLE obs_metar (
+  station     text NOT NULL,
+  valid_ts    timestamptz NOT NULL,
+  raw         text NOT NULL,
+  temp_c10    int,        -- T-group current temp, tenths °C
+  max6_c10    int,        -- 1-group 6h max, tenths °C (null except synoptic reports)
+  min6_c10    int,
+  body_temp_c int,        -- whole °C from body
+  PRIMARY KEY (station, valid_ts)
+);
+
+Conversion & rounding (the part that must be exactly right):
+
+°F = c10/10 × 9/5 + 32, computed in decimal, never floats-then-round.
+settlement_f = round_half_up(°F) — BUT: verify NWS's actual rounding convention at .5 against historical pairs before trusting round-half-up. Acceptance test: for 90 days of history, decoded 6h-max-derived daily max rounds to the CLI value on ≥ 95% of days; every mismatch gets a written explanation (sensor correction, missing period, DST window edge).
+Phase 3 — Unified running high
+
+One function, one source of truth, consumed by dashboard + elimination logic + revalidation:
+
+running_high(station, settlement_date) = max over sources:
+  - obs_minute.tmpf within the LST settlement window
+  - obs_metar temp_c10 → °F
+  - obs_metar max6_c10 → °F (for 6h windows fully inside the settlement window;
+    partial-overlap windows: use only if the max is corroborated by minute/T-group data)
+returns: { value_f_precise, value_f_rounded, source, observed_ts }
+DST/LST window logic reuses the existing settlement-window code — do not re-derive it here.
+Store the winner per (station, date) in a running_high_current row updated each poll; keep history of increases (each new max appended to running_high_events with source — this powers the race-track UI later and the audit trail now).
+Elimination logic keys off value_f_rounded; dashboard displays both ("92.8°F → settles as 93").
+Settlement reconciliation upgrade: settlements table now compares CLI vs our precise max vs Kalshi bracket. Mismatch alerting unchanged.
+Guardrails
+All of this is observation plumbing — zero changes to signal thresholds, risk officer, or approval flow in this spec. The sharper running high flows into existing logic through the same function signature.
+If the two obs sources disagree by > 1.0°F for the same timestamp neighborhood, flag obs_conflict and let the lower value drive eliminations (conservative: never kill a bracket on a possibly-bad high reading).
+IEM/NWS outage ⇒ running high freezes at last-known with staleness age, same pattern as the Kalshi feed; stale obs suppress eliminations, never invent them.
+Build order
+Phase 0 latency audit (0.5 day) — gates everything
+obs_metar ingest + decoder + conversion tests (1 day; the rounding acceptance test is most of it)
+obs_minute ingest + 90-day backfill (0.5 day + overnight job)
+Unified running_high + dashboard decimal display + reconciliation upgrade (1 day)
+Historical study: hourly-vs-continuous miss rate per station (0.5 day, produces the slide)
