@@ -117,11 +117,22 @@ router.get("/markets", async (req, res): Promise<void> => {
   const kalshiAge = cache.ageSeconds("kalshi:events");
   const feedFresh = !anyStubData && kalshiAge <= TTL.KALSHI_BOOK_MS / 1000;
 
+  // feedStatusDetail: why is the feed stale?
+  const hasApiKey = Boolean(process.env["KALSHI_API_KEY"]);
+  const feedStatusDetail: "live" | "no_api_key" | "key_lacks_access" | "unavailable" = feedFresh
+    ? "live"
+    : !hasApiKey
+      ? "no_api_key"
+      : anyStubData
+        ? "key_lacks_access"
+        : "unavailable";
+
   res.json({
     markets: flat,
     bookSnapshotTimeLst: bookSnapshotTime(),
     bookLatencySeconds: kalshiBookLatency(),
     feedFresh,
+    feedStatusDetail,
   });
 });
 
@@ -222,6 +233,16 @@ router.get("/markets/:contractId", async (req, res): Promise<void> => {
     kalshiAge <= TTL.KALSHI_BOOK_MS / 1000 &&
     orderBookResult.isLive;
 
+  // feedStatusDetail: why is the feed stale?
+  const hasApiKey = Boolean(process.env["KALSHI_API_KEY"]);
+  const feedStatusDetail: "live" | "no_api_key" | "key_lacks_access" | "unavailable" = feedFresh
+    ? "live"
+    : !hasApiKey
+      ? "no_api_key"
+      : bracketResult.usingStubData || !orderBookResult.isLive
+        ? "key_lacks_access"
+        : "unavailable";
+
   res.json({
     contractId,
     stationId: matchedStation,
@@ -252,6 +273,7 @@ router.get("/markets/:contractId", async (req, res): Promise<void> => {
     kalshiUrl,
     bookSnapshotTimeLst: bookSnapshotTime(),
     feedFresh,
+    feedStatusDetail,
   });
 });
 

@@ -55,7 +55,7 @@ function MarketsView() {
 
   return (
     <div className="flex-1 flex flex-col h-full bg-background overflow-hidden">
-      <FeedBanner fresh={marketData.feedFresh} timestampLst={marketData.bookSnapshotTimeLst} hideEdgeSignal />
+      <FeedBanner fresh={marketData.feedFresh} timestampLst={marketData.bookSnapshotTimeLst} hideEdgeSignal feedStatusDetail={marketData.feedStatusDetail as "live" | "no_api_key" | "key_lacks_access" | "unavailable" | undefined} />
       
       <div className="p-4 border-b flex items-center justify-between shrink-0 bg-card">
         <div className="flex items-center gap-2">

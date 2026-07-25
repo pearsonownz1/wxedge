@@ -11,6 +11,7 @@ export * from './bracketProbabilityLockStatus';
 export * from './calibrationStats';
 export * from './errorResponse';
 export * from './feedStatus';
+export * from './feedStatusDetail';
 export * from './healthStatus';
 export * from './intradayObs';
 export * from './marketDetail';

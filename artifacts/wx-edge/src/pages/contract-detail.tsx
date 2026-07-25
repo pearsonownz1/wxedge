@@ -53,7 +53,7 @@ ${market.disagreementBreakdown.runningHighFloorNote ? 'Floor: ' + market.disagre
 
   return (
     <Shell>
-      <FeedBanner fresh={market.feedFresh} timestampLst={market.bookSnapshotTimeLst} hideEdgeSignal />
+      <FeedBanner fresh={market.feedFresh} timestampLst={market.bookSnapshotTimeLst} hideEdgeSignal feedStatusDetail={market.feedStatusDetail as "live" | "no_api_key" | "key_lacks_access" | "unavailable" | undefined} />
       
       <div className="flex-1 bg-background overflow-auto p-8">
         <div className="max-w-5xl mx-auto space-y-8">
@@ -186,7 +186,14 @@ ${market.disagreementBreakdown.runningHighFloorNote ? 'Floor: ' + market.disagre
               {/* Order Book */}
               <section className="border bg-card p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Order Book Ladder</h2>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Order Book Ladder</h2>
+                    {!market.orderBookIsLive && (
+                      <span className="bg-orange-100 text-orange-800 border border-orange-300 px-2 py-0.5 rounded-sm text-[10px] font-bold uppercase tracking-widest">
+                        Stub Data
+                      </span>
+                    )}
+                  </div>
                   <div className="text-xs text-muted-foreground data-mono">{market.bookSnapshotTimeLst} LST</div>
                 </div>
 

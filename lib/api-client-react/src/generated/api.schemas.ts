@@ -256,11 +256,25 @@ export interface MarketRow {
   lockStatus: MarketRowLockStatus;
 }
 
+/**
+ * Why the feed is stale (or live). `no_api_key` — KALSHI_API_KEY not set; `key_lacks_access` — key set but weather markets returned no data; `unavailable` — other fetch failure; `live` — data is current.
+ */
+export type FeedStatusDetail = typeof FeedStatusDetail[keyof typeof FeedStatusDetail];
+
+
+export const FeedStatusDetail = {
+  live: 'live',
+  no_api_key: 'no_api_key',
+  key_lacks_access: 'key_lacks_access',
+  unavailable: 'unavailable',
+} as const;
+
 export interface MarketList {
   markets: MarketRow[];
   bookSnapshotTimeLst: string;
   bookLatencySeconds: number;
   feedFresh: boolean;
+  feedStatusDetail: FeedStatusDetail;
 }
 
 export type OrderBookLevelSide = typeof OrderBookLevelSide[keyof typeof OrderBookLevelSide];
@@ -330,7 +344,10 @@ export interface MarketDetail {
      * @nullable
      */
   kalshiUrl: string | null;
+  /** True when the order book was fetched live from Kalshi (not a stub) */
+  orderBookIsLive: boolean;
   bookSnapshotTimeLst: string;
   feedFresh: boolean;
+  feedStatusDetail: FeedStatusDetail;
 }
 

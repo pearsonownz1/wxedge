@@ -5,6 +5,7 @@
  * WX Edge — Kalshi weather market edge API
  * OpenAPI spec version: 0.1.0
  */
+import type { FeedStatusDetail } from './feedStatusDetail';
 import type { MarketRow } from './marketRow';
 
 export interface MarketList {
@@ -12,4 +13,5 @@ export interface MarketList {
   bookSnapshotTimeLst: string;
   bookLatencySeconds: number;
   feedFresh: boolean;
+  feedStatusDetail: FeedStatusDetail;
 }

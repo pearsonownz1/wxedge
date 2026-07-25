@@ -171,7 +171,8 @@ export const ListMarketsResponse = zod.object({
 })),
   "bookSnapshotTimeLst": zod.string(),
   "bookLatencySeconds": zod.number(),
-  "feedFresh": zod.boolean()
+  "feedFresh": zod.boolean(),
+  "feedStatusDetail": zod.enum(['live', 'no_api_key', 'key_lacks_access', 'unavailable']).describe('Why the feed is stale (or live). `no_api_key` — KALSHI_API_KEY not set; `key_lacks_access` — key set but weather markets returned no data; `unavailable` — other fetch failure; `live` — data is current.\n')
 })
 
 
@@ -221,8 +222,10 @@ export const GetMarketResponse = zod.object({
   "contractId": zod.string().nullable().describe('Kalshi contract ticker if mapped')
 }).describe('Model vs implied probability for a single temperature bracket')),
   "kalshiUrl": zod.string().nullable().describe('Direct link to this contract on Kalshi'),
+  "orderBookIsLive": zod.boolean().describe('True when the order book was fetched live from Kalshi (not a stub)'),
   "bookSnapshotTimeLst": zod.string(),
-  "feedFresh": zod.boolean()
+  "feedFresh": zod.boolean(),
+  "feedStatusDetail": zod.enum(['live', 'no_api_key', 'key_lacks_access', 'unavailable']).describe('Why the feed is stale (or live). `no_api_key` — KALSHI_API_KEY not set; `key_lacks_access` — key set but weather markets returned no data; `unavailable` — other fetch failure; `live` — data is current.\n')
 })
 
 

@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { BracketProbability } from './bracketProbability';
+import type { FeedStatusDetail } from './feedStatusDetail';
 import type { MarketDetailStatus } from './marketDetailStatus';
 import type { ModelDisagreementBreakdown } from './modelDisagreementBreakdown';
 import type { OrderBookLevel } from './orderBookLevel';
@@ -29,6 +30,9 @@ export interface MarketDetail {
      * @nullable
      */
   kalshiUrl: string | null;
+  /** True when the order book was fetched live from Kalshi (not a stub) */
+  orderBookIsLive: boolean;
   bookSnapshotTimeLst: string;
   feedFresh: boolean;
+  feedStatusDetail: FeedStatusDetail;
 }

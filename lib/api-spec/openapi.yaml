@@ -524,6 +524,16 @@ components:
         - status
         - lockStatus
 
+    FeedStatusDetail:
+      type: string
+      enum: [live, no_api_key, key_lacks_access, unavailable]
+      description: >
+        Why the feed is stale (or live).
+        `no_api_key` — KALSHI_API_KEY not set;
+        `key_lacks_access` — key set but weather markets returned no data;
+        `unavailable` — other fetch failure;
+        `live` — data is current.
+
     MarketList:
       type: object
       properties:
@@ -537,11 +547,14 @@ components:
           type: integer
         feedFresh:
           type: boolean
+        feedStatusDetail:
+          $ref: "#/components/schemas/FeedStatusDetail"
       required:
         - markets
         - bookSnapshotTimeLst
         - bookLatencySeconds
         - feedFresh
+        - feedStatusDetail
 
     OrderBookLevel:
       type: object
@@ -627,10 +640,15 @@ components:
         kalshiUrl:
           type: ["string", "null"]
           description: Direct link to this contract on Kalshi
+        orderBookIsLive:
+          type: boolean
+          description: True when the order book was fetched live from Kalshi (not a stub)
         bookSnapshotTimeLst:
           type: string
         feedFresh:
           type: boolean
+        feedStatusDetail:
+          $ref: "#/components/schemas/FeedStatusDetail"
       required:
         - contractId
         - stationId
@@ -643,7 +661,9 @@ components:
         - status
         - disagreementBreakdown
         - orderBook
+        - orderBookIsLive
         - allBrackets
         - kalshiUrl
         - bookSnapshotTimeLst
         - feedFresh
+        - feedStatusDetail
