@@ -270,6 +270,81 @@ function StationView({ stationId }: { stationId: string }) {
             })}
           </div>
           
+          {/* NBM Spread annotation */}
+          {dist.nbmSpread && (
+            <div className="mt-4 pt-4 border-t">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  NBM Spread
+                </div>
+                <div className={cn(
+                  "text-[10px] px-1.5 py-0.5 rounded-sm font-bold uppercase tracking-wider",
+                  dist.nbmSpread.source === 'nbm'
+                    ? "bg-primary/10 text-primary"
+                    : "bg-muted text-muted-foreground"
+                )}>
+                  {dist.nbmSpread.source === 'nbm' ? 'NBM' : 'Approx'}
+                </div>
+              </div>
+              <div className="relative h-6">
+                {/* Compute bar positions relative to P10–P90 range */}
+                {(() => {
+                  const spread = dist.nbmSpread;
+                  const rangeF = spread.p90F - spread.p10F;
+                  const pct = (v: number) =>
+                    rangeF > 0 ? Math.max(0, Math.min(100, ((v - spread.p10F) / rangeF) * 100)) : 50;
+                  return (
+                    <div className="relative w-full h-full flex items-center">
+                      {/* P10–P90 track */}
+                      <div className="absolute inset-x-0 h-1.5 rounded-full bg-muted" />
+                      {/* P25–P75 interquartile band */}
+                      <div
+                        className="absolute h-1.5 bg-primary/30 rounded-sm"
+                        style={{
+                          left: `${pct(spread.p25F)}%`,
+                          width: `${pct(spread.p75F) - pct(spread.p25F)}%`,
+                        }}
+                      />
+                      {/* P50 tick */}
+                      <div
+                        className="absolute w-1 h-4 bg-primary rounded-full -translate-x-0.5"
+                        style={{ left: `${pct(spread.p50F)}%` }}
+                      />
+                      {/* P10 label */}
+                      <span
+                        className="absolute text-[10px] data-mono text-muted-foreground -translate-x-1/2 top-4"
+                        style={{ left: `${pct(spread.p10F)}%` }}
+                      >
+                        {spread.p10F.toFixed(0)}°
+                      </span>
+                      {/* P50 label */}
+                      <span
+                        className="absolute text-[10px] data-mono font-bold text-primary -translate-x-1/2 top-4"
+                        style={{ left: `${pct(spread.p50F)}%` }}
+                      >
+                        {spread.p50F.toFixed(0)}°
+                      </span>
+                      {/* P90 label */}
+                      <span
+                        className="absolute text-[10px] data-mono text-muted-foreground -translate-x-1/2 top-4"
+                        style={{ left: `${pct(spread.p90F)}%` }}
+                      >
+                        {spread.p90F.toFixed(0)}°
+                      </span>
+                    </div>
+                  );
+                })()}
+              </div>
+              <div className="mt-6 flex gap-4 text-[10px] text-muted-foreground">
+                <span>P10={dist.nbmSpread.p10F.toFixed(1)}°</span>
+                <span>P25={dist.nbmSpread.p25F.toFixed(1)}°</span>
+                <span className="font-bold text-foreground">P50={dist.nbmSpread.p50F.toFixed(1)}°</span>
+                <span>P75={dist.nbmSpread.p75F.toFixed(1)}°</span>
+                <span>P90={dist.nbmSpread.p90F.toFixed(1)}°</span>
+              </div>
+            </div>
+          )}
+
           <div className="mt-6 flex items-center justify-between text-xs text-muted-foreground border-t pt-4">
             <div className="flex items-center gap-1">
               <Info className="w-3 h-3" />

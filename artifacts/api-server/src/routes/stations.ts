@@ -16,6 +16,7 @@ import { computeSettlementWindow } from "../lib/settlementWindow.js";
 import {
   fetchIntradayObs,
   fetchTodayMaxForecast,
+  fetchNbmPercentiles,
 } from "../lib/nwsApi.js";
 import { getBracketsForStation } from "../lib/kalshiApi.js";
 import {
@@ -89,12 +90,22 @@ router.get("/stations", async (req, res): Promise<void> => {
       const runningHighF = runningHighFromObs(intradayObs);
       const nbmMedianF = forecast?.maxTempF ?? runningHighF;
 
+      // Fetch NBM percentile spread (falls back to Normal approx if unavailable)
+      const percentiles = await fetchNbmPercentiles(
+        meta.lat,
+        meta.lon,
+        meta.lstOffset,
+        nbmMedianF,
+        meta.rmse
+      );
+
       const brackets = buildBracketDistribution(
         bracketResult.brackets,
         nbmMedianF,
         bias,
         meta.rmse,
-        runningHighF
+        runningHighF,
+        percentiles
       );
 
       const best = bestEdge(brackets);
@@ -210,12 +221,22 @@ router.get(
     const nbmMedianF = forecast?.maxTempF ?? runningHighF;
     const calibratedMedianF = parseFloat((nbmMedianF + bias).toFixed(1));
 
+    // Fetch NBM percentile spread (falls back to Normal approx if unavailable)
+    const percentiles = await fetchNbmPercentiles(
+      meta.lat,
+      meta.lon,
+      meta.lstOffset,
+      nbmMedianF,
+      meta.rmse
+    );
+
     const brackets = buildBracketDistribution(
       bracketResult.brackets,
       nbmMedianF,
       bias,
       meta.rmse,
-      runningHighF
+      runningHighF,
+      percentiles
     );
 
     const best = bestEdge(brackets);
@@ -235,6 +256,7 @@ router.get(
       biasAppliedF: bias,
       bestDivergencePts: best ? Math.abs(best.edgePts) : 0,
       runningHighF,
+      nbmSpread: percentiles,
       bookSnapshotTimeLst: latestObs?.timeLst ?? new Date().toISOString(),
       feedFresh: feedStatus.nwsFresh && feedStatus.kalshiFresh,
       feedStatus,

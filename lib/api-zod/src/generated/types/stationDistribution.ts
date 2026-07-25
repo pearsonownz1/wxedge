@@ -7,6 +7,7 @@
  */
 import type { BracketProbability } from './bracketProbability';
 import type { FeedStatus } from './feedStatus';
+import type { NbmSpread } from './nbmSpread';
 
 export interface StationDistribution {
   stationId: string;
@@ -16,6 +17,8 @@ export interface StationDistribution {
   biasAppliedF: number;
   bestDivergencePts: number;
   runningHighF: number;
+  /** Raw (pre-bias) NBM percentile spread used to fit the distribution */
+  nbmSpread: NbmSpread;
   bookSnapshotTimeLst: string;
   feedFresh: boolean;
   feedStatus: FeedStatus;

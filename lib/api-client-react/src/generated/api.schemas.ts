@@ -175,6 +175,35 @@ export interface BracketProbability {
   contractId: string | null;
 }
 
+/**
+ * 'nbm' = real NBM quantile fields; 'normal_approx' = derived from RMSE
+ */
+export type NbmSpreadSource = typeof NbmSpreadSource[keyof typeof NbmSpreadSource];
+
+
+export const NbmSpreadSource = {
+  nbm: 'nbm',
+  normal_approx: 'normal_approx',
+} as const;
+
+/**
+ * NBM-derived temperature percentile spread for today's forecast high
+ */
+export interface NbmSpread {
+  /** 10th percentile temperature in °F */
+  p10F: number;
+  /** 25th percentile temperature in °F */
+  p25F: number;
+  /** 50th percentile (median) temperature in °F */
+  p50F: number;
+  /** 75th percentile temperature in °F */
+  p75F: number;
+  /** 90th percentile temperature in °F */
+  p90F: number;
+  /** 'nbm' = real NBM quantile fields; 'normal_approx' = derived from RMSE */
+  source: NbmSpreadSource;
+}
+
 export interface StationDistribution {
   stationId: string;
   brackets: BracketProbability[];
@@ -183,6 +212,8 @@ export interface StationDistribution {
   biasAppliedF: number;
   bestDivergencePts: number;
   runningHighF: number;
+  /** Raw (pre-bias) NBM percentile spread used to fit the distribution */
+  nbmSpread: NbmSpread;
   bookSnapshotTimeLst: string;
   feedFresh: boolean;
   feedStatus: FeedStatus;

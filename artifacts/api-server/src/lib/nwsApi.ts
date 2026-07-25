@@ -179,6 +179,153 @@ export interface NwsForecast {
   periodName: string;
 }
 
+// ── NBM Percentile Fetching ──────────────────────────────────────────────────
+
+export interface NbmPercentiles {
+  p10F: number;
+  p25F: number;
+  p50F: number;
+  p75F: number;
+  p90F: number;
+  /** 'nbm' = came from real NWS quantile fields; 'normal_approx' = derived from RMSE */
+  source: "nbm" | "normal_approx";
+}
+
+/** Parse ISO 8601 interval start: "2026-07-25T12:00:00+00:00/PT1H" → Date */
+function parseIntervalStart(validTime: string): Date | null {
+  const slash = validTime.indexOf("/");
+  const start = slash >= 0 ? validTime.slice(0, slash) : validTime;
+  const d = new Date(start);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+/**
+ * Extract the maximum temperature-in-°F for today's daytime window from a
+ * NWS time-series property object { uom, values: [{ validTime, value }] }.
+ */
+function extractDaytimeMaxF(
+  prop: unknown,
+  todayLstDate: number,
+  lstOffsetHours: number
+): number | null {
+  if (!prop || typeof prop !== "object") return null;
+  const obj = prop as Record<string, unknown>;
+  const values = obj["values"] as
+    | Array<{ validTime: string; value: number | null }>
+    | undefined;
+  if (!Array.isArray(values)) return null;
+
+  let maxF: number | null = null;
+  for (const entry of values) {
+    if (entry.value == null) continue;
+    const start = parseIntervalStart(entry.validTime);
+    if (!start) continue;
+
+    // Convert UTC → LST to check the date
+    const lstMs = start.getTime() + lstOffsetHours * 3600_000;
+    const lstDate = new Date(lstMs);
+    if (lstDate.getUTCDate() !== todayLstDate) continue;
+
+    // Restrict to daytime hours in LST (06:00–22:00)
+    const lstHour = lstDate.getUTCHours();
+    if (lstHour < 6 || lstHour > 22) continue;
+
+    const tempF = celsiusToF(entry.value);
+    if (maxF === null || tempF > maxF) maxF = tempF;
+  }
+  return maxF;
+}
+
+/** Compute symmetric Normal-approximation percentiles from median + RMSE. */
+function normalApproxPercentiles(medianF: number, rmse: number): NbmPercentiles {
+  return {
+    p10F: parseFloat((medianF - 1.2816 * rmse).toFixed(1)),
+    p25F: parseFloat((medianF - 0.6745 * rmse).toFixed(1)),
+    p50F: parseFloat(medianF.toFixed(1)),
+    p75F: parseFloat((medianF + 0.6745 * rmse).toFixed(1)),
+    p90F: parseFloat((medianF + 1.2816 * rmse).toFixed(1)),
+    source: "normal_approx",
+  };
+}
+
+/**
+ * Fetch NBM-derived temperature percentiles for today's forecast high.
+ *
+ * Tries the NWS raw gridpoints endpoint for `temperatureQuantile{N}Pct` fields
+ * (available from some NWS Weather Forecast Offices that ingest NBM output).
+ * Falls back to Normal(forecastMedianF, rmse) approximation when unavailable.
+ */
+export async function fetchNbmPercentiles(
+  lat: number,
+  lon: number,
+  lstOffset: number,
+  forecastMedianF: number,
+  rmse: number
+): Promise<NbmPercentiles> {
+  const key = `nws:nbm:percentiles:${lat.toFixed(4)}:${lon.toFixed(4)}`;
+  const cached = cache.get<NbmPercentiles>(key);
+  if (cached) return cached.value;
+
+  try {
+    const grid = await fetchGridMeta(lat, lon);
+    if (!grid) throw new Error("No grid meta");
+
+    const data = (await nwsFetch(
+      `${NWS_BASE}/gridpoints/${grid.office}/${grid.gridX},${grid.gridY}`
+    )) as Record<string, unknown>;
+
+    const props = data["properties"] as Record<string, unknown> | undefined;
+    if (!props) throw new Error("No gridpoints properties");
+
+    // Known quantile field naming convention in NWS gridpoints responses.
+    // P50 falls back to the standard temperature field (which IS the NBM median).
+    const p10Prop = props["temperatureQuantile10Pct"];
+    const p25Prop = props["temperatureQuantile25Pct"];
+    const p50Prop = props["temperatureQuantile50Pct"] ?? props["temperature"];
+    const p75Prop = props["temperatureQuantile75Pct"];
+    const p90Prop = props["temperatureQuantile90Pct"];
+
+    const lstNow = new Date(Date.now() + lstOffset * 3600_000);
+    const todayLstDate = lstNow.getUTCDate();
+
+    const p10F = p10Prop ? extractDaytimeMaxF(p10Prop, todayLstDate, lstOffset) : null;
+    const p25F = p25Prop ? extractDaytimeMaxF(p25Prop, todayLstDate, lstOffset) : null;
+    const p50F = p50Prop ? extractDaytimeMaxF(p50Prop, todayLstDate, lstOffset) : null;
+    const p75F = p75Prop ? extractDaytimeMaxF(p75Prop, todayLstDate, lstOffset) : null;
+    const p90F = p90Prop ? extractDaytimeMaxF(p90Prop, todayLstDate, lstOffset) : null;
+
+    // Require P10, P50, P90 at minimum to fit the asymmetric distribution
+    if (p10F == null || p50F == null || p90F == null) {
+      throw new Error(
+        `NBM quantile fields incomplete (p10=${p10F}, p50=${p50F}, p90=${p90F})`
+      );
+    }
+
+    const result: NbmPercentiles = {
+      p10F,
+      p25F: p25F ?? parseFloat(((p10F + p50F) / 2).toFixed(1)),
+      p50F,
+      p75F: p75F ?? parseFloat(((p50F + p90F) / 2).toFixed(1)),
+      p90F,
+      source: "nbm",
+    };
+
+    logger.info({ result, lat, lon }, "NBM percentiles fetched from gridpoints");
+    cache.set(key, result, TTL.NWS_FORECAST_MS);
+    return result;
+  } catch (err) {
+    logger.info(
+      { err, lat, lon },
+      "NBM quantile fields unavailable — using normal approximation"
+    );
+    const approx = normalApproxPercentiles(forecastMedianF, rmse);
+    cache.set(key, approx, TTL.NWS_FORECAST_MS);
+    return approx;
+  }
+}
+
+// ── Daily Max Forecast ────────────────────────────────────────────────────────
+
 export async function fetchTodayMaxForecast(
   lat: number,
   lon: number,

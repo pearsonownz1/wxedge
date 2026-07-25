@@ -10,6 +10,7 @@ import { computeSettlementWindow } from "../lib/settlementWindow.js";
 import {
   fetchIntradayObs,
   fetchTodayMaxForecast,
+  fetchNbmPercentiles,
 } from "../lib/nwsApi.js";
 import {
   getBracketsForStation,
@@ -72,12 +73,21 @@ router.get("/markets", async (req, res): Promise<void> => {
       const runningHighF = runningHighFromObs(intradayObs);
       const nbmMedianF = forecast?.maxTempF ?? runningHighF;
 
+      const percentiles = await fetchNbmPercentiles(
+        meta.lat,
+        meta.lon,
+        meta.lstOffset,
+        nbmMedianF,
+        meta.rmse
+      );
+
       const brackets = buildBracketDistribution(
         bracketResult.brackets,
         nbmMedianF,
         bias,
         meta.rmse,
-        runningHighF
+        runningHighF,
+        percentiles
       );
 
       return brackets.map((b) => ({
@@ -176,12 +186,21 @@ router.get("/markets/:contractId", async (req, res): Promise<void> => {
   const nbmMedianF = forecast?.maxTempF ?? runningHighF;
   const calibratedMedianF = parseFloat((nbmMedianF + bias).toFixed(1));
 
+  const percentiles = await fetchNbmPercentiles(
+    meta.lat,
+    meta.lon,
+    meta.lstOffset,
+    nbmMedianF,
+    meta.rmse
+  );
+
   const allBrackets = buildBracketDistribution(
     bracketResult.brackets,
     nbmMedianF,
     bias,
     meta.rmse,
-    runningHighF
+    runningHighF,
+    percentiles
   );
 
   // Find the specific bracket for this contract — exact match only; no fallback.

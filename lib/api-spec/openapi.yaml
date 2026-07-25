@@ -412,6 +412,37 @@ components:
         - askCents
         - contractId
 
+    NbmSpread:
+      type: object
+      description: NBM-derived temperature percentile spread for today's forecast high
+      properties:
+        p10F:
+          type: number
+          description: 10th percentile temperature in °F
+        p25F:
+          type: number
+          description: 25th percentile temperature in °F
+        p50F:
+          type: number
+          description: 50th percentile (median) temperature in °F
+        p75F:
+          type: number
+          description: 75th percentile temperature in °F
+        p90F:
+          type: number
+          description: 90th percentile temperature in °F
+        source:
+          type: string
+          enum: [nbm, normal_approx]
+          description: "'nbm' = real NBM quantile fields; 'normal_approx' = derived from RMSE"
+      required:
+        - p10F
+        - p25F
+        - p50F
+        - p75F
+        - p90F
+        - source
+
     StationDistribution:
       type: object
       properties:
@@ -431,6 +462,9 @@ components:
           type: number
         runningHighF:
           type: number
+        nbmSpread:
+          $ref: "#/components/schemas/NbmSpread"
+          description: Raw (pre-bias) NBM percentile spread used to fit the distribution
         bookSnapshotTimeLst:
           type: string
         feedFresh:
@@ -445,6 +479,7 @@ components:
         - biasAppliedF
         - bestDivergencePts
         - runningHighF
+        - nbmSpread
         - bookSnapshotTimeLst
         - feedFresh
         - feedStatus

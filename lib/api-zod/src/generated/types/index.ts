@@ -20,6 +20,8 @@ export * from './marketRow';
 export * from './marketRowLockStatus';
 export * from './marketRowStatus';
 export * from './modelDisagreementBreakdown';
+export * from './nbmSpread';
+export * from './nbmSpreadSource';
 export * from './orderBookLevel';
 export * from './orderBookLevelSide';
 export * from './settlementWindow';

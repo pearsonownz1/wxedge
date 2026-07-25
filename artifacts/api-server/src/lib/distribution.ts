@@ -2,11 +2,12 @@
  * Distribution builder and bracket probability calculator.
  *
  * Approach:
- *   1. Use NWS forecast as the "NBM median" (best available point forecast).
- *   2. Apply station-specific seasonal bias correction.
- *   3. Model temperature distribution as Normal(calibratedMedian, rmse)
- *      — the RMSE serves as the standard deviation proxy.
- *      (The real NBM gives P10–P90; this is a v1 approximation.)
+ *   1. Use NWS/NBM forecast as the "NBM median".
+ *   2. Apply station-specific seasonal bias correction to all percentiles.
+ *   3. Model temperature distribution as an asymmetric two-sided half-normal
+ *      fitted to the NBM P10/P50/P90 spread (skewed distribution).
+ *      Falls back to symmetric Normal(calibratedMedian, rmse) when NBM
+ *      percentiles are unavailable.
  *   4. Integrate the CDF over each Kalshi bracket boundary.
  *   5. Apply lock-in logic from running high.
  *
@@ -17,6 +18,7 @@
  */
 
 import type { KalshiBracket } from "./kalshiApi.js";
+import type { NbmPercentiles } from "./nwsApi.js";
 
 /** Error function approximation (Abramowitz & Stegun, max error 1.5e-7). */
 function erf(x: number): number {
@@ -39,8 +41,35 @@ function normalCdf(x: number, mean: number, sigma: number): number {
   return 0.5 * (1 + erf((x - mean) / (sigma * Math.sqrt(2))));
 }
 
+/**
+ * Asymmetric two-sided half-normal CDF fitted to NBM P10/P50/P90.
+ *
+ * Below the median: sigma_left  = (p50 − p10) / 1.2816
+ * Above the median: sigma_right = (p90 − p50) / 1.2816
+ *
+ * Each half integrates to exactly 0.5, so the combined CDF is monotone
+ * and ranges from 0 to 1.
+ */
+function asymmetricNormalCdf(
+  x: number,
+  p10: number,
+  p50: number,
+  p90: number
+): number {
+  // Floor the sigmas so degenerate spreads (e.g. all percentiles equal) still
+  // produce a reasonable CDF rather than a step function.
+  const sigmaLeft = Math.max((p50 - p10) / 1.2816, 0.5);
+  const sigmaRight = Math.max((p90 - p50) / 1.2816, 0.5);
+
+  if (x <= p50) {
+    return 0.5 * (1 + erf((x - p50) / (sigmaLeft * Math.SQRT2)));
+  } else {
+    return 0.5 * (1 + erf((x - p50) / (sigmaRight * Math.SQRT2)));
+  }
+}
+
 /** P(lowerF < X ≤ upperF) under Normal(mean, sigma). */
-function bracketMass(
+function bracketMassNormal(
   lowerF: number | null,
   upperF: number | null,
   mean: number,
@@ -49,6 +78,23 @@ function bracketMass(
   const lo = lowerF == null ? 0 : normalCdf(lowerF, mean, sigma);
   const hi = upperF == null ? 1 : normalCdf(upperF + 1, mean, sigma);
   // upperF is inclusive: integrate to upperF + 1 (next bracket starts at upperF + 1)
+  return Math.max(0, Math.min(1, hi - lo));
+}
+
+/**
+ * P(lowerF < X ≤ upperF) under the asymmetric distribution fitted to
+ * bias-corrected NBM percentiles.
+ */
+function bracketMassAsymmetric(
+  lowerF: number | null,
+  upperF: number | null,
+  p10: number,
+  p50: number,
+  p90: number
+): number {
+  const cdf = (x: number) => asymmetricNormalCdf(x, p10, p50, p90);
+  const lo = lowerF == null ? 0 : cdf(lowerF);
+  const hi = upperF == null ? 1 : cdf(upperF + 1);
   return Math.max(0, Math.min(1, hi - lo));
 }
 
@@ -99,14 +145,23 @@ export function buildBracketDistribution(
   nbmMedianF: number,
   biasF: number,
   rmse: number,
-  runningHighF: number
+  runningHighF: number,
+  percentiles?: NbmPercentiles | null
 ): BracketResult[] {
   const calibratedMedian = nbmMedianF + biasF;
-  const sigma = rmse; // RMSE as proxy for spread
 
-  // Raw model probabilities from normal CDF
+  // Apply bias correction to all percentile values so the calibrated
+  // distribution is shifted by the same mean-bias as the point forecast.
+  const useAsymmetric = percentiles != null;
+  const cp10 = useAsymmetric ? percentiles!.p10F + biasF : 0;
+  const cp50 = useAsymmetric ? percentiles!.p50F + biasF : 0;
+  const cp90 = useAsymmetric ? percentiles!.p90F + biasF : 0;
+
+  // Raw model probabilities: asymmetric if NBM percentiles available, else Normal
   const rawProbs = kalshiBrackets.map((b) =>
-    bracketMass(b.lowerBoundF, b.upperBoundF, calibratedMedian, sigma)
+    useAsymmetric
+      ? bracketMassAsymmetric(b.lowerBoundF, b.upperBoundF, cp10, cp50, cp90)
+      : bracketMassNormal(b.lowerBoundF, b.upperBoundF, calibratedMedian, rmse)
   );
 
   // Normalise so they sum to 100

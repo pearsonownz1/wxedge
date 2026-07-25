@@ -129,6 +129,14 @@ export const GetStationDistributionResponse = zod.object({
   "biasAppliedF": zod.number(),
   "bestDivergencePts": zod.number(),
   "runningHighF": zod.number(),
+  "nbmSpread": zod.object({
+  "p10F": zod.number().describe('10th percentile temperature in °F'),
+  "p25F": zod.number().describe('25th percentile temperature in °F'),
+  "p50F": zod.number().describe('50th percentile (median) temperature in °F'),
+  "p75F": zod.number().describe('75th percentile temperature in °F'),
+  "p90F": zod.number().describe('90th percentile temperature in °F'),
+  "source": zod.enum(['nbm', 'normal_approx']).describe('\'nbm\' = real NBM quantile fields; \'normal_approx\' = derived from RMSE')
+}).describe('Raw (pre-bias) NBM percentile spread used to fit the distribution'),
   "bookSnapshotTimeLst": zod.string(),
   "feedFresh": zod.boolean(),
   "feedStatus": zod.object({
