@@ -341,6 +341,39 @@ export interface BracketsResult {
   usingStubData: boolean;
 }
 
+/**
+ * Enrich a bracket's bid/ask with the best levels from a live order book.
+ *
+ * When `book.isLive` is true, replaces the events-list approximation with the
+ * real best-bid and best-ask prices from the order book, then recalculates
+ * `impliedPct` as their midpoint. Returns a new bracket object; does not
+ * mutate the original.
+ *
+ * When the book is not live (stub), the original bracket is returned unchanged.
+ */
+export function enrichBracketFromOrderBook(
+  bracket: KalshiBracket,
+  book: OrderBookResult
+): KalshiBracket {
+  if (!book.isLive) return bracket;
+
+  const bestBid = book.levels.find((l) => l.side === "bid" && l.isBest);
+  const bestAsk = book.levels.find((l) => l.side === "ask" && l.isBest);
+
+  // If the live book has no best levels, keep the events-list values.
+  if (!bestBid && !bestAsk) return bracket;
+
+  const bidCents = bestBid?.priceCents ?? null;
+  const askCents = bestAsk?.priceCents ?? null;
+
+  return {
+    ...bracket,
+    bidCents,
+    askCents,
+    impliedPct: marketToImpliedPct(bidCents, askCents),
+  };
+}
+
 /** Get bracket data for a specific station, using live Kalshi data or stubs. */
 export async function getBracketsForStation(
   stationId: string,

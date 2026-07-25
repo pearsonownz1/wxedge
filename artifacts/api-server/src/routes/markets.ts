@@ -15,6 +15,7 @@ import {
 import {
   getBracketsForStation,
   fetchOrderBook,
+  enrichBracketFromOrderBook,
   type OrderBookResult,
 } from "../lib/kalshiApi.js";
 import {
@@ -81,8 +82,19 @@ router.get("/markets", async (req, res): Promise<void> => {
         meta.rmse
       );
 
+      // Enrich each bracket with live order book bid/ask when available.
+      // Fetches are parallelised and cached, so the overhead per call is low.
+      const enrichedBrackets = bracketResult.usingStubData
+        ? bracketResult.brackets
+        : await Promise.all(
+            bracketResult.brackets.map(async (b) => {
+              const book = await fetchOrderBook(b.contractId);
+              return enrichBracketFromOrderBook(b, book);
+            })
+          );
+
       const brackets = buildBracketDistribution(
-        bracketResult.brackets,
+        enrichedBrackets,
         nbmMedianF,
         bias,
         meta.rmse,
@@ -205,8 +217,16 @@ router.get("/markets/:contractId", async (req, res): Promise<void> => {
     meta.rmse
   );
 
+  // Enrich the target bracket with live order book bid/ask so edge is
+  // calculated on the real best-bid/best-ask, not the events-list approximation.
+  const enrichedBrackets = bracketResult.brackets.map((b) =>
+    b.contractId === contractId
+      ? enrichBracketFromOrderBook(b, orderBookResult)
+      : b
+  );
+
   const allBrackets = buildBracketDistribution(
-    bracketResult.brackets,
+    enrichedBrackets,
     nbmMedianF,
     bias,
     meta.rmse,
