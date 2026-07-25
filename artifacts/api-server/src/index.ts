@@ -37,6 +37,7 @@ app.listen(port, (err) => {
   // refilled before it expires.  A failed refresh is logged and retried on
   // the next tick; the server continues serving stale-flagged data.
   const REFRESH_INTERVAL_MS = 4 * 60 * 1000; // 4 minutes
+
   setInterval(() => {
     warmCache().catch((err) => {
       logger.warn({ err }, "Periodic cache refresh encountered an error — will retry next tick");

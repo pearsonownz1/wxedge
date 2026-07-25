@@ -1,21 +1,20 @@
 ---
 name: Kalshi API structure
-description: Per-station series tickers, correct field names, bracket boundary parsing, rate-limit mitigation.
+description: How Kalshi weather market data is structured and accessed; auth, date formats, field names.
 ---
 
-**Why:** The unified `/events?series_ticker=KXHIGH` endpoint does not exist and returns 403. Each city has its own series.
+## Key facts
 
-**Station → series ticker:**
-- KNYC → KXHIGHNY, KMDW → KXHIGHCHI, KAUS → KXHIGHAUS, KLAX → KXHIGHLAX, KPHL → KXHIGHPHIL
-- KDFW → KXHIGHDFW but has **no open events** as of Jul 2026; falls back to stubs.
+- Per-station series tickers: KXHIGHNY, KXHIGHCHI, KXHIGHAUS, KXHIGHLAX, KXHIGHPHIL. No unified KXHIGH series. KDFW has no Kalshi series (excluded from trading).
+- Bid/ask prices are string dollars in the API (`yes_bid_dollars: "0.1400"`), not integers. Parse with `parseFloat * 100` → cents.
+- Bracket bounds come from `strike_type` + `floor_strike`/`cap_strike` fields (not subtitle regex).
+- Ticker date format is **YYMMMDD** (e.g. `26JUL25` = 2026-Jul-25). NOT DDMMMYY.
+- The event object has `strike_date` (settlement timestamp) — NOT `close_time`. The `close_time` field only exists on individual market objects, not the event object.
+- The events API is **fully public** — no authentication required. Even a fake bearer token returns 200. The `KALSHI_API_KEY` secret is not needed for reading market data.
+- Auth header format is `Authorization: Bearer <key>` — but since the API is public, this is irrelevant for reads.
+- Orderbook endpoint (`/markets/{ticker}/orderbook`) is also public, returns `orderbook_fp.yes_dollars` and `no_dollars` as `[price, size]` arrays. Empty arrays = no resting orders (common for thin markets).
+- The `with_nested_markets=true` parameter on the events endpoint includes `yes_bid_dollars`/`yes_ask_dollars` per market — these are the primary bid/ask source, more reliable than the separate orderbook endpoint for thin markets.
 
-**Price fields:** `yes_bid_dollars` and `yes_ask_dollars` are **strings** like `"0.1900"`. Use `parseFloat * 100` for cents. NOT `yes_bid`/`yes_ask` (those are absent or 0).
+**Why:** The auth requirement and field name issues caused multiple failed deploys and banner misclassification bugs.
 
-**Bracket boundaries** (verified against live KXHIGHNY response):
-- `strike_type: "less"`, cap=80 → YES if high < 80 → upperBound = cap−1 = 79
-- `strike_type: "between"`, floor=80, cap=81 → YES if 80 ≤ high ≤ 81 → lowerBound=80, upperBound=81 (cap, not cap−1)
-- `strike_type: "greater"`, floor=87 → YES if high > 87 → lowerBound = floor+1 = 88
-
-**Rate limits:** 5 parallel requests in one burst can trigger HTTP 429. Stagger with 150 ms delay per station index (total < 1 s).
-
-**How to apply:** See `artifacts/api-server/src/lib/kalshiApi.ts`, `fetchKalshiEvents()` and `parseKalshiMarket()`.
+**How to apply:** Always use `event["strike_date"]` not `event["close_time"]` for stale filtering. Never hard-depend on auth being required. For bid/ask, prefer event-embedded prices over orderbook when the book is empty.

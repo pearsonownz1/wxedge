@@ -1,4 +1,5 @@
-- [Kalshi API structure](kalshi-api.md) — per-station series (KXHIGHNY etc.), not unified KXHIGH; prices are string dollars; bounds from strike_type+floor/cap; ticker date format is YYMMMDD (26JUL25 = 2026-Jul-25), NOT DDMMMYY.
+- [Kalshi API structure](kalshi-api.md) — public API (no auth needed); strike_date not close_time on events; YYMMMDD tickers; prices are string dollars; KDFW has no series.
+- [IEM data sources](iem-data-sources.md) — 3-letter station IDs (NYC not KNYC); NWS rawMessage always empty; IEM asos.py is primary METAR source; 1-min latency unknown (Phase 0 auditing).
 - [Snapshot collector](snapshot-collector.md) — PostgreSQL via @workspace/db; logSnapshots() called from warmup.ts after every warmCache(); setInterval only works on Reserved VM deployment.
 - [Fee formula](fee-formula.md) — replaced flat 1pt with P×(1-P) shape (K=14); verify rate against kalshi.com/trading/fees before live sizing.
 - [DB schema bootstrap](db-schema-bootstrap.md) — drizzle-kit push silently skips new tables when schema/index.ts re-exports a module that didn't exist at push time; use raw SQL CREATE TABLE IF NOT EXISTS to recover.
