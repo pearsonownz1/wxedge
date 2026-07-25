@@ -3,13 +3,17 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: WX Edge — Kalshi weather market edge API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: stations
+    description: Settlement station operations
+  - name: markets
+    description: Kalshi market operations
 paths:
   /healthz:
     get:
@@ -24,6 +28,115 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /stations:
+    get:
+      operationId: listStations
+      tags: [stations]
+      summary: List all settlement stations
+      description: Returns all 6 Kalshi settlement stations sorted by best absolute edge
+      responses:
+        "200":
+          description: List of stations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StationSummary"
+
+  /stations/{stationId}:
+    get:
+      operationId: getStation
+      tags: [stations]
+      summary: Get full station detail
+      description: Returns calibration stats, settlement window, and intraday ASOS observations
+      parameters:
+        - name: stationId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Station detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StationDetail"
+        "404":
+          description: Station not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /stations/{stationId}/distribution:
+    get:
+      operationId: getStationDistribution
+      tags: [stations]
+      summary: Get bracket probability distribution for a station
+      description: Returns calibrated model vs Kalshi implied probabilities per bracket, with lock-in status
+      parameters:
+        - name: stationId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Bracket distribution
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StationDistribution"
+        "404":
+          description: Station not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /markets:
+    get:
+      operationId: listMarkets
+      tags: [markets]
+      summary: List all active bracket markets ranked by net edge
+      description: Returns all active bracket markets across all stations, ranked by fee-adjusted net edge
+      responses:
+        "200":
+          description: Market list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MarketList"
+
+  /markets/{contractId}:
+    get:
+      operationId: getMarket
+      tags: [markets]
+      summary: Get single contract detail
+      description: Returns full contract detail with order book, WHY breakdown, and all-brackets comparison
+      parameters:
+        - name: contractId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Contract detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MarketDetail"
+        "404":
+          description: Contract not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +147,468 @@ components:
       required:
         - status
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    SettlementWindow:
+      type: object
+      description: Settlement window in both LST and local wall-clock time
+      properties:
+        lstStart:
+          type: string
+          description: "Settlement window start in LST e.g. '00:00'"
+        lstEnd:
+          type: string
+          description: "Settlement window end in LST e.g. '23:59'"
+        localStart:
+          type: string
+          description: "Wall-clock equivalent start e.g. '01:00'"
+        localEnd:
+          type: string
+          description: "Wall-clock equivalent end e.g. '00:59+1'"
+        dstActive:
+          type: boolean
+          description: Whether DST is currently active for this station
+        spillsToNextDay:
+          type: boolean
+          description: Whether DST causes the window to spill into the next calendar day
+        spillsToDate:
+          type: ["string", "null"]
+          description: The next calendar day date if spilling, else null
+        hoursRemaining:
+          type: number
+          description: Hours remaining until settlement window closes (LST)
+        contractDate:
+          type: string
+          description: "The contract date string e.g. '24 Jul'"
+        utcOffset:
+          type: integer
+          description: "UTC offset in hours (LST, always standard time) e.g. -5"
+      required:
+        - lstStart
+        - lstEnd
+        - localStart
+        - localEnd
+        - dstActive
+        - spillsToNextDay
+        - spillsToDate
+        - hoursRemaining
+        - contractDate
+        - utcOffset
+
+    CalibrationStats:
+      type: object
+      properties:
+        meanBias:
+          type: number
+          description: "Mean bias in °F vs NWS point forecast e.g. 0.8"
+        sigmaCalibrated:
+          type: number
+          description: "Calibrated sigma (spread correction) in °F"
+        rmse:
+          type: number
+          description: "RMSE of forecast vs CLI actual over 90-day window"
+        pairCount:
+          type: integer
+          description: Number of valid forecast-CLI pairs in the window
+        season:
+          type: string
+          description: "Current season used for calibration e.g. 'summer'"
+        dataSource:
+          type: string
+          description: "Source of calibration data e.g. 'IEM/ACIS 90d rolling'"
+        lastUpdated:
+          type: string
+          description: ISO timestamp of last calibration update
+      required:
+        - meanBias
+        - sigmaCalibrated
+        - rmse
+        - pairCount
+        - season
+        - dataSource
+        - lastUpdated
+
+    IntradayObs:
+      type: object
+      description: A single intraday hourly ASOS observation
+      properties:
+        timeLst:
+          type: string
+          description: "LST time e.g. '14:00'"
+        tempF:
+          type: number
+          description: Observed temperature in °F
+        isRunningHigh:
+          type: boolean
+          description: Whether this observation is the current running high
+      required:
+        - timeLst
+        - tempF
+        - isRunningHigh
+
+    StationSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          description: "ICAO station ID e.g. 'KNYC'"
+        name:
+          type: string
+          description: "Human-readable name e.g. 'Central Park, NY'"
+        runningHighF:
+          type: number
+          description: Current running high temperature in °F
+        bestBracket:
+          type: ["string", "null"]
+          description: "The bracket with highest absolute divergence e.g. '91-92°'"
+        bestEdgePts:
+          type: ["number", "null"]
+          description: Net edge in probability points (model - implied - fee), signed
+        isActionable:
+          type: boolean
+          description: Whether best edge exceeds the ±5 pt actionable threshold
+        settlementWindow:
+          $ref: "#/components/schemas/SettlementWindow"
+        feedFresh:
+          type: boolean
+          description: Whether all feeds are within their freshness TTL
+        obsTimestampLst:
+          type: string
+          description: Timestamp of most recent observation (LST label)
+      required:
+        - id
+        - name
+        - runningHighF
+        - bestBracket
+        - bestEdgePts
+        - isActionable
+        - settlementWindow
+        - feedFresh
+        - obsTimestampLst
+
+    StationDetail:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        lat:
+          type: number
+        lon:
+          type: number
+        runningHighF:
+          type: number
+        nbmMedianF:
+          type: number
+          description: Raw NBM point forecast median in °F
+        calibratedMedianF:
+          type: number
+          description: Bias-corrected median in °F
+        settlementWindow:
+          $ref: "#/components/schemas/SettlementWindow"
+        calibration:
+          $ref: "#/components/schemas/CalibrationStats"
+        intradayObs:
+          type: array
+          items:
+            $ref: "#/components/schemas/IntradayObs"
+        feedFresh:
+          type: boolean
+        feedStatus:
+          $ref: "#/components/schemas/FeedStatus"
+      required:
+        - id
+        - name
+        - lat
+        - lon
+        - runningHighF
+        - nbmMedianF
+        - calibratedMedianF
+        - settlementWindow
+        - calibration
+        - intradayObs
+        - feedFresh
+        - feedStatus
+
+    FeedStatus:
+      type: object
+      description: Freshness status of each data feed
+      properties:
+        nwsObsAgeSeconds:
+          type: integer
+        nbmAgeSeconds:
+          type: integer
+        kalshiBookAgeSeconds:
+          type: integer
+        calibrationAgeSeconds:
+          type: integer
+        nwsFresh:
+          type: boolean
+        nbmFresh:
+          type: boolean
+        kalshiFresh:
+          type: boolean
+        calibrationFresh:
+          type: boolean
+      required:
+        - nwsObsAgeSeconds
+        - nbmAgeSeconds
+        - kalshiBookAgeSeconds
+        - calibrationAgeSeconds
+        - nwsFresh
+        - nbmFresh
+        - kalshiFresh
+        - calibrationFresh
+
+    BracketProbability:
+      type: object
+      description: Model vs implied probability for a single temperature bracket
+      properties:
+        label:
+          type: string
+          description: "Display label e.g. '91–92°'"
+        lowerBoundF:
+          type: ["number", "null"]
+          description: Lower bound in °F (null for open bracket like ≤86°)
+        upperBoundF:
+          type: ["number", "null"]
+          description: Upper bound in °F (null for open bracket like ≥97°)
+        modelPct:
+          type: integer
+          description: Model probability 0-100
+        impliedPct:
+          type: integer
+          description: Kalshi implied probability 0-100 (mid-price * 100)
+        edgePts:
+          type: number
+          description: "Net edge: model - implied - 1 (fee)"
+        lockStatus:
+          type: string
+          enum: [live, dead, ambiguous]
+          description: live=still possible, dead=running high eliminates it, ambiguous=near METAR rounding boundary
+        bidCents:
+          type: ["integer", "null"]
+        askCents:
+          type: ["integer", "null"]
+        contractId:
+          type: ["string", "null"]
+          description: Kalshi contract ticker if mapped
+      required:
+        - label
+        - lowerBoundF
+        - upperBoundF
+        - modelPct
+        - impliedPct
+        - edgePts
+        - lockStatus
+        - bidCents
+        - askCents
+        - contractId
+
+    StationDistribution:
+      type: object
+      properties:
+        stationId:
+          type: string
+        brackets:
+          type: array
+          items:
+            $ref: "#/components/schemas/BracketProbability"
+        nbmMedianF:
+          type: number
+        calibratedMedianF:
+          type: number
+        biasAppliedF:
+          type: number
+        bestDivergencePts:
+          type: number
+        runningHighF:
+          type: number
+        bookSnapshotTimeLst:
+          type: string
+        feedFresh:
+          type: boolean
+        feedStatus:
+          $ref: "#/components/schemas/FeedStatus"
+      required:
+        - stationId
+        - brackets
+        - nbmMedianF
+        - calibratedMedianF
+        - biasAppliedF
+        - bestDivergencePts
+        - runningHighF
+        - bookSnapshotTimeLst
+        - feedFresh
+        - feedStatus
+
+    MarketRow:
+      type: object
+      properties:
+        contractId:
+          type: string
+          description: "Kalshi contract ticker e.g. 'KXHIGHNY'"
+        stationId:
+          type: string
+        bracket:
+          type: string
+          description: "e.g. '91–92°'"
+        modelPct:
+          type: integer
+        impliedPct:
+          type: integer
+        bidCents:
+          type: ["integer", "null"]
+        askCents:
+          type: ["integer", "null"]
+        edgeNetPts:
+          type: number
+          description: model - implied - 1 (fee), signed
+        status:
+          type: string
+          enum: [actionable, settled_short, below_threshold, locked]
+        lockStatus:
+          type: string
+          enum: [live, dead, ambiguous]
+      required:
+        - contractId
+        - stationId
+        - bracket
+        - modelPct
+        - impliedPct
+        - bidCents
+        - askCents
+        - edgeNetPts
+        - status
+        - lockStatus
+
+    MarketList:
+      type: object
+      properties:
+        markets:
+          type: array
+          items:
+            $ref: "#/components/schemas/MarketRow"
+        bookSnapshotTimeLst:
+          type: string
+        bookLatencySeconds:
+          type: integer
+        feedFresh:
+          type: boolean
+      required:
+        - markets
+        - bookSnapshotTimeLst
+        - bookLatencySeconds
+        - feedFresh
+
+    OrderBookLevel:
+      type: object
+      properties:
+        priceCents:
+          type: integer
+        size:
+          type: integer
+        side:
+          type: string
+          enum: [ask, bid]
+        isBest:
+          type: boolean
+      required:
+        - priceCents
+        - size
+        - side
+        - isBest
+
+    ModelDisagreementBreakdown:
+      type: object
+      description: Step-by-step explanation of why the model diverges from the market
+      properties:
+        rawNbmMedianF:
+          type: number
+        biasLabel:
+          type: string
+          description: "e.g. 'KNYC summer bias correction'"
+        biasAppliedF:
+          type: number
+        calibratedMedianF:
+          type: number
+        bracketMassPct:
+          type: integer
+          description: Probability mass in this bracket from the calibrated CDF
+        runningHighFloorNote:
+          type: ["string", "null"]
+          description: "e.g. '≥ 61% conditional (92°F touched)' or null if no floor"
+        lockinAmbiguityNote:
+          type: ["string", "null"]
+          description: "METAR rounding caveat if bracket is near boundary"
+      required:
+        - rawNbmMedianF
+        - biasLabel
+        - biasAppliedF
+        - calibratedMedianF
+        - bracketMassPct
+        - runningHighFloorNote
+        - lockinAmbiguityNote
+
+    MarketDetail:
+      type: object
+      properties:
+        contractId:
+          type: string
+        stationId:
+          type: string
+        stationName:
+          type: string
+        contractDate:
+          type: string
+        bracket:
+          type: string
+        modelPct:
+          type: integer
+        askCents:
+          type: ["integer", "null"]
+        edgeNetPts:
+          type: number
+        status:
+          type: string
+          enum: [actionable, settled_short, below_threshold, locked]
+        disagreementBreakdown:
+          $ref: "#/components/schemas/ModelDisagreementBreakdown"
+        orderBook:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderBookLevel"
+        allBrackets:
+          type: array
+          items:
+            $ref: "#/components/schemas/BracketProbability"
+        kalshiUrl:
+          type: ["string", "null"]
+          description: Direct link to this contract on Kalshi
+        bookSnapshotTimeLst:
+          type: string
+        feedFresh:
+          type: boolean
+      required:
+        - contractId
+        - stationId
+        - stationName
+        - contractDate
+        - bracket
+        - modelPct
+        - askCents
+        - edgeNetPts
+        - status
+        - disagreementBreakdown
+        - orderBook
+        - allBrackets
+        - kalshiUrl
+        - bookSnapshotTimeLst
+        - feedFresh
