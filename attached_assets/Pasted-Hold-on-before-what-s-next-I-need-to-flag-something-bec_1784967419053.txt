@@ -1,0 +1,21 @@
+Hold on — before "what's next," I need to flag something, because I'm fairly sure your dev just talked himself into the wrong conclusion, and the evidence is sitting in your own screenshots from tonight.
+
+The date parser is reading Kalshi tickers backwards. The dev's log shows the filter parsing 26JUL25 as July 26, 2025 — day-month-year — and concluding "Kalshi is returning year-old contracts that were never closed." But Kalshi's ticker date format is YYMMMDD: 26JUL25 = year 2026, JULy, day 25. That's today. Here's the proof you already have: an hour ago you were literally on Kalshi's website at the URL kalshi.com/markets/kxhighlax/...../kxhighlax-26jul25, and that page said "Highest temperature in LA today?" with a live order book and a Review Buy button. Same ticker the filter is now rejecting as "stale 2025 contracts." And the 26JUL24 rows from the earlier broken screenshot? July 24, 2026 — yesterday's settled markets, which is exactly why they looked dead. Everything snaps into place under YYMMMDD.
+
+So the current state is worse than "waiting for Kalshi to list contracts" — the board is empty because the filter is rejecting today's live markets, and the reassuring banner ("key works, contracts not listed yet") is confidently wrong. If you wait for tomorrow's contracts as suggested, the same parser will misread those too, and the board stays empty forever.
+
+The fix to hand back, two parts:
+
+Correct the parse to YYMMMDD — one line, and the log line the dev already added (settlementDate vs todayUtc) will immediately show today's events passing.
+Better: stop parsing tickers at all. Kalshi's event/market objects carry real timestamp fields (close time / expected expiration). Filter on those, not on string-decoding the ticker. Ticker formats are a convention that can change; the API's own timestamps are the contract. Keep the ticker parse only as a logged cross-check — and in fact, "parsed ticker date disagrees with API close_time" would make a nice invariant alarm, since it just caught its first real bug tonight, pointed the wrong way.
+
+One small mercy from the episode: the earlier confusion ("Replit clock runs a year ahead"? No — it's genuinely July 25, 2026, as you told him) came from the same root cause. Both the dev and the model assisting him trusted the string parse over the two anchors that were actually reliable: your word on today's date, and Kalshi's own live website. Worth a chuckle and a memory-file note.
+
+Then the actual "what's next," which becomes real the moment the filter is fixed:
+
+Redeploy production. All tonight's fixes — stub deletion, book-quality gate, banner logic, and now the date fix — exist only in dev. sellinghighs.com is still running the old code.
+Watch the first real proposal arrive. With live markets flowing and approval mode on, the trader will create a proposal the next time a signal clears the risk officer with a coherent book. KAUS and KPHL are currently suppressed as incoherent (the invariants doing their job) — NYC or Chicago are the likely first candidates once afternoon heating starts moving the books.
+Fund the Kalshi account. Your screenshot showed $0.00 available. When the first proposal lands and you tap Approve, the executor needs actual grant cents to place the order — deposit before that moment, not during it.
+Tomorrow morning: check two tables. Snapshots for overnight gaps (the Autoscale-sleeping question is still open), and the first settlement reconciliation rows against the CLI.
+
+But it's all downstream of the parser fix. Send the dev the YYMMMDD correction with the LA screenshot as evidence — that's the whole argument in one image.

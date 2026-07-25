@@ -106,13 +106,17 @@ function marketToImpliedPct(bidCents: number | null, askCents: number | null): n
 }
 
 /**
- * Parse the settlement date from a Kalshi event ticker, e.g. "KXHIGHLAX-26JUL25".
- * Returns a UTC midnight Date, or null if the format is not recognised.
+ * Parse the settlement date from a Kalshi event ticker.
+ *
+ * Kalshi's format is YYMMMDD — NOT DDMMMYY.
+ * Example: "KXHIGHLAX-26JUL25" → year=2026, month=JUL, day=25 → 2026-07-25.
+ *
+ * Use only as a logged cross-check; prefer the API's own close_time field.
  */
 function parseEventSettlementDate(eventTicker: string): Date | null {
   const match = eventTicker.match(/(\d{2})([A-Z]{3})(\d{2})$/);
   if (!match) return null;
-  const [, day, mon, yr] = match;
+  const [, yr, mon, day] = match; // YYMMMDD
   const months: Record<string, number> = {
     JAN: 0, FEB: 1, MAR: 2, APR: 3, MAY: 4, JUN: 5,
     JUL: 6, AUG: 7, SEP: 8, OCT: 9, NOV: 10, DEC: 11,
@@ -207,16 +211,39 @@ export async function fetchKalshiEvents(): Promise<KalshiFetchResult> {
         const event = events[0] as Record<string, unknown>;
         const eventTicker = event["event_ticker"] as string;
 
-        // Reject events whose settlement date is in the past.
-        // Kalshi occasionally keeps old events visible under status=open
-        // after the underlying markets have settled.
-        const settlementDate = parseEventSettlementDate(eventTicker);
-        if (settlementDate && settlementDate < todayUtc) {
+        // Primary filter: use the API's own close_time timestamp if present.
+        // Ticker format (YYMMMDD) is a convention that can change; close_time is the contract.
+        const closeTimeRaw = event["close_time"] as string | undefined;
+        const closeTime = closeTimeRaw ? new Date(closeTimeRaw) : null;
+
+        if (closeTime && !isNaN(closeTime.getTime()) && closeTime < todayUtc) {
           logger.warn(
-            { eventTicker, settlementDate: settlementDate.toISOString(), todayUtc: todayUtc.toISOString() },
-            "Skipping stale event returned by Kalshi under status=open"
+            { eventTicker, closeTime: closeTime.toISOString(), todayUtc: todayUtc.toISOString() },
+            "Skipping event whose close_time is in the past"
           );
           return null;
+        }
+
+        // Cross-check: parsed ticker date vs close_time (or vs today if no close_time).
+        // A disagreement is a format bug we want to catch early.
+        const tickerDate = parseEventSettlementDate(eventTicker);
+        if (tickerDate) {
+          if (!closeTime) {
+            // No close_time — fall back to ticker date as the stale guard.
+            if (tickerDate < todayUtc) {
+              logger.warn(
+                { eventTicker, tickerDate: tickerDate.toISOString(), todayUtc: todayUtc.toISOString() },
+                "Skipping stale event (no close_time; ticker date in the past)"
+              );
+              return null;
+            }
+          } else if (Math.abs(tickerDate.getTime() - closeTime.getTime()) > 2 * 24 * 3600 * 1000) {
+            // Ticker date and close_time disagree by more than 2 days — log as invariant alarm.
+            logger.warn(
+              { eventTicker, tickerDate: tickerDate.toISOString(), closeTime: closeTime.toISOString() },
+              "INVARIANT: parsed ticker date disagrees with API close_time by >2 days — check format"
+            );
+          }
         }
 
         const rawMarkets = (event["markets"] as unknown[]) ?? [];
