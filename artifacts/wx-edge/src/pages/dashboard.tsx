@@ -227,7 +227,7 @@ function StationView({ stationId }: { stationId: string }) {
               return (
                 <div key={b.label} className={cn("relative flex items-center group", isDead && "opacity-30")}>
                   {/* Bracket Label */}
-                  <div className="w-20 shrink-0 text-sm font-bold data-mono text-right pr-4">
+                  <div className="w-20 shrink-0 text-sm font-bold data-mono text-right pr-4 whitespace-nowrap">
                     {b.label}
                   </div>
                   
