@@ -16,6 +16,8 @@ import {
   type IntradayPoint,
 } from "./nwsApi.js";
 import { fetchKalshiEvents } from "./kalshiApi.js";
+import { logSnapshots } from "./snapshotLogger.js";
+import { checkAndWriteOutcomes } from "./outcomeLogger.js";
 import { logger } from "./logger.js";
 
 async function warmStation(id: string): Promise<void> {
@@ -82,4 +84,15 @@ export async function warmCache(): Promise<void> {
       "Cache pre-warm complete"
     );
   }
+
+  // Persist bracket snapshots for the reliability curve (skips stubs).
+  // Run in the background so a slow DB write never delays a request.
+  logSnapshots().catch((err) => {
+    logger.warn({ err }, "Snapshot logger encountered an error");
+  });
+
+  // Opportunistically close out prior days — fetches NWS CLI when available.
+  checkAndWriteOutcomes().catch((err) => {
+    logger.warn({ err }, "Outcome logger encountered an error");
+  });
 }

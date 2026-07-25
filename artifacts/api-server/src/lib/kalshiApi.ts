@@ -168,9 +168,15 @@ export async function fetchKalshiEvents(): Promise<KalshiFetchResult> {
   const cached = cache.get<KalshiFetchResult>(key);
   if (cached) return cached.value;
 
-  // Fan out one request per station series in parallel (there is no unified KXHIGH endpoint)
+  // Fan out one request per station series.  We stagger with a small per-entry
+  // delay rather than firing all 5 simultaneously; Kalshi rate-limits burst
+  // requests (HTTP 429) when both dev and deployed processes poll at the same
+  // time.  Total added latency < 1 s, well within the 30-second Kalshi TTL.
+  const stationEntries = Object.entries(STATION_SERIES);
   const perStationResults = await Promise.allSettled(
-    Object.entries(STATION_SERIES).map(async ([_stationId, series]) => {
+    stationEntries.map(async ([_stationId, series], i) => {
+      if (i > 0) await new Promise((r) => setTimeout(r, i * 150));
+      return (async () => {
       const data = (await kalshiFetch(
         `/events?series_ticker=${series}&status=open&with_nested_markets=true&limit=1`
       )) as Record<string, unknown>;
@@ -211,6 +217,7 @@ export async function fetchKalshiEvents(): Promise<KalshiFetchResult> {
         contractDate: (event["series_ticker"] as string) ?? series,
         brackets,
       } satisfies KalshiEvent;
+      })();
     })
   );
 

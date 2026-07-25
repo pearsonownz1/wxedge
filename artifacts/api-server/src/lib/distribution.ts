@@ -157,7 +157,26 @@ function getLockStatus(
   return "live";
 }
 
-const FEE_PTS = 1; // 1 probability point round-trip fee assumption
+/**
+ * Kalshi round-trip trading fee in probability points, as a function of the
+ * market mid-price.
+ *
+ * Shape: P×(1−P), peaking at the 50¢ level (~3.5 pts) where interesting
+ * model/market disagreements tend to live.  This correctly suppresses phantom
+ * edges in the 40-60¢ zone that a flat fee constant ignores.
+ *
+ * Derivation: ~7% fee per leg × 2 legs, expressed as probability points.
+ *   fee_pts ≈ 14 × (P/100) × (1 − P/100)
+ *
+ * Examples: P=50 → 3.5 pts, P=25 → 2.6 pts, P=10 → 1.3 pts.
+ *
+ * TODO: Verify the exact rate constant from kalshi.com/trading/fees before
+ *       using this for live position sizing.
+ */
+function kalshiFeePts(impliedPct: number): number {
+  const p = impliedPct / 100;
+  return parseFloat((14 * p * (1 - p)).toFixed(1));
+}
 
 export function buildBracketDistribution(
   kalshiBrackets: KalshiBracket[],
@@ -192,7 +211,7 @@ export function buildBracketDistribution(
   return kalshiBrackets.map((b, i) => {
     const rawModelPct = Math.round(rawProbs[i] * normFactor * 100);
     const impliedPct = b.impliedPct;
-    const edgePts = rawModelPct - impliedPct - FEE_PTS;
+    const edgePts = rawModelPct - impliedPct - kalshiFeePts(impliedPct);
     const lockStatus = getLockStatus(b.lowerBoundF, b.upperBoundF, runningHighF);
 
     return {

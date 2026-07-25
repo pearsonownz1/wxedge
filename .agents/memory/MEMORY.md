@@ -1,0 +1,3 @@
+- [Kalshi API structure](kalshi-api.md) — per-station series (KXHIGHNY etc.), not unified KXHIGH; prices are string dollars; bounds from strike_type+floor/cap.
+- [Snapshot collector](snapshot-collector.md) — PostgreSQL via @workspace/db; logSnapshots() called from warmup.ts after every warmCache(); setInterval only works on Reserved VM deployment.
+- [Fee formula](fee-formula.md) — replaced flat 1pt with P×(1-P) shape (K=14); verify rate against kalshi.com/trading/fees before live sizing.
