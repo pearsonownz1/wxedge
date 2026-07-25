@@ -155,19 +155,26 @@ router.get("/markets", async (req, res): Promise<void> => {
 
   const hasApiKey = Boolean(process.env["KALSHI_API_KEY"]);
   // fetchKalshiEvents is cached — this re-uses the in-memory result, no network call.
-  const { allStaleFiltered } = await fetchKalshiEvents();
+  const { allStaleFiltered, failureReason } = await fetchKalshiEvents();
 
   const feedStatusDetail:
-    | "live" | "no_api_key" | "key_lacks_access" | "no_current_contracts" | "unavailable" =
+    | "live" | "no_api_key" | "auth_failed" | "rate_limited" | "network_error"
+    | "key_lacks_access" | "no_current_contracts" | "unavailable" =
     feedFresh
       ? "live"
       : !hasApiKey
         ? "no_api_key"
         : allStaleFiltered
           ? "no_current_contracts"
-          : anyStubData
-            ? "key_lacks_access"
-            : "unavailable";
+          : failureReason === "auth_failed"
+            ? "auth_failed"
+            : failureReason === "rate_limited"
+              ? "rate_limited"
+              : failureReason === "network_error"
+                ? "network_error"
+                : anyStubData
+                  ? "key_lacks_access"  // unknown failure — conservative fallback
+                  : "unavailable";
 
   res.json({
     markets: flat,

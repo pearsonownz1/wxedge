@@ -53,7 +53,7 @@ ${market.disagreementBreakdown.runningHighFloorNote ? 'Floor: ' + market.disagre
 
   return (
     <Shell>
-      <FeedBanner fresh={market.feedFresh} timestampLst={market.bookSnapshotTimeLst} hideEdgeSignal feedStatusDetail={market.feedStatusDetail as "live" | "no_api_key" | "key_lacks_access" | "unavailable" | undefined} />
+      <FeedBanner fresh={market.feedFresh} timestampLst={market.bookSnapshotTimeLst} hideEdgeSignal feedStatusDetail={market.feedStatusDetail as "live" | "no_api_key" | "auth_failed" | "rate_limited" | "network_error" | "key_lacks_access" | "unavailable" | undefined} />
       
       <div className="flex-1 bg-background overflow-auto p-8">
         <div className="max-w-5xl mx-auto space-y-8">

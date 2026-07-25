@@ -30,6 +30,14 @@ function getAuthHeaders(): Record<string, string> {
   return {};
 }
 
+/** HTTP error from Kalshi — carries the status code for banner classification. */
+class KalshiHttpError extends Error {
+  constructor(public readonly status: number, message: string) {
+    super(message);
+    this.name = "KalshiHttpError";
+  }
+}
+
 async function kalshiFetch(path: string): Promise<unknown> {
   const resp = await fetch(`${KALSHI_BASE}${path}`, {
     headers: {
@@ -42,14 +50,15 @@ async function kalshiFetch(path: string): Promise<unknown> {
     // Log body to diagnose auth/permission errors in production.
     let body = "";
     try { body = await resp.text(); } catch { /* ignore */ }
-    throw new Error(
+    throw new KalshiHttpError(
+      resp.status,
       `Kalshi fetch ${path} → ${resp.status} ${resp.statusText}` +
       (body ? ` body=${body.slice(0, 200)}` : "")
     );
   }
   const text = await resp.text();
   if (text.startsWith("API has been moved")) {
-    throw new Error(`Kalshi API moved: ${text.slice(0, 120)}`);
+    throw new KalshiHttpError(0, `Kalshi API moved: ${text.slice(0, 120)}`);
   }
   return JSON.parse(text);
 }
@@ -72,6 +81,9 @@ export interface KalshiEvent {
   brackets: KalshiBracket[];
 }
 
+/** Why a Kalshi fetch cycle returned no live events, or null when data is live / no contracts yet. */
+export type KalshiFailureReason = "auth_failed" | "rate_limited" | "network_error" | null;
+
 export interface KalshiFetchResult {
   events: KalshiEvent[];
   /** True when no live events were available (API error, auth failure, or stale-filtered). */
@@ -81,6 +93,8 @@ export interface KalshiFetchResult {
    * Indicates "contracts not open yet today" — distinct from an auth/network failure.
    */
   allStaleFiltered: boolean;
+  /** Classified failure reason. null when events are live or contracts just aren't open yet. */
+  failureReason: KalshiFailureReason;
 }
 
 export interface OrderBookLevel {
@@ -190,7 +204,7 @@ function pollingEnabled(): boolean {
 
 export async function fetchKalshiEvents(): Promise<KalshiFetchResult> {
   if (!pollingEnabled()) {
-    return { events: [], usingStubData: false, allStaleFiltered: false };
+    return { events: [], usingStubData: false, allStaleFiltered: false, failureReason: null };
   }
 
   const key = "kalshi:events";
@@ -301,13 +315,22 @@ export async function fetchKalshiEvents(): Promise<KalshiFetchResult> {
   const result: KalshiEvent[] = [];
   let anyFailed = false;
   let anyStaleFiltered = false;
+  let anyRateLimited = false;
+  let anyAuthFailed = false;
 
   for (const r of perStationResults) {
     if (r.status === "fulfilled" && r.value != null) {
       result.push(r.value);
     } else if (r.status === "rejected") {
-      logger.warn({ reason: String(r.reason) }, "Kalshi per-station fetch failed");
-      anyFailed = true;
+      const err = r.reason;
+      const httpStatus = err instanceof KalshiHttpError ? err.status : null;
+      logger.warn(
+        { reason: String(err), httpStatus },
+        "Kalshi per-station fetch failed"
+      );
+      if (httpStatus === 429) anyRateLimited = true;
+      else if (httpStatus === 401 || httpStatus === 403) anyAuthFailed = true;
+      else anyFailed = true;
     } else if (r.status === "fulfilled" && r.value === null) {
       // null means either no open events for the series, or the event was
       // stale-filtered. We set anyStaleFiltered speculatively; the warning
@@ -319,7 +342,15 @@ export async function fetchKalshiEvents(): Promise<KalshiFetchResult> {
   const usingStubData = result.length === 0;
   // allStaleFiltered = true when we got responses but every event was filtered
   // as past-dated (key is fine, today's contracts just haven't opened yet).
-  const allStaleFiltered = usingStubData && anyStaleFiltered && !anyFailed;
+  const allStaleFiltered = usingStubData && anyStaleFiltered && !anyFailed && !anyRateLimited && !anyAuthFailed;
+
+  // Classify why we got no live events. Priority: auth > rate limit > network > none.
+  const failureReason: KalshiFailureReason = usingStubData
+    ? anyAuthFailed   ? "auth_failed"
+    : anyRateLimited  ? "rate_limited"
+    : anyFailed       ? "network_error"
+    : null
+    : null;
 
   if (usingStubData) {
     // All stations returned empty (429s or no contracts). Before giving up,
@@ -347,8 +378,10 @@ export async function fetchKalshiEvents(): Promise<KalshiFetchResult> {
     );
   }
 
-  const fetchResult: KalshiFetchResult = { events: result, usingStubData, allStaleFiltered };
-  cache.set(key, fetchResult, TTL.KALSHI_BOOK_MS);
+  const fetchResult: KalshiFetchResult = { events: result, usingStubData, allStaleFiltered, failureReason };
+  // Only use the full 5-min TTL for live results. Failed results use a 30s retry window
+  // so the system recovers quickly after a transient 429 or network error.
+  cache.set(key, fetchResult, usingStubData ? 30_000 : TTL.KALSHI_BOOK_MS);
   return fetchResult;
 }
 
