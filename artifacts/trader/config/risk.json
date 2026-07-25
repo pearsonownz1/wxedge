@@ -1,0 +1,29 @@
+{
+  "_comment": [
+    "Risk Officer and Signal Engine configuration.",
+    "All dollar amounts in CENTS unless the key ends in _prob, _min, or _rate.",
+    "",
+    "⚑ UNVERIFIED: fee_rate is an approximation (~7% of P*(1-P) per leg).",
+    "   Verify the exact rate from kalshi.com/trading/fees before going live.",
+    "   Update fee_rate here — the code reads it from this file."
+  ],
+
+  "mode": "shadow",
+
+  "max_cost_per_trade_cents": 60,
+  "max_open_orders_per_station": 1,
+  "max_daily_exposure_per_station_cents": 200,
+  "max_total_open_exposure_cents": 500,
+  "max_daily_loss_cents": 300,
+
+  "cooldown_min": 30,
+
+  "min_edge": 0.05,
+  "slippage_buffer": 0.01,
+  "max_age_min": 10,
+
+  "fee_rate": 0.07,
+
+  "ttl_min": 15,
+  "cancel_edge": 0.01
+}

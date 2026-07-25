@@ -1,0 +1,159 @@
+/**
+ * Trading layer schema — Phase A.
+ *
+ * books          — per-bracket order book snapshot, one row per ticker per poll.
+ * signals        — signal engine output (ALL signals, suppressed or live).
+ * risk_decisions — risk officer approve/reject log keyed to each signal.
+ * orders         — append-only order lifecycle (shadow and live).
+ * settlements    — daily reconciliation: CLI final high vs. Kalshi settlement.
+ * daily_pnl      — rolled-up P&L per day per mode (written by auditor).
+ *
+ * Invariant: every row written by the trader is recoverable from this store
+ * alone — no external logs are required to reconstruct a full day.
+ */
+
+import {
+  pgTable,
+  serial,
+  text,
+  real,
+  integer,
+  boolean,
+  timestamp,
+  uniqueIndex,
+  index,
+} from "drizzle-orm/pg-core";
+
+/** Per-bracket order book snapshot from the Kalshi events list. */
+export const books = pgTable(
+  "books",
+  {
+    id:           serial("id").primaryKey(),
+    tsUtc:        timestamp("ts_utc", { withTimezone: true }).notNull(),
+    stationId:    text("station_id").notNull(),
+    ticker:       text("ticker").notNull(),
+    bracketLo:    real("bracket_lo"),
+    bracketHi:    real("bracket_hi"),
+    yesBid:       integer("yes_bid"),
+    yesAsk:       integer("yes_ask"),
+    /** Derived: 100 − yes_ask */
+    noBid:        integer("no_bid"),
+    /** Derived: 100 − yes_bid */
+    noAsk:        integer("no_ask"),
+    /** NULL — the events list does not expose order-book depth. */
+    bidSize:      integer("bid_size"),
+    askSize:      integer("ask_size"),
+    /** False when the station's bracket sum fails the coherence invariant. */
+    coherentFlag: boolean("coherent_flag").notNull().default(true),
+  },
+  (table) => [
+    index("books_station_ts_idx").on(table.stationId, table.tsUtc),
+    index("books_ticker_ts_idx").on(table.ticker, table.tsUtc),
+  ]
+);
+
+/**
+ * Signal engine output.  Every candidate signal is written here, whether it
+ * passes the risk officer or not.  suppressed_reason is NULL for live signals.
+ */
+export const signals = pgTable(
+  "signals",
+  {
+    id:               serial("id").primaryKey(),
+    tsUtc:            timestamp("ts_utc", { withTimezone: true }).notNull(),
+    stationId:        text("station_id").notNull(),
+    ticker:           text("ticker").notNull(),
+    side:             text("side").notNull(),
+    limitPrice:       integer("limit_price").notNull(),
+    modelProb:        real("model_prob").notNull(),
+    impliedProb:      real("implied_prob").notNull(),
+    edgeNet:          real("edge_net").notNull(),
+    inputsHash:       text("inputs_hash").notNull(),
+    suppressedReason: text("suppressed_reason"),
+  },
+  (table) => [
+    index("signals_station_ts_idx").on(table.stationId, table.tsUtc),
+    index("signals_ticker_ts_idx").on(table.ticker, table.tsUtc),
+  ]
+);
+
+/** Risk officer decision, one row per signal that reached the officer. */
+export const riskDecisions = pgTable(
+  "risk_decisions",
+  {
+    id:       serial("id").primaryKey(),
+    signalId: integer("signal_id").notNull(),
+    tsUtc:    timestamp("ts_utc", { withTimezone: true }).notNull(),
+    approved: boolean("approved").notNull(),
+    reason:   text("reason").notNull(),
+  },
+  (table) => [
+    index("risk_decisions_signal_idx").on(table.signalId),
+  ]
+);
+
+/**
+ * Order lifecycle.  Append-only.
+ * status transitions: open → filled | cancelled | expired
+ */
+export const orders = pgTable(
+  "orders",
+  {
+    id:             serial("id").primaryKey(),
+    signalId:       integer("signal_id").notNull(),
+    mode:           text("mode").notNull(),
+    tsPlaced:       timestamp("ts_placed", { withTimezone: true }).notNull(),
+    ticker:         text("ticker").notNull(),
+    stationId:      text("station_id").notNull(),
+    side:           text("side").notNull(),
+    priceCents:     integer("price_cents").notNull(),
+    count:          integer("count").notNull().default(1),
+    status:         text("status").notNull().default("open"),
+    tsFilled:       timestamp("ts_filled", { withTimezone: true }),
+    fillPriceCents: integer("fill_price_cents"),
+    tsCancelled:    timestamp("ts_cancelled", { withTimezone: true }),
+    bookStateJson:  text("book_state_json"),
+    kalshiOrderId:  text("kalshi_order_id"),
+  },
+  (table) => [
+    index("orders_signal_idx").on(table.signalId),
+    index("orders_station_status_idx").on(table.stationId, table.status),
+    index("orders_ts_placed_idx").on(table.tsPlaced),
+  ]
+);
+
+/** One row per station per settlement date, written by the auditor. */
+export const settlements = pgTable(
+  "settlements",
+  {
+    id:                   serial("id").primaryKey(),
+    settlementDate:       text("settlement_date").notNull(),
+    stationId:            text("station_id").notNull(),
+    cliHighF:             real("cli_high_f"),
+    appHighF:             real("app_high_f"),
+    kalshiSettledBracket: text("kalshi_settled_bracket"),
+    matchFlag:            boolean("match_flag"),
+    tsUtc:                timestamp("ts_utc", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("settlements_station_date_idx").on(table.stationId, table.settlementDate),
+  ]
+);
+
+/** Rolled-up daily P&L written by the auditor at 21:00 UTC. */
+export const dailyPnl = pgTable(
+  "daily_pnl",
+  {
+    id:         serial("id").primaryKey(),
+    date:       text("date").notNull(),
+    mode:       text("mode").notNull(),
+    grossCents: integer("gross_cents").notNull(),
+    feesCents:  integer("fees_cents").notNull(),
+    netCents:   integer("net_cents").notNull(),
+    tradeCount: integer("trade_count").notNull(),
+    tsUtc:      timestamp("ts_utc", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("daily_pnl_date_mode_idx").on(table.date, table.mode),
+  ]
+);

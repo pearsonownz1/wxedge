@@ -16,6 +16,7 @@ import {
   text,
   real,
   integer,
+  boolean,
   timestamp,
   uniqueIndex,
   index,
@@ -50,6 +51,10 @@ export const snapshots = pgTable(
     /** model_pct − implied_pct − kalshi_fee_pts. */
     edgePts:        real("edge_pts").notNull(),
     lockStatus:     text("lock_status").notNull(),
+    /** Age of the most recent NWS observation at poll time (seconds). NULL if unknown. */
+    obsAgeS:        real("obs_age_s"),
+    /** True when this batch follows an unexplained gap (> max_age_min since last poll). */
+    gapFlag:        boolean("gap_flag"),
   },
   (table) => [
     index("snapshots_station_date_idx").on(table.stationId, table.settlementDate),

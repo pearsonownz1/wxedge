@@ -1,3 +1,5 @@
 - [Kalshi API structure](kalshi-api.md) — per-station series (KXHIGHNY etc.), not unified KXHIGH; prices are string dollars; bounds from strike_type+floor/cap.
 - [Snapshot collector](snapshot-collector.md) — PostgreSQL via @workspace/db; logSnapshots() called from warmup.ts after every warmCache(); setInterval only works on Reserved VM deployment.
 - [Fee formula](fee-formula.md) — replaced flat 1pt with P×(1-P) shape (K=14); verify rate against kalshi.com/trading/fees before live sizing.
+- [DB schema bootstrap](db-schema-bootstrap.md) — drizzle-kit push silently skips new tables when schema/index.ts re-exports a module that didn't exist at push time; use raw SQL CREATE TABLE IF NOT EXISTS to recover.
+- [Trader workflow config](trader-workflow-config.md) — background services without artifact registration must not use waitForPort; configure with outputType="console" only. Trader config path is ../config/risk.json (one level up from src/).

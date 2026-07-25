@@ -87,6 +87,8 @@ export interface IntradayPoint {
   timeLst: string;
   tempF: number;
   isRunningHigh: boolean;
+  /** ISO-8601 UTC timestamp of this observation; used to compute obs_age_s for the snapshot logger. */
+  tsUtc: string;
 }
 
 export async function fetchIntradayObs(
@@ -130,9 +132,10 @@ export async function fetchIntradayObs(
     const result: IntradayPoint[] = todayPoints.map((p) => {
       if (p.tempF > runningMax) runningMax = p.tempF;
       return {
-        timeLst: p.timeLst,
-        tempF: p.tempF,
+        timeLst:       p.timeLst,
+        tempF:         p.tempF,
         isRunningHigh: p.tempF === runningMax,
+        tsUtc:         p.timestamp,
       };
     });
 

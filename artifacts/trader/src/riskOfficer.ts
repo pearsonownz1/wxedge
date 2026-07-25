@@ -1,0 +1,114 @@
+/**
+ * Risk Officer — pure function, no I/O.
+ *
+ * Takes a signal candidate, the current risk state (built from the DB by the
+ * caller), and the config.  Returns { approved: boolean, reason: string }.
+ *
+ * Design principles:
+ *   - Stateless: the function is a pure transform of its arguments.
+ *   - Fail-closed: any unexpected condition returns approved=false.
+ *   - Logged by caller: the returned decision is written to risk_decisions by
+ *     the caller; the function itself does no I/O.
+ *   - Config-driven: every numeric limit is a config parameter.
+ *
+ * The executor MUST call this before placing any order (shadow or live).
+ * Bypassing it is a code defect, not a policy violation.
+ */
+
+import type { RiskConfig } from "./config.js";
+import type { RiskState } from "./db.js";
+
+export interface SignalCandidate {
+  ticker:     string;
+  station_id: string;
+  side:       "YES" | "NO";
+  limit_price: number;  // cents
+  edge_net:   number;
+  ts:         Date;
+}
+
+export interface RiskDecision {
+  approved: boolean;
+  reason:   string;
+}
+
+/**
+ * Evaluate a signal candidate against all risk limits.
+ * Returns on the FIRST failing check.
+ */
+export function checkRisk(
+  signal: SignalCandidate,
+  state: RiskState,
+  config: RiskConfig
+): RiskDecision {
+  // 1. Kill switch — always checked first.
+  if (state.killSwitchActive) {
+    return { approved: false, reason: "kill_switch" };
+  }
+
+  // 2. Daily loss cap — stops all trading when realised losses hit the limit.
+  if (state.dailyCostToday >= config.max_daily_loss_cents) {
+    return {
+      approved: false,
+      reason: `max_daily_loss: today_cost=${state.dailyCostToday} >= limit=${config.max_daily_loss_cents}`,
+    };
+  }
+
+  // 3. Per-trade cost limit.
+  if (signal.limit_price > config.max_cost_per_trade_cents) {
+    return {
+      approved: false,
+      reason: `max_cost_per_trade: price=${signal.limit_price} > limit=${config.max_cost_per_trade_cents}`,
+    };
+  }
+
+  // 4. Max open orders per station.
+  const stationOpen = state.openOrdersPerStation[signal.station_id] ?? 0;
+  if (stationOpen >= config.max_open_orders_per_station) {
+    return {
+      approved: false,
+      reason: `max_open_orders_per_station: open=${stationOpen} >= limit=${config.max_open_orders_per_station}`,
+    };
+  }
+
+  // 5. Max daily exposure per station.
+  const stationDaily = state.dailyExposurePerStation[signal.station_id] ?? 0;
+  if (stationDaily + signal.limit_price > config.max_daily_exposure_per_station_cents) {
+    return {
+      approved: false,
+      reason:
+        `max_daily_exposure_per_station: station_today=${stationDaily}` +
+        ` + this=${signal.limit_price}` +
+        ` > limit=${config.max_daily_exposure_per_station_cents}`,
+    };
+  }
+
+  // 6. Max total open exposure.
+  if (state.totalOpenExposure + signal.limit_price > config.max_total_open_exposure_cents) {
+    return {
+      approved: false,
+      reason:
+        `max_total_open_exposure: open=${state.totalOpenExposure}` +
+        ` + this=${signal.limit_price}` +
+        ` > limit=${config.max_total_open_exposure_cents}`,
+    };
+  }
+
+  // 7. Duplicate guard: same ticker+side within cooldown window.
+  const cooldownMs = config.cooldown_min * 60_000;
+  const cutoff = new Date(signal.ts.getTime() - cooldownMs);
+  const duplicate = state.recentSignals.find(
+    (r) => r.ticker === signal.ticker && r.side === signal.side && r.ts > cutoff
+  );
+  if (duplicate) {
+    return {
+      approved: false,
+      reason:
+        `duplicate_within_cooldown: ${signal.ticker}/${signal.side}` +
+        ` last_seen=${duplicate.ts.toISOString()}` +
+        ` cooldown=${config.cooldown_min}min`,
+    };
+  }
+
+  return { approved: true, reason: "approved" };
+}

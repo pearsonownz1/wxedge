@@ -14,8 +14,8 @@
  * ~5 min apart across a full overnight run.
  */
 
-import { db, snapshots, outcomes } from "@workspace/db";
-import { eq, and, isNull, desc, sql } from "drizzle-orm";
+import { db, snapshots, outcomes, books } from "@workspace/db";
+import { eq, and, isNull, desc, sql, max } from "drizzle-orm";
 import { logger } from "./logger.js";
 
 // ---------------------------------------------------------------------------
@@ -38,6 +38,23 @@ export interface SnapshotRow {
   ask_cents:       number | null;
   edge_pts:        number;
   lock_status:     string;
+  /** Seconds since the most recent NWS observation; null if unavailable. */
+  obs_age_s?:      number | null;
+  /** True when this batch follows an unexplained gap in the collector. */
+  gap_flag?:       boolean | null;
+}
+
+export interface BookRow {
+  ts_utc:        string;
+  station_id:    string;
+  ticker:        string;
+  bracket_lo:    number | null;
+  bracket_hi:    number | null;
+  yes_bid:       number | null;
+  yes_ask:       number | null;
+  no_bid:        number | null;
+  no_ask:        number | null;
+  coherent_flag: boolean;
 }
 
 export interface OutcomeRow {
@@ -72,8 +89,46 @@ export async function insertSnapshots(rows: SnapshotRow[]): Promise<void> {
       askCents:       r.ask_cents,
       edgePts:        r.edge_pts,
       lockStatus:     r.lock_status,
+      obsAgeS:        r.obs_age_s ?? null,
+      gapFlag:        r.gap_flag ?? null,
     }))
   );
+}
+
+/** Bulk-insert order book rows (one per bracket per station per poll). */
+export async function insertBooks(rows: BookRow[]): Promise<void> {
+  if (rows.length === 0) return;
+  await db.insert(books).values(
+    rows.map((r) => ({
+      tsUtc:        new Date(r.ts_utc),
+      stationId:    r.station_id,
+      ticker:       r.ticker,
+      bracketLo:    r.bracket_lo,
+      bracketHi:    r.bracket_hi,
+      yesBid:       r.yes_bid,
+      yesAsk:       r.yes_ask,
+      noBid:        r.no_bid,
+      noAsk:        r.no_ask,
+      coherentFlag: r.coherent_flag,
+    }))
+  );
+}
+
+/**
+ * Returns the most recent snapshot ts_utc for each station.
+ * Used by the snapshot logger to detect collector gaps.
+ */
+export async function getLastSnapshotTsPerStation(): Promise<Record<string, Date>> {
+  const rows = await db
+    .select({ stationId: snapshots.stationId, maxTs: max(snapshots.tsUtc) })
+    .from(snapshots)
+    .groupBy(snapshots.stationId);
+
+  const result: Record<string, Date> = {};
+  for (const row of rows) {
+    if (row.maxTs) result[row.stationId] = row.maxTs;
+  }
+  return result;
 }
 
 /** Insert an outcome row; silently ignores duplicate (station, date) pairs. */
