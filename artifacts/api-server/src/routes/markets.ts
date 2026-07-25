@@ -14,6 +14,7 @@ import {
 import {
   getBracketsForStation,
   fetchOrderBook,
+  type OrderBookResult,
 } from "../lib/kalshiApi.js";
 import {
   buildBracketDistribution,
@@ -158,12 +159,17 @@ router.get("/markets/:contractId", async (req, res): Promise<void> => {
   const meta = STATIONS[matchedStation];
   const bias = meta.biasF[season];
 
-  const [intradayObs, forecast, bracketResult, orderBook] = await Promise.all([
+  const [intradayObs, forecast, bracketResult, orderBookResult] = await Promise.all([
     fetchIntradayObs(matchedStation, meta.lstOffset),
     fetchTodayMaxForecast(meta.lat, meta.lon, meta.lstOffset),
     getBracketsForStation(matchedStation, meta.lstOffset),
     fetchOrderBook(contractId),
-  ]);
+  ]) as [
+    Awaited<ReturnType<typeof fetchIntradayObs>>,
+    Awaited<ReturnType<typeof fetchTodayMaxForecast>>,
+    Awaited<ReturnType<typeof getBracketsForStation>>,
+    OrderBookResult,
+  ];
 
   // True running high: intraday max, not latest obs temp
   const runningHighF = runningHighFromObs(intradayObs);
@@ -191,7 +197,11 @@ router.get("/markets/:contractId", async (req, res): Promise<void> => {
   const kalshiUrl = `https://kalshi.com/markets/${contractId.toLowerCase()}`;
 
   const kalshiAge = cache.ageSeconds("kalshi:events");
-  const feedFresh = !bracketResult.usingStubData && kalshiAge <= TTL.KALSHI_BOOK_MS / 1000;
+  // feedFresh requires both: live brackets from Kalshi AND a live order book.
+  const feedFresh =
+    !bracketResult.usingStubData &&
+    kalshiAge <= TTL.KALSHI_BOOK_MS / 1000 &&
+    orderBookResult.isLive;
 
   res.json({
     contractId,
@@ -217,7 +227,8 @@ router.get("/markets/:contractId", async (req, res): Promise<void> => {
       ),
       lockinAmbiguityNote: lockinAmbiguityNote(targetBracket.lockStatus),
     },
-    orderBook,
+    orderBook: orderBookResult.levels,
+    orderBookIsLive: orderBookResult.isLive,
     allBrackets,
     kalshiUrl,
     bookSnapshotTimeLst: bookSnapshotTime(),

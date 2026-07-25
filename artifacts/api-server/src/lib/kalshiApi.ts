@@ -5,10 +5,11 @@
  * public base is https://api.elections.kalshi.com/trade-api/v2.
  *
  * NOTE ON WEATHER MARKETS: As of July 2026, daily high-temperature (KXHIGH)
- * contracts are not returned by the public unauthenticated API — they likely
- * require an API key or have been discontinued publicly. When live data cannot
- * be fetched, we fall back to deterministic stubs and set `usingStubData: true`
- * so callers can suppress edge signals and surface a clear warning to users.
+ * contracts require an API key — they are not available on the unauthenticated
+ * public API. Set the KALSHI_API_KEY environment secret to enable live data.
+ * When live data cannot be fetched, we fall back to deterministic stubs and
+ * set `usingStubData: true` so callers can suppress edge signals and surface
+ * a clear warning to users.
  *
  * Bracket-ID drift risk (HIGH): always derive brackets from the live API, never
  * hardcode them. The stub brackets below are fallback only.
@@ -20,9 +21,21 @@ import { logger } from "./logger.js";
 const KALSHI_BASE = "https://api.elections.kalshi.com/trade-api/v2";
 const UA = "WxEdge/1.0 (kalshi-weather-edge)";
 
+function getAuthHeaders(): Record<string, string> {
+  const apiKey = process.env["KALSHI_API_KEY"];
+  if (apiKey) {
+    return { Authorization: `Bearer ${apiKey}` };
+  }
+  return {};
+}
+
 async function kalshiFetch(path: string): Promise<unknown> {
   const resp = await fetch(`${KALSHI_BASE}${path}`, {
-    headers: { "User-Agent": UA, Accept: "application/json" },
+    headers: {
+      "User-Agent": UA,
+      Accept: "application/json",
+      ...getAuthHeaders(),
+    },
   });
   if (!resp.ok) {
     throw new Error(`Kalshi fetch ${path} → ${resp.status} ${resp.statusText}`);
@@ -64,6 +77,12 @@ export interface OrderBookLevel {
   size: number;
   side: "ask" | "bid";
   isBest: boolean;
+}
+
+export interface OrderBookResult {
+  levels: OrderBookLevel[];
+  /** True when the book was fetched live from the Kalshi API (not a stub). */
+  isLive: boolean;
 }
 
 /** Parse Kalshi market ticker to extract bracket info.
@@ -138,6 +157,8 @@ export async function fetchKalshiEvents(): Promise<KalshiFetchResult> {
   const cached = cache.get<KalshiFetchResult>(key);
   if (cached) return cached.value;
 
+  const hasApiKey = Boolean(process.env["KALSHI_API_KEY"]);
+
   try {
     const data = (await kalshiFetch(
       "/events?series_ticker=KXHIGH&with_nested_markets=true&status=open"
@@ -200,9 +221,17 @@ export async function fetchKalshiEvents(): Promise<KalshiFetchResult> {
     // Use stubs and surface this explicitly so edge signals can be suppressed.
     const usingStubData = result.length === 0;
     if (usingStubData) {
-      logger.warn(
-        "Kalshi returned no KXHIGH events (may require auth). Using stub brackets — edge signals will be suppressed."
-      );
+      if (hasApiKey) {
+        logger.warn(
+          "Kalshi returned no KXHIGH events despite API key — key may lack weather market access or contracts are not currently open. Using stub brackets — edge signals will be suppressed."
+        );
+      } else {
+        logger.warn(
+          "Kalshi returned no KXHIGH events — no KALSHI_API_KEY set. Set the secret to enable live weather market data. Using stub brackets — edge signals will be suppressed."
+        );
+      }
+    } else {
+      logger.info({ eventCount: result.length }, "Kalshi events fetched live");
     }
 
     const fetchResult: KalshiFetchResult = { events: result, usingStubData };
@@ -214,9 +243,19 @@ export async function fetchKalshiEvents(): Promise<KalshiFetchResult> {
   }
 }
 
-export async function fetchOrderBook(contractId: string): Promise<OrderBookLevel[]> {
+/**
+ * Fetch the live order book for a contract from Kalshi.
+ *
+ * Kalshi's v2 API returns `orderbook_fp` with two arrays:
+ *   - `yes_dollars`: YES-side bids as [price_fraction, size] pairs, highest first
+ *   - `no_dollars`:  NO-side bids as [price_fraction, size] pairs, highest first
+ *
+ * YES ask price = 100 - (best NO bid price in cents).
+ * Falls back to a deterministic stub (WARNING logged) if the API is unreachable.
+ */
+export async function fetchOrderBook(contractId: string): Promise<OrderBookResult> {
   const key = `kalshi:book:${contractId}`;
-  const cached = cache.get<OrderBookLevel[]>(key);
+  const cached = cache.get<OrderBookResult>(key);
   if (cached) return cached.value;
 
   try {
@@ -224,30 +263,58 @@ export async function fetchOrderBook(contractId: string): Promise<OrderBookLevel
       `/markets/${contractId}/orderbook`
     )) as Record<string, unknown>;
 
-    const book = (data["orderbook"] as Record<string, unknown>) ?? {};
-    const asks = (book["asks"] as [number, number][]) ?? [];
-    const bids = (book["bids"] as [number, number][]) ?? [];
+    // Kalshi v2 returns orderbook_fp (full-precision), not orderbook.
+    // yes_dollars = YES-side bids: [price_0_to_1, size][], highest bid first.
+    // no_dollars  = NO-side bids: [price_0_to_1, size][], highest bid first.
+    // YES ask = 100 - (NO bid cents); best ask = highest NO bid → lowest YES ask.
+    const book = (data["orderbook_fp"] as Record<string, unknown>) ?? {};
+    const yesBids = (book["yes_dollars"] as [number, number][]) ?? [];
+    const noBids = (book["no_dollars"] as [number, number][]) ?? [];
 
-    const levels: OrderBookLevel[] = [
-      ...asks.map(([price, size], i) => ({
-        priceCents: Math.round(price * 100),
-        size,
-        side: "ask" as const,
-        isBest: i === asks.length - 1, // lowest ask is best
-      })),
-      ...bids.map(([price, size], i) => ({
-        priceCents: Math.round(price * 100),
-        size,
-        side: "bid" as const,
-        isBest: i === 0, // highest bid is best
-      })),
-    ];
+    const bidLevels: OrderBookLevel[] = yesBids.map(([price, size], i) => ({
+      priceCents: Math.round(price * 100),
+      size,
+      side: "bid" as const,
+      isBest: i === 0, // highest bid first → index 0 is best
+    }));
 
-    cache.set(key, levels, TTL.KALSHI_BOOK_MS);
-    return levels;
+    const askLevels: OrderBookLevel[] = noBids.map(([price, size], i) => ({
+      priceCents: 100 - Math.round(price * 100), // convert NO bid to YES ask
+      size,
+      side: "ask" as const,
+      isBest: i === 0, // highest NO bid → lowest YES ask → best ask
+    }));
+
+    const levels = [...askLevels, ...bidLevels];
+
+    // If Kalshi returned an empty book (no bids/asks), the ticker may be
+    // inactive or require auth. Treat it as a stub so feedFresh reflects reality.
+    if (levels.length === 0) {
+      const hasApiKey = Boolean(process.env["KALSHI_API_KEY"]);
+      const authHint = hasApiKey ? "" : " Set KALSHI_API_KEY secret for live order book.";
+      logger.warn(
+        { contractId },
+        `Kalshi order book returned empty for ${contractId}.${authHint} Falling back to stub.`
+      );
+      const stubResult: OrderBookResult = {
+        levels: generateStubOrderBook(contractId),
+        isLive: false,
+      };
+      cache.set(key, stubResult, TTL.KALSHI_BOOK_MS);
+      return stubResult;
+    }
+
+    logger.debug({ contractId, bidLevels: bidLevels.length, askLevels: askLevels.length }, "Kalshi order book fetched live");
+
+    const liveResult: OrderBookResult = { levels, isLive: true };
+    cache.set(key, liveResult, TTL.KALSHI_BOOK_MS);
+    return liveResult;
   } catch (err) {
-    logger.warn({ err, contractId }, "Kalshi order book fetch failed");
-    return generateStubOrderBook(contractId);
+    logger.warn({ err, contractId }, "Kalshi order book fetch failed — using stub");
+    return {
+      levels: generateStubOrderBook(contractId),
+      isLive: false,
+    };
   }
 }
 
