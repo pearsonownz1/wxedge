@@ -68,34 +68,53 @@ function asymmetricNormalCdf(
   }
 }
 
-/** P(lowerF < X ≤ upperF) under Normal(mean, sigma). */
+/**
+ * P(lowerF < X ≤ upperF | X ≥ runningHighF) under Normal(mean, sigma).
+ *
+ * Conditions on the running high being a hard lower bound: the final daily
+ * high cannot be lower than the maximum temp already observed.  Dead brackets
+ * (upper < runningHighF) return 0; live brackets are renormalized by
+ * P(X ≥ runningHighF), concentrating mass on still-reachable outcomes.
+ */
 function bracketMassNormal(
   lowerF: number | null,
   upperF: number | null,
   mean: number,
-  sigma: number
+  sigma: number,
+  runningHighF: number
 ): number {
-  const lo = lowerF == null ? 0 : normalCdf(lowerF, mean, sigma);
-  const hi = upperF == null ? 1 : normalCdf(upperF + 1, mean, sigma);
-  // upperF is inclusive: integrate to upperF + 1 (next bracket starts at upperF + 1)
-  return Math.max(0, Math.min(1, hi - lo));
+  if (upperF != null && upperF < runningHighF) return 0;
+  const cdf = (x: number) => normalCdf(x, mean, sigma);
+  const pAboveFloor = 1 - cdf(runningHighF);
+  if (pAboveFloor <= 0) return upperF == null ? 1 : 0;
+  const effectiveLo = lowerF == null ? runningHighF : Math.max(lowerF, runningHighF);
+  const lo = cdf(effectiveLo);
+  const hi = upperF == null ? 1 : cdf(upperF + 1);
+  return Math.max(0, Math.min(1, (hi - lo) / pAboveFloor));
 }
 
 /**
- * P(lowerF < X ≤ upperF) under the asymmetric distribution fitted to
- * bias-corrected NBM percentiles.
+ * P(lowerF < X ≤ upperF | X ≥ runningHighF) under the asymmetric distribution
+ * fitted to bias-corrected NBM percentiles.
+ *
+ * Same running-high conditioning as bracketMassNormal.
  */
 function bracketMassAsymmetric(
   lowerF: number | null,
   upperF: number | null,
   p10: number,
   p50: number,
-  p90: number
+  p90: number,
+  runningHighF: number
 ): number {
+  if (upperF != null && upperF < runningHighF) return 0;
   const cdf = (x: number) => asymmetricNormalCdf(x, p10, p50, p90);
-  const lo = lowerF == null ? 0 : cdf(lowerF);
+  const pAboveFloor = 1 - cdf(runningHighF);
+  if (pAboveFloor <= 0) return upperF == null ? 1 : 0;
+  const effectiveLo = lowerF == null ? runningHighF : Math.max(lowerF, runningHighF);
+  const lo = cdf(effectiveLo);
   const hi = upperF == null ? 1 : cdf(upperF + 1);
-  return Math.max(0, Math.min(1, hi - lo));
+  return Math.max(0, Math.min(1, (hi - lo) / pAboveFloor));
 }
 
 export type LockStatus = "live" | "dead" | "ambiguous";
@@ -157,11 +176,13 @@ export function buildBracketDistribution(
   const cp50 = useAsymmetric ? percentiles!.p50F + biasF : 0;
   const cp90 = useAsymmetric ? percentiles!.p90F + biasF : 0;
 
-  // Raw model probabilities: asymmetric if NBM percentiles available, else Normal
+  // Raw model probabilities conditioned on running high (X ≥ runningHighF).
+  // Dead brackets return 0; live brackets are renormalized automatically
+  // inside the mass functions so probabilities over reachable outcomes sum to 1.
   const rawProbs = kalshiBrackets.map((b) =>
     useAsymmetric
-      ? bracketMassAsymmetric(b.lowerBoundF, b.upperBoundF, cp10, cp50, cp90)
-      : bracketMassNormal(b.lowerBoundF, b.upperBoundF, calibratedMedian, rmse)
+      ? bracketMassAsymmetric(b.lowerBoundF, b.upperBoundF, cp10, cp50, cp90, runningHighF)
+      : bracketMassNormal(b.lowerBoundF, b.upperBoundF, calibratedMedian, rmse, runningHighF)
   );
 
   // Normalise so they sum to 100

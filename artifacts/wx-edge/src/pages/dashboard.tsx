@@ -196,8 +196,8 @@ function StationView({ stationId }: { stationId: string }) {
               </ResponsiveContainer>
             </div>
             <div className="flex justify-between text-xs text-muted-foreground mt-2 data-mono">
-              <span>{detail.intradayObs[0]?.timeLst} LST</span>
-              <span>{detail.intradayObs[detail.intradayObs.length - 1]?.timeLst} LST</span>
+              <span>{detail.intradayObs[0]?.timeLst}</span>
+              <span>{detail.intradayObs[detail.intradayObs.length - 1]?.timeLst}</span>
             </div>
           </div>
         </div>
@@ -350,7 +350,7 @@ function StationView({ stationId }: { stationId: string }) {
               <Info className="w-3 h-3" />
               Faded = mathematically eliminated
             </div>
-            <div>Snapshot {dist.bookSnapshotTimeLst} LST</div>
+            <div>Snapshot {dist.bookSnapshotTimeLst}</div>
           </div>
         </div>
 

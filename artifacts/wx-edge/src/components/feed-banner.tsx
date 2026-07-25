@@ -28,7 +28,7 @@ export function FeedBanner({
       ? "No Kalshi API key — showing stub prices. Set KALSHI_API_KEY to enable live data."
       : detail === "key_lacks_access"
         ? "API key lacks weather market access — showing stub prices. Check key permissions."
-        : `Feed stale. Last good snapshot: ${timestampLst} LST.`;
+        : `Feed stale. Last good snapshot: ${timestampLst}.`;
 
   return (
     <div className="bg-orange-100 text-orange-900 border-b border-orange-200 px-4 py-2 flex items-center gap-2 text-sm font-medium">

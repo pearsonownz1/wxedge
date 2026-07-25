@@ -30,4 +30,21 @@ app.listen(port, (err) => {
   warmCache().catch((err) => {
     logger.warn({ err }, "Cache pre-warm encountered an unexpected error");
   });
+
+  // Periodic background refresh — keeps all feeds alive even when the UI
+  // is idle (e.g. overnight on Replit's free tier).  Interval is shorter
+  // than all TTLs (NWS obs 5 min, Kalshi book 30 s) so the cache is always
+  // refilled before it expires.  A failed refresh is logged and retried on
+  // the next tick; the server continues serving stale-flagged data.
+  const REFRESH_INTERVAL_MS = 4 * 60 * 1000; // 4 minutes
+  setInterval(() => {
+    warmCache().catch((err) => {
+      logger.warn({ err }, "Periodic cache refresh encountered an error — will retry next tick");
+    });
+  }, REFRESH_INTERVAL_MS);
+
+  logger.info(
+    { refreshIntervalMs: REFRESH_INTERVAL_MS },
+    "Background cache refresh scheduled"
+  );
 });

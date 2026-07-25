@@ -85,54 +85,6 @@ export interface OrderBookResult {
   isLive: boolean;
 }
 
-/** Parse Kalshi market ticker to extract bracket info.
- * Ticker format example: KXHIGHNY-25JUL26-T91 (above 91)
- * or KXHIGHNY-25JUL26-B8788 (between 87-88)
- */
-function parseBracketLabel(
-  ticker: string,
-  subtitle: string
-): { label: string; lowerBoundF: number | null; upperBoundF: number | null } {
-  // Try to parse from subtitle first (more reliable)
-  // e.g. "High of 91 to 92" or "High above 97" or "High at most 86"
-  const subtitleLower = subtitle.toLowerCase();
-
-  const aboveMatch = subtitleLower.match(/above\s+(\d+)/);
-  if (aboveMatch) {
-    return {
-      label: `≥${aboveMatch[1]}°`,
-      lowerBoundF: parseInt(aboveMatch[1], 10),
-      upperBoundF: null,
-    };
-  }
-
-  const mostMatch = subtitleLower.match(/at most\s+(\d+)/);
-  if (mostMatch) {
-    return {
-      label: `≤${mostMatch[1]}°`,
-      lowerBoundF: null,
-      upperBoundF: parseInt(mostMatch[1], 10),
-    };
-  }
-
-  const rangeMatch = subtitleLower.match(/(\d+)\s+to\s+(\d+)/);
-  if (rangeMatch) {
-    return {
-      label: `${rangeMatch[1]}–${rangeMatch[2]}°`,
-      lowerBoundF: parseInt(rangeMatch[1], 10),
-      upperBoundF: parseInt(rangeMatch[2], 10),
-    };
-  }
-
-  // Fall back: parse ticker suffix
-  if (ticker.includes("-T")) {
-    const m = ticker.match(/-T(\d+)$/);
-    if (m) return { label: `≥${m[1]}°`, lowerBoundF: parseInt(m[1], 10), upperBoundF: null };
-  }
-
-  return { label: subtitle, lowerBoundF: null, upperBoundF: null };
-}
-
 function marketToImpliedPct(bidCents: number | null, askCents: number | null): number {
   if (bidCents != null && askCents != null) {
     return Math.round((bidCents + askCents) / 2);
@@ -142,12 +94,71 @@ function marketToImpliedPct(bidCents: number | null, askCents: number | null): n
   return 0;
 }
 
-/** Map station ID to Kalshi event ticker prefix */
-const STATION_TO_PREFIX: Record<string, string> = {
+/**
+ * Parse Kalshi market bracket boundaries from the structured `strike_type`,
+ * `floor_strike`, and `cap_strike` fields (preferred over subtitle regex).
+ *
+ * Kalshi boundary conventions (verified against live KXHIGHNY API response):
+ *   "less":    YES if high < cap_strike       → int ≤ cap_strike−1
+ *   "between": YES if floor_strike ≤ high ≤ cap_strike (both inclusive)
+ *   "greater": YES if high > floor_strike     → int ≥ floor_strike+1
+ *
+ * The bracket mass function uses cdf(upperBound+1)−cdf(lowerBound), so these
+ * bounds slot directly into the asymmetric integration without additional +/−1.
+ */
+function parseKalshiMarket(market: Record<string, unknown>): {
+  label: string;
+  lowerBoundF: number | null;
+  upperBoundF: number | null;
+  bidCents: number | null;
+  askCents: number | null;
+} {
+  const subtitle = (market["subtitle"] ?? "") as string;
+  const strikeType = (market["strike_type"] ?? "") as string;
+  const floorStrike = market["floor_strike"] as number | undefined;
+  const capStrike = market["cap_strike"] as number | undefined;
+
+  let lowerBoundF: number | null = null;
+  let upperBoundF: number | null = null;
+  let label: string;
+
+  if (strikeType === "less" && capStrike != null) {
+    // YES if high < capStrike → integer ≤ capStrike−1
+    upperBoundF = capStrike - 1;
+    label = `≤${upperBoundF}°`;
+  } else if (strikeType === "between" && floorStrike != null && capStrike != null) {
+    // YES if floorStrike ≤ high ≤ capStrike (both inclusive)
+    lowerBoundF = floorStrike;
+    upperBoundF = capStrike;
+    label = subtitle || `${lowerBoundF}–${upperBoundF}°`;
+  } else if (strikeType === "greater" && floorStrike != null) {
+    // YES if high > floorStrike → integer ≥ floorStrike+1
+    lowerBoundF = floorStrike + 1;
+    label = `≥${lowerBoundF}°`;
+  } else {
+    // Fallback: use subtitle text as label with no boundary info
+    label = subtitle;
+  }
+
+  // Prices are returned as decimal strings ("0.1600"), not numeric.
+  const bidStr = market["yes_bid_dollars"] as string | null | undefined;
+  const askStr = market["yes_ask_dollars"] as string | null | undefined;
+  const bidCents = bidStr ? Math.round(parseFloat(bidStr) * 100) : null;
+  const askCents = askStr ? Math.round(parseFloat(askStr) * 100) : null;
+
+  return { label, lowerBoundF, upperBoundF, bidCents, askCents };
+}
+
+/**
+ * Individual Kalshi series tickers — each city has its own series.
+ * There is no unified "KXHIGH" series; fetches must be per-station.
+ *
+ * KDFW is excluded: no events are currently listed for KXHIGHDFW.
+ */
+const STATION_SERIES: Record<string, string> = {
   KNYC: "KXHIGHNY",
   KMDW: "KXHIGHCHI",
   KAUS: "KXHIGHAUS",
-  KDFW: "KXHIGHDFW",
   KLAX: "KXHIGHLAX",
   KPHL: "KXHIGHPHIL",
 };
@@ -157,90 +168,82 @@ export async function fetchKalshiEvents(): Promise<KalshiFetchResult> {
   const cached = cache.get<KalshiFetchResult>(key);
   if (cached) return cached.value;
 
-  const hasApiKey = Boolean(process.env["KALSHI_API_KEY"]);
+  // Fan out one request per station series in parallel (there is no unified KXHIGH endpoint)
+  const perStationResults = await Promise.allSettled(
+    Object.entries(STATION_SERIES).map(async ([_stationId, series]) => {
+      const data = (await kalshiFetch(
+        `/events?series_ticker=${series}&status=open&with_nested_markets=true&limit=1`
+      )) as Record<string, unknown>;
 
-  try {
-    const data = (await kalshiFetch(
-      "/events?series_ticker=KXHIGH&with_nested_markets=true&status=open"
-    )) as Record<string, unknown>;
+      const events = (data["events"] as unknown[]) ?? [];
+      if (events.length === 0) return null;
 
-    const rawEvents = (data["events"] as unknown[]) ?? [];
-    const result: KalshiEvent[] = [];
-
-    for (const ev of rawEvents) {
-      const event = ev as Record<string, unknown>;
+      const event = events[0] as Record<string, unknown>;
       const eventTicker = event["event_ticker"] as string;
-      const markets = (event["markets"] as unknown[]) ?? [];
+      const rawMarkets = (event["markets"] as unknown[]) ?? [];
 
-      // Find which station prefix this event belongs to
-      const stationPrefix = Object.values(STATION_TO_PREFIX).find((p) =>
-        eventTicker.startsWith(p)
-      );
-      if (!stationPrefix) continue;
-
-      const brackets: KalshiBracket[] = markets
+      const brackets: KalshiBracket[] = rawMarkets
         .map((m) => {
           const market = m as Record<string, unknown>;
-          const ticker = market["ticker"] as string;
-          const subtitle = (market["subtitle"] ?? market["title"] ?? "") as string;
-          const { label, lowerBoundF, upperBoundF } = parseBracketLabel(ticker, subtitle);
-
-          const yesAsk = market["yes_ask"] as number | null;
-          const yesBid = market["yes_bid"] as number | null;
-          const askCents = yesAsk != null ? Math.round(yesAsk * 100) : null;
-          const bidCents = yesBid != null ? Math.round(yesBid * 100) : null;
-
+          const { label, lowerBoundF, upperBoundF, bidCents, askCents } =
+            parseKalshiMarket(market);
+          if (!label) return null;
           return {
-            contractId: ticker,
+            contractId: market["ticker"] as string,
             label,
             lowerBoundF,
             upperBoundF,
             bidCents,
             askCents,
             impliedPct: marketToImpliedPct(bidCents, askCents),
-          };
+          } satisfies KalshiBracket;
         })
-        .filter((b) => b.label !== "");
+        .filter((b): b is KalshiBracket => b !== null && b.label !== "");
 
-      // Sort brackets by lower bound (ascending, nulls first)
-      brackets.sort((a, b) => {
-        const aLow = a.lowerBoundF ?? -Infinity;
-        const bLow = b.lowerBoundF ?? -Infinity;
-        return aLow - bLow;
-      });
+      // Sort by lower bound ascending (null = unbounded below → first)
+      brackets.sort(
+        (a, b) => (a.lowerBoundF ?? -Infinity) - (b.lowerBoundF ?? -Infinity)
+      );
 
-      result.push({
-        stationPrefix,
+      return {
+        stationPrefix: series,
         eventTicker,
-        contractDate: event["series_ticker"] as string,
+        contractDate: (event["series_ticker"] as string) ?? series,
         brackets,
-      });
-    }
+      } satisfies KalshiEvent;
+    })
+  );
 
-    // If the API returned no KXHIGH events, weather markets likely require auth.
-    // Use stubs and surface this explicitly so edge signals can be suppressed.
-    const usingStubData = result.length === 0;
-    if (usingStubData) {
-      if (hasApiKey) {
-        logger.warn(
-          "Kalshi returned no KXHIGH events despite API key — key may lack weather market access or contracts are not currently open. Using stub brackets — edge signals will be suppressed."
-        );
-      } else {
-        logger.warn(
-          "Kalshi returned no KXHIGH events — no KALSHI_API_KEY set. Set the secret to enable live weather market data. Using stub brackets — edge signals will be suppressed."
-        );
-      }
-    } else {
-      logger.info({ eventCount: result.length }, "Kalshi events fetched live");
-    }
+  const result: KalshiEvent[] = [];
+  let anyFailed = false;
 
-    const fetchResult: KalshiFetchResult = { events: result, usingStubData };
-    cache.set(key, fetchResult, TTL.KALSHI_BOOK_MS);
-    return fetchResult;
-  } catch (err) {
-    logger.warn({ err }, "Kalshi events fetch failed — using stub data");
-    return { events: [], usingStubData: true };
+  for (const r of perStationResults) {
+    if (r.status === "fulfilled" && r.value != null) {
+      result.push(r.value);
+    } else if (r.status === "rejected") {
+      logger.warn({ reason: String(r.reason) }, "Kalshi per-station fetch failed");
+      anyFailed = true;
+    }
+    // fulfilled-but-null means no open events for that series (normal)
   }
+
+  const usingStubData = result.length === 0;
+
+  if (usingStubData) {
+    logger.warn(
+      { hasApiKey: Boolean(process.env["KALSHI_API_KEY"]) },
+      "Kalshi returned no live events for any station — using stub brackets"
+    );
+  } else {
+    logger.info(
+      { stationsLive: result.length, anyFailed },
+      "Kalshi events fetched live"
+    );
+  }
+
+  const fetchResult: KalshiFetchResult = { events: result, usingStubData };
+  cache.set(key, fetchResult, TTL.KALSHI_BOOK_MS);
+  return fetchResult;
 }
 
 /**
@@ -379,7 +382,7 @@ export async function getBracketsForStation(
   stationId: string,
   _lstOffset: number
 ): Promise<BracketsResult> {
-  const prefix = STATION_TO_PREFIX[stationId];
+  const prefix = STATION_SERIES[stationId];
   if (!prefix) return { brackets: getStubBrackets(stationId), usingStubData: true };
 
   const { events, usingStubData } = await fetchKalshiEvents();

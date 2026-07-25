@@ -148,7 +148,7 @@ function MarketsView() {
       <div className="p-4 border-t flex items-center justify-between text-xs text-muted-foreground shrink-0 bg-card">
         <div>Ranked by fee-adjusted edge · view only</div>
         <div className="data-mono">
-          Book snapshot {marketData.bookSnapshotTimeLst} LST · {marketData.bookLatencySeconds.toFixed(1)}s latency
+          Book snapshot {marketData.bookSnapshotTimeLst} · {marketData.bookLatencySeconds.toFixed(1)}s latency
         </div>
       </div>
     </div>
