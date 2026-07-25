@@ -18,17 +18,17 @@ export function FeedBanner({
   const detail = feedStatusDetail ?? "unavailable";
 
   const icon =
-    detail === "no_api_key" ? <KeyRound className="w-4 h-4 shrink-0" /> :
+    detail === "no_api_key"      ? <KeyRound className="w-4 h-4 shrink-0" /> :
     detail === "key_lacks_access" ? <KeyRound className="w-4 h-4 shrink-0" /> :
-    detail === "unavailable" ? <WifiOff className="w-4 h-4 shrink-0" /> :
+    detail === "unavailable"      ? <WifiOff  className="w-4 h-4 shrink-0" /> :
     <AlertTriangle className="w-4 h-4 shrink-0" />;
 
   const message =
     detail === "no_api_key"
-      ? "No Kalshi API key — showing stub prices. Set KALSHI_API_KEY to enable live data."
+      ? "No Kalshi API key — live market data unavailable. Set KALSHI_API_KEY to enable live prices."
       : detail === "key_lacks_access"
-        ? "API key lacks weather market access — showing stub prices. Check key permissions."
-        : `Feed stale. Last good snapshot: ${timestampLst}.`;
+        ? "Kalshi API key lacks weather market access — live prices unavailable. Check key permissions."
+        : `Kalshi feed stale — last good snapshot: ${timestampLst}.`;
 
   return (
     <div className="bg-orange-100 text-orange-900 border-b border-orange-200 px-4 py-2 flex items-center gap-2 text-sm font-medium">

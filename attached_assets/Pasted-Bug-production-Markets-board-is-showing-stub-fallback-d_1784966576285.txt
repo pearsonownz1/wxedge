@@ -1,0 +1,16 @@
+Bug: production Markets board is showing stub/fallback data. Root cause first, then three hardening fixes.
+
+1. Root cause — the deployed app's Kalshi auth is failing. The banner says "API key lacks weather market access." Two likely causes, check in order:
+
+The KALSHI_API_KEY secret isn't present in the production deployment's environment (Replit deployment secrets are separate from workspace secrets — verify it's set for the published app, not just the editor).
+If the secret is there, the key itself lacks market-data permission or the prod request is failing differently (log the actual HTTP status/error body from one authenticated KXHIGHCHI event fetch in prod — don't guess from the banner).
+
+2. Delete the stub fallback path entirely. When Kalshi auth fails, the correct behavior is an empty board with the error banner — not STUB rows with synthetic prices. Fail loudly. The stubs were supposed to be gone already; they came back through this fallback. Remove the code path, not just the rows.
+
+3. Filter to live events only. Yesterday's markets (26JUL24 tickers) are rendering on the board. Only today's/open events should appear — filter on event status/close time from the API, not on our own date math.
+
+4. Add a book-quality gate to STATUS. A row must NOT show ACTIONABLE if any of: data came from fallback, book is one-sided (missing bid or ask), spread > some sane max (say 20¢), or event is closed/settled. Those rows get status NO-DATA / CLOSED and must be excluded from signal generation and (soon) proposal creation. The trader's staleness gates may already suppress signals — this makes the display tell the same truth, which matters once the Approve button exists.
+
+Acceptance: prod board shows only today's real markets with two-sided books; killing the API key in a test deploy produces an empty board + banner, zero rows, zero ACTIONABLE.
+
+That's the whole handoff. #1 is probably a two-minute fix (re-add the secret to the deployment); #2-4 are the insurance that this class of bug can never again produce a row your approval queue would offer you.

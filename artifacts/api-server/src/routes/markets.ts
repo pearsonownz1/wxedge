@@ -28,6 +28,8 @@ import { cache, TTL } from "../lib/cache.js";
 
 const router: IRouter = Router();
 
+const MAX_SPREAD_CENTS = 20;
+
 function bookSnapshotTime(): string {
   const d = new Date();
   const h = String(d.getUTCHours()).padStart(2, "0");
@@ -41,13 +43,35 @@ function kalshiBookLatency(): number {
   return age === Infinity ? 0 : Math.round(age);
 }
 
-/**
- * Running high = monotonic max over today's observations.
- * This is correct even when temperatures peak mid-day and drop afterward.
- */
 function runningHighFromObs(intradayObs: { tempF: number }[]): number {
   if (intradayObs.length === 0) return 72;
   return intradayObs.reduce((max, p) => Math.max(max, p.tempF), -Infinity);
+}
+
+/**
+ * Book-quality gate — determines whether a bracket is actually ACTIONABLE.
+ *
+ * A bracket is NOT actionable if any of:
+ *   - Data came from fallback (usingStubData)
+ *   - Book is one-sided (missing bid or ask)
+ *   - Spread > MAX_SPREAD_CENTS (≥ 20¢ indicates illiquid / stale book)
+ *
+ * On failure, downgrades "actionable" to "no_data" so the board and the
+ * approval queue tell the same truth.
+ */
+function qualifiedStatus(
+  rawStatus: "actionable" | "settled_short" | "below_threshold" | "locked",
+  bidCents: number | null,
+  askCents: number | null,
+  usingStubData: boolean
+): "actionable" | "settled_short" | "below_threshold" | "locked" | "no_data" {
+  if (rawStatus !== "actionable") return rawStatus;
+
+  if (usingStubData) return "no_data";
+  if (bidCents === null || askCents === null) return "no_data";
+  if (askCents - bidCents > MAX_SPREAD_CENTS) return "no_data";
+
+  return "actionable";
 }
 
 // GET /markets
@@ -68,9 +92,12 @@ router.get("/markets", async (req, res): Promise<void> => {
         getBracketsForStation(stationId, meta.lstOffset),
       ]);
 
-      if (bracketResult.usingStubData) anyStubData = true;
+      if (bracketResult.usingStubData) {
+        anyStubData = true;
+        // No live data for this station — emit no rows rather than synthetic ones.
+        return [];
+      }
 
-      // True running high from intraday max (not latest obs which may have dropped)
       const runningHighF = runningHighFromObs(intradayObs);
       const nbmMedianF = forecast?.maxTempF ?? runningHighF;
 
@@ -82,16 +109,13 @@ router.get("/markets", async (req, res): Promise<void> => {
         meta.rmse
       );
 
-      // Enrich each bracket with live order book bid/ask when available.
-      // Fetches are parallelised and cached, so the overhead per call is low.
-      const enrichedBrackets = bracketResult.usingStubData
-        ? bracketResult.brackets
-        : await Promise.all(
-            bracketResult.brackets.map(async (b) => {
-              const book = await fetchOrderBook(b.contractId);
-              return enrichBracketFromOrderBook(b, book);
-            })
-          );
+      // Enrich with live order book bid/ask (parallelised, cached).
+      const enrichedBrackets = await Promise.all(
+        bracketResult.brackets.map(async (b) => {
+          const book = await fetchOrderBook(b.contractId);
+          return enrichBracketFromOrderBook(b, book);
+        })
+      );
 
       const brackets = buildBracketDistribution(
         enrichedBrackets,
@@ -103,21 +127,21 @@ router.get("/markets", async (req, res): Promise<void> => {
       );
 
       return brackets.map((b) => ({
-        contractId: b.contractId ?? `${stationId}-UNKNOWN`,
+        contractId:  b.contractId ?? `${stationId}-UNKNOWN`,
         stationId,
-        bracket: b.label,
-        modelPct: b.modelPct,
-        impliedPct: b.impliedPct,
-        bidCents: b.bidCents,
-        askCents: b.askCents,
-        edgeNetPts: b.edgePts,
-        status: getMarketStatus(b),
-        lockStatus: b.lockStatus,
+        bracket:     b.label,
+        modelPct:    b.modelPct,
+        impliedPct:  b.impliedPct,
+        bidCents:    b.bidCents,
+        askCents:    b.askCents,
+        edgeNetPts:  b.edgePts,
+        status:      qualifiedStatus(getMarketStatus(b), b.bidCents, b.askCents, false),
+        lockStatus:  b.lockStatus,
       }));
     })
   );
 
-  // Flatten and sort by absolute edge (settled/dead brackets go to bottom)
+  // Flatten and sort by absolute edge (settled/dead brackets go to bottom).
   const flat = allMarkets.flat();
   flat.sort((a, b) => {
     if (a.status === "settled_short" && b.status !== "settled_short") return 1;
@@ -125,11 +149,9 @@ router.get("/markets", async (req, res): Promise<void> => {
     return Math.abs(b.edgeNetPts) - Math.abs(a.edgeNetPts);
   });
 
-  // feedFresh is false if Kalshi brackets are stubs (edge signals unreliable)
   const kalshiAge = cache.ageSeconds("kalshi:events");
   const feedFresh = !anyStubData && kalshiAge <= TTL.KALSHI_BOOK_MS / 1000;
 
-  // feedStatusDetail: why is the feed stale?
   const hasApiKey = Boolean(process.env["KALSHI_API_KEY"]);
   const feedStatusDetail: "live" | "no_api_key" | "key_lacks_access" | "unavailable" = feedFresh
     ? "live"
@@ -142,7 +164,7 @@ router.get("/markets", async (req, res): Promise<void> => {
   res.json({
     markets: flat,
     bookSnapshotTimeLst: bookSnapshotTime(),
-    bookLatencySeconds: kalshiBookLatency(),
+    bookLatencySeconds:  kalshiBookLatency(),
     feedFresh,
     feedStatusDetail,
   });
@@ -162,25 +184,13 @@ router.get("/markets/:contractId", async (req, res): Promise<void> => {
   const now = new Date();
   const season = getSeason(now);
 
-  // Find which station this contract belongs to — check kalshiPrefix first, then station ID prefix
+  // Find which station owns this contract.
   let matchedStation: string | null = null;
   for (const id of STATION_IDS) {
     const meta = STATIONS[id];
     if (contractId.startsWith(meta.kalshiPrefix) || contractId.startsWith(id)) {
       matchedStation = id;
       break;
-    }
-  }
-
-  // Second pass: scan all station bracket lists (handles stub IDs like "KNYC-STUB-3")
-  if (!matchedStation) {
-    for (const id of STATION_IDS) {
-      const meta = STATIONS[id];
-      const { brackets } = await getBracketsForStation(id, meta.lstOffset);
-      if (brackets.some((b) => b.contractId === contractId)) {
-        matchedStation = id;
-        break;
-      }
     }
   }
 
@@ -204,7 +214,14 @@ router.get("/markets/:contractId", async (req, res): Promise<void> => {
     OrderBookResult,
   ];
 
-  // True running high: intraday max, not latest obs temp
+  if (bracketResult.usingStubData || bracketResult.brackets.length === 0) {
+    res.status(503).json({
+      error: "Live Kalshi data unavailable for this station",
+      feedStatusDetail: "key_lacks_access",
+    });
+    return;
+  }
+
   const runningHighF = runningHighFromObs(intradayObs);
   const nbmMedianF = forecast?.maxTempF ?? runningHighF;
   const calibratedMedianF = parseFloat((nbmMedianF + bias).toFixed(1));
@@ -217,8 +234,6 @@ router.get("/markets/:contractId", async (req, res): Promise<void> => {
     meta.rmse
   );
 
-  // Enrich the target bracket with live order book bid/ask so edge is
-  // calculated on the real best-bid/best-ask, not the events-list approximation.
   const enrichedBrackets = bracketResult.brackets.map((b) =>
     b.contractId === contractId
       ? enrichBracketFromOrderBook(b, orderBookResult)
@@ -234,12 +249,12 @@ router.get("/markets/:contractId", async (req, res): Promise<void> => {
     percentiles
   );
 
-  // Find the specific bracket for this contract — exact match only; no fallback.
-  // A prefixed-but-unknown contractId must return 404, not a substitute bracket.
   const targetBracket = allBrackets.find((b) => b.contractId === contractId);
 
   if (!targetBracket) {
-    res.status(404).json({ error: `Contract '${contractId}' not found in current bracket set` });
+    res.status(404).json({
+      error: `Contract '${contractId}' not found in current bracket set`,
+    });
     return;
   }
 
@@ -247,13 +262,11 @@ router.get("/markets/:contractId", async (req, res): Promise<void> => {
   const kalshiUrl = `https://kalshi.com/markets/${contractId.toLowerCase()}`;
 
   const kalshiAge = cache.ageSeconds("kalshi:events");
-  // feedFresh requires both: live brackets from Kalshi AND a live order book.
   const feedFresh =
     !bracketResult.usingStubData &&
     kalshiAge <= TTL.KALSHI_BOOK_MS / 1000 &&
     orderBookResult.isLive;
 
-  // feedStatusDetail: why is the feed stale?
   const hasApiKey = Boolean(process.env["KALSHI_API_KEY"]);
   const feedStatusDetail: "live" | "no_api_key" | "key_lacks_access" | "unavailable" = feedFresh
     ? "live"
@@ -263,22 +276,30 @@ router.get("/markets/:contractId", async (req, res): Promise<void> => {
         ? "key_lacks_access"
         : "unavailable";
 
+  const rawStatus = getMarketStatus(targetBracket);
+  const status = qualifiedStatus(
+    rawStatus,
+    targetBracket.bidCents,
+    targetBracket.askCents,
+    bracketResult.usingStubData
+  );
+
   res.json({
     contractId,
-    stationId: matchedStation,
+    stationId:   matchedStation,
     stationName: meta.name,
     contractDate: window.contractDate,
-    bracket: targetBracket.label,
-    modelPct: targetBracket.modelPct,
-    askCents: targetBracket.askCents,
-    edgeNetPts: targetBracket.edgePts,
-    status: getMarketStatus(targetBracket),
+    bracket:     targetBracket.label,
+    modelPct:    targetBracket.modelPct,
+    askCents:    targetBracket.askCents,
+    edgeNetPts:  targetBracket.edgePts,
+    status,
     disagreementBreakdown: {
-      rawNbmMedianF: nbmMedianF,
-      biasLabel: `${meta.name.split(",")[0]} ${season} bias correction`,
-      biasAppliedF: bias,
+      rawNbmMedianF:      nbmMedianF,
+      biasLabel:          `${meta.name.split(",")[0]} ${season} bias correction`,
+      biasAppliedF:       bias,
       calibratedMedianF,
-      bracketMassPct: targetBracket.modelPct,
+      bracketMassPct:     targetBracket.modelPct,
       runningHighFloorNote: runningHighFloorNote(
         targetBracket.lowerBoundF,
         targetBracket.upperBoundF,
@@ -287,7 +308,7 @@ router.get("/markets/:contractId", async (req, res): Promise<void> => {
       ),
       lockinAmbiguityNote: lockinAmbiguityNote(targetBracket.lockStatus),
     },
-    orderBook: orderBookResult.levels,
+    orderBook:       orderBookResult.levels,
     orderBookIsLive: orderBookResult.isLive,
     allBrackets,
     kalshiUrl,
