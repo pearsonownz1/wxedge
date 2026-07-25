@@ -1,15 +1,16 @@
 /**
  * Kalshi API client.
  *
- * NOTE ON WEATHER MARKETS: As of July 2026, daily high-temperature (KXHIGH)
- * contracts require an API key — they are not available on the unauthenticated
- * public API. Set the KALSHI_API_KEY environment secret to enable live data.
+ * AUTH: Kalshi market reads (events, orderbooks) are fully public — no API key
+ * required. Do NOT send an Authorization header on read requests; Kalshi rejects
+ * requests with an invalid/expired bearer token even on public endpoints.
+ * RSA signing (KALSHI_KEY_ID / KALSHI_PRIVATE_KEY) is only needed for order
+ * execution (Phase B) and is not implemented here yet.
  *
- * Failure policy: FAIL LOUDLY. When Kalshi auth fails or the API is
- * unreachable, return empty brackets/book with usingStubData=true / isLive=false.
- * The route layer renders an empty board + error banner. NO synthetic prices,
- * NO stub rows, NO fake order books. A stub row in the approval queue is worse
- * than an empty queue.
+ * Failure policy: FAIL LOUDLY. When the API is unreachable, return empty
+ * brackets/book with usingStubData=true / isLive=false. The route layer renders
+ * an empty board + error banner. NO synthetic prices, NO stub rows, NO fake order
+ * books. A stub row in the approval queue is worse than an empty queue.
  *
  * Date filter: only show events whose settlement date is today or in the future.
  * The Kalshi API occasionally returns stale closed events under status=open;
@@ -22,14 +23,6 @@ import { logger } from "./logger.js";
 const KALSHI_BASE = "https://api.elections.kalshi.com/trade-api/v2";
 const UA = "WxEdge/1.0 (kalshi-weather-edge)";
 
-function getAuthHeaders(): Record<string, string> {
-  const apiKey = process.env["KALSHI_API_KEY"];
-  if (apiKey) {
-    return { Authorization: `Bearer ${apiKey}` };
-  }
-  return {};
-}
-
 /** HTTP error from Kalshi — carries the status code for banner classification. */
 class KalshiHttpError extends Error {
   constructor(public readonly status: number, message: string) {
@@ -39,11 +32,12 @@ class KalshiHttpError extends Error {
 }
 
 async function kalshiFetch(path: string): Promise<unknown> {
+  // No Authorization header — Kalshi reads are fully public.
+  // Sending an invalid/expired bearer token causes 401/403 even on public endpoints.
   const resp = await fetch(`${KALSHI_BASE}${path}`, {
     headers: {
       "User-Agent": UA,
       Accept: "application/json",
-      ...getAuthHeaders(),
     },
   });
   if (!resp.ok) {

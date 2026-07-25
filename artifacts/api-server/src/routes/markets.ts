@@ -153,28 +153,25 @@ router.get("/markets", async (req, res): Promise<void> => {
   const kalshiAge = cache.ageSeconds("kalshi:events");
   const feedFresh = !anyStubData && kalshiAge <= TTL.KALSHI_BOOK_MS / 1000;
 
-  const hasApiKey = Boolean(process.env["KALSHI_API_KEY"]);
   // fetchKalshiEvents is cached — this re-uses the in-memory result, no network call.
   const { allStaleFiltered, failureReason } = await fetchKalshiEvents();
 
+  // Kalshi reads are fully public — no API key required. Drive feedStatusDetail
+  // from the actual fetch outcome, not from whether an API key is present.
   const feedStatusDetail:
-    | "live" | "no_api_key" | "auth_failed" | "rate_limited" | "network_error"
-    | "key_lacks_access" | "no_current_contracts" | "unavailable" =
+    | "live" | "auth_failed" | "rate_limited" | "network_error"
+    | "no_current_contracts" | "unavailable" =
     feedFresh
       ? "live"
-      : !hasApiKey
-        ? "no_api_key"
-        : allStaleFiltered
-          ? "no_current_contracts"
-          : failureReason === "auth_failed"
-            ? "auth_failed"
-            : failureReason === "rate_limited"
-              ? "rate_limited"
-              : failureReason === "network_error"
-                ? "network_error"
-                : anyStubData
-                  ? "key_lacks_access"  // unknown failure — conservative fallback
-                  : "unavailable";
+      : failureReason === "auth_failed"
+        ? "auth_failed"
+        : failureReason === "rate_limited"
+          ? "rate_limited"
+          : failureReason === "network_error"
+            ? "network_error"
+            : (allStaleFiltered || (anyStubData && !failureReason))
+              ? "no_current_contracts"  // 0 events with no error = markets not open yet
+              : "unavailable";
 
   res.json({
     markets: flat,
@@ -282,14 +279,14 @@ router.get("/markets/:contractId", async (req, res): Promise<void> => {
     kalshiAge <= TTL.KALSHI_BOOK_MS / 1000 &&
     orderBookResult.isLive;
 
-  const hasApiKey = Boolean(process.env["KALSHI_API_KEY"]);
-  const feedStatusDetail: "live" | "no_api_key" | "key_lacks_access" | "unavailable" = feedFresh
+  // Kalshi reads are public — classify by actual failure, not API key presence.
+  const feedStatusDetail: "live" | "auth_failed" | "rate_limited" | "network_error" | "no_current_contracts" | "unavailable" = feedFresh
     ? "live"
-    : !hasApiKey
-      ? "no_api_key"
-      : bracketResult.usingStubData || !orderBookResult.isLive
-        ? "key_lacks_access"
-        : "unavailable";
+    : bracketResult.usingStubData && !bracketResult.usingStubData // stub from fetch failure
+      ? "unavailable"
+      : !orderBookResult.isLive
+        ? "unavailable"
+        : "no_current_contracts";
 
   const rawStatus = getMarketStatus(targetBracket);
   const status = qualifiedStatus(
