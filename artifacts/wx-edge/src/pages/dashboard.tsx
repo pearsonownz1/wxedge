@@ -123,7 +123,14 @@ function StationView({ stationId }: { stationId: string }) {
   }
 
   const { settlementWindow: win } = detail;
-  const stale = !dist.feedFresh;
+  // Observation staleness (IEM/NWS) — freezes the race track and kill feed.
+  // Separate from Kalshi/book staleness, which only suppresses edge signals
+  // and is already surfaced by the top FeedBanner.
+  const obsStale = !dist.feedStatus.nwsFresh;
+  // Book staleness — hides edge signals in the divergence table.
+  const bookStale = !dist.feedFresh;
+  // The race track and kill feed care about obs, not book.
+  const stale = obsStale;
 
   return (
     <div className="flex h-full overflow-hidden">

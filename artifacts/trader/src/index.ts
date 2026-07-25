@@ -63,6 +63,17 @@ async function tryAcquireLeaderLock(): Promise<boolean> {
   );
   if (rows[0]?.acquired === true) {
     _leaderConn = client; // hold forever — lock lives with this session
+
+    // If the DB forcibly closes this connection (admin shutdown, failover, etc.)
+    // the advisory lock is released automatically by Postgres.  We exit cleanly
+    // so the API server's restart-with-backoff loop can spawn a fresh trader,
+    // which will then race standby instances for the lock.
+    client.on("error", (err) => {
+      logger.error({ err, lockKey: ADVISORY_LOCK_KEY },
+        "Leader lock connection lost — exiting so restart can re-acquire the lock");
+      process.exit(1);
+    });
+
     logger.info(
       { lockKey: ADVISORY_LOCK_KEY, mode: config.mode, execution_mode: config.execution_mode },
       "Advisory lock acquired — this instance is the trader leader"
