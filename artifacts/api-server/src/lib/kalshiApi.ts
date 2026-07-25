@@ -194,6 +194,11 @@ export async function fetchKalshiEvents(): Promise<KalshiFetchResult> {
   }
 
   const key = "kalshi:events";
+
+  // Peek before get: save the stale entry BEFORE cache.get() deletes it on expiry.
+  // Used as a fallback if the fresh fetch returns 429 or fails.
+  const staleEntry = cache.peek<KalshiFetchResult>(key);
+
   const cached = cache.get<KalshiFetchResult>(key);
   if (cached) return cached.value;
 
@@ -317,6 +322,18 @@ export async function fetchKalshiEvents(): Promise<KalshiFetchResult> {
   const allStaleFiltered = usingStubData && anyStaleFiltered && !anyFailed;
 
   if (usingStubData) {
+    // All stations returned empty (429s or no contracts). Before giving up,
+    // serve the last-known-good stale entry so the board stays visible.
+    if (staleEntry && !staleEntry.value.usingStubData) {
+      logger.warn(
+        { staleAgeMs: staleEntry.ageMs, anyFailed, allStaleFiltered },
+        "Kalshi fetch returned no live events — serving stale cached data to avoid board blackout"
+      );
+      // Re-cache the stale value for a short window so the next request doesn't also hammer Kalshi.
+      cache.set(key, staleEntry.value, Math.min(TTL.KALSHI_BOOK_MS / 4, 60_000));
+      return staleEntry.value;
+    }
+
     logger.warn(
       { hasApiKey: Boolean(process.env["KALSHI_API_KEY"]), anyFailed, allStaleFiltered },
       allStaleFiltered

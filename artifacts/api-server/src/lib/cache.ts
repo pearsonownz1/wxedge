@@ -51,6 +51,6 @@ export const cache = new Cache();
 export const TTL = {
   NWS_OBS_MS: 5 * 60 * 1000,       // 5 min
   NWS_FORECAST_MS: 30 * 60 * 1000, // 30 min
-  KALSHI_BOOK_MS: 30 * 1000,        // 30 s
+  KALSHI_BOOK_MS: 5 * 60 * 1000,   // 5 min (background refresh runs every 4 min)
   CALIBRATION_MS: 24 * 60 * 60 * 1000, // 24 h
 } as const;
