@@ -74,8 +74,13 @@ export interface KalshiEvent {
 
 export interface KalshiFetchResult {
   events: KalshiEvent[];
-  /** True when the response is built from hardcoded stubs rather than live API data. */
+  /** True when no live events were available (API error, auth failure, or stale-filtered). */
   usingStubData: boolean;
+  /**
+   * True when Kalshi responded successfully but all events were rejected as stale.
+   * Indicates "contracts not open yet today" — distinct from an auth/network failure.
+   */
+  allStaleFiltered: boolean;
 }
 
 export interface OrderBookLevel {
@@ -253,6 +258,7 @@ export async function fetchKalshiEvents(): Promise<KalshiFetchResult> {
 
   const result: KalshiEvent[] = [];
   let anyFailed = false;
+  let anyStaleFiltered = false;
 
   for (const r of perStationResults) {
     if (r.status === "fulfilled" && r.value != null) {
@@ -260,16 +266,25 @@ export async function fetchKalshiEvents(): Promise<KalshiFetchResult> {
     } else if (r.status === "rejected") {
       logger.warn({ reason: String(r.reason) }, "Kalshi per-station fetch failed");
       anyFailed = true;
+    } else if (r.status === "fulfilled" && r.value === null) {
+      // null means either no open events for the series, or the event was
+      // stale-filtered. We set anyStaleFiltered speculatively; the warning
+      // logs above will confirm which case it was.
+      anyStaleFiltered = true;
     }
-    // fulfilled-but-null = no open events or past event filtered out (normal)
   }
 
   const usingStubData = result.length === 0;
+  // allStaleFiltered = true when we got responses but every event was filtered
+  // as past-dated (key is fine, today's contracts just haven't opened yet).
+  const allStaleFiltered = usingStubData && anyStaleFiltered && !anyFailed;
 
   if (usingStubData) {
     logger.warn(
-      { hasApiKey: Boolean(process.env["KALSHI_API_KEY"]), anyFailed },
-      "Kalshi returned no live events for any station — board will be empty"
+      { hasApiKey: Boolean(process.env["KALSHI_API_KEY"]), anyFailed, allStaleFiltered },
+      allStaleFiltered
+        ? "All Kalshi events are stale (yesterday's contracts) — today's not open yet"
+        : "Kalshi returned no live events for any station — board will be empty"
     );
   } else {
     logger.info(
@@ -278,7 +293,7 @@ export async function fetchKalshiEvents(): Promise<KalshiFetchResult> {
     );
   }
 
-  const fetchResult: KalshiFetchResult = { events: result, usingStubData };
+  const fetchResult: KalshiFetchResult = { events: result, usingStubData, allStaleFiltered };
   cache.set(key, fetchResult, TTL.KALSHI_BOOK_MS);
   return fetchResult;
 }

@@ -14,6 +14,7 @@ import {
 } from "../lib/nwsApi.js";
 import {
   getBracketsForStation,
+  fetchKalshiEvents,
   fetchOrderBook,
   enrichBracketFromOrderBook,
   type OrderBookResult,
@@ -153,13 +154,20 @@ router.get("/markets", async (req, res): Promise<void> => {
   const feedFresh = !anyStubData && kalshiAge <= TTL.KALSHI_BOOK_MS / 1000;
 
   const hasApiKey = Boolean(process.env["KALSHI_API_KEY"]);
-  const feedStatusDetail: "live" | "no_api_key" | "key_lacks_access" | "unavailable" = feedFresh
-    ? "live"
-    : !hasApiKey
-      ? "no_api_key"
-      : anyStubData
-        ? "key_lacks_access"
-        : "unavailable";
+  // fetchKalshiEvents is cached — this re-uses the in-memory result, no network call.
+  const { allStaleFiltered } = await fetchKalshiEvents();
+
+  const feedStatusDetail:
+    | "live" | "no_api_key" | "key_lacks_access" | "no_current_contracts" | "unavailable" =
+    feedFresh
+      ? "live"
+      : !hasApiKey
+        ? "no_api_key"
+        : allStaleFiltered
+          ? "no_current_contracts"
+          : anyStubData
+            ? "key_lacks_access"
+            : "unavailable";
 
   res.json({
     markets: flat,
