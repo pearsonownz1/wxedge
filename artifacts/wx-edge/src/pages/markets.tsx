@@ -84,6 +84,7 @@ function MarketsView() {
               <th className="px-4 py-3 font-medium">Bracket</th>
               <th className="px-4 py-3 font-medium text-right">Model %</th>
               <th className="px-4 py-3 font-medium text-right">Implied %</th>
+              <th className="px-4 py-3 font-medium text-right">Δ Mod−Mkt</th>
               <th className="px-4 py-3 font-medium text-right">Bid / Ask</th>
               <th className="px-4 py-3 font-medium text-right text-foreground">Edge (Net)</th>
               <th className="px-4 py-3 font-medium">Status</th>
@@ -115,6 +116,19 @@ function MarketsView() {
                   </td>
                   <td className="px-4 py-3 text-right data-mono">{formatPct(m.modelPct)}</td>
                   <td className="px-4 py-3 text-right data-mono">{formatPct(m.impliedPct)}</td>
+                  <td className="px-4 py-3 text-right data-mono font-bold" style={
+                    (() => {
+                      const d = m.modelPct - m.impliedPct;
+                      if (!marketData.feedFresh) return { color: "hsl(0 0% 45%)" };
+                      return d >= 0
+                        ? { color: "hsl(350 85% 55%)" }
+                        : { color: "oklch(0.55 0.09 250)" };
+                    })()
+                  }>
+                    {marketData.feedFresh
+                      ? `${m.modelPct - m.impliedPct > 0 ? "+" : ""}${(m.modelPct - m.impliedPct).toFixed(1)}`
+                      : "—"}
+                  </td>
                   <td className="px-4 py-3 text-right data-mono text-muted-foreground">
                     {m.bidCents !== null ? `${m.bidCents}¢` : "—"} / {m.askCents !== null ? `${m.askCents}¢` : "—"}
                   </td>

@@ -8,10 +8,12 @@ import {
   useGetStationDistribution,
   getGetStationDistributionQueryKey
 } from "@workspace/api-client-react";
-import { cn, formatPts, formatTemp, formatPct } from "@/lib/utils";
+import { cn, formatPts } from "@/lib/utils";
 import { Shell } from "@/components/shell";
 import { FeedBanner } from "@/components/feed-banner";
-import { ArrowRight, Thermometer, Clock, Target, Info } from "lucide-react";
+import { RaceTrack } from "@/components/race-track";
+import { KillFeed } from "@/components/kill-feed";
+import { ArrowRight, Clock, Target } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, ReferenceLine } from "recharts";
 
 export default function Dashboard() {
@@ -120,289 +122,192 @@ function StationView({ stationId }: { stationId: string }) {
     return <div className="p-8 text-sm text-muted-foreground">Loading station data...</div>;
   }
 
-  const { settlementWindow: window } = detail;
-  const showEdge = dist.feedFresh;
-
-  const activeBrackets = dist.brackets;
+  const { settlementWindow: win } = detail;
+  const stale = !dist.feedFresh;
 
   return (
-    <div className="max-w-6xl mx-auto p-8 flex gap-8">
-      {/* Left Column: Data & Chart */}
-      <div className="flex-1 flex flex-col gap-8">
-        
-        {/* Header */}
-        <div className="flex items-start justify-between">
+    <div className="flex h-full overflow-hidden">
+
+      {/* ── Main column ─────────────────────────────────────────── */}
+      <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-6 min-w-0">
+
+        {/* Header row */}
+        <div className="flex items-start justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2 mb-1">
-              <h1 className="text-3xl font-bold tracking-tight">{detail.id}</h1>
-              <span className="text-3xl text-muted-foreground font-light">·</span>
-              <h2 className="text-3xl font-medium text-muted-foreground">{window.contractDate}</h2>
+            <div className="flex items-center gap-2 mb-0.5">
+              <h1 className="text-2xl font-bold tracking-tight">{detail.id}</h1>
+              <span className="text-2xl text-muted-foreground font-light">·</span>
+              <h2 className="text-2xl font-medium text-muted-foreground">{win.contractDate}</h2>
             </div>
-            <div className="text-muted-foreground">{detail.name}</div>
-          </div>
-          <div className="text-right">
-            <div className="text-5xl font-bold tracking-tighter text-foreground data-mono">
-              {detail.runningHighF.toFixed(0)}<span className="text-2xl text-muted-foreground font-light ml-1">°F</span>
+            <div className="text-sm text-muted-foreground">
+              {detail.name} · window {win.lstStart}–{win.lstEnd} LST
+              {' · '}
+              <span className="data-mono">
+                {Math.floor(win.hoursRemaining)}h {Math.floor((win.hoursRemaining % 1) * 60)}m remaining
+              </span>
             </div>
-            <div className="text-sm text-muted-foreground uppercase tracking-widest mt-1">Running High</div>
-          </div>
-        </div>
-
-        {/* Info Cards Row */}
-        <div className="grid grid-cols-2 gap-4">
-          <div className="border bg-card p-4 flex flex-col justify-between">
-            <div className="flex items-center gap-2 text-muted-foreground mb-2">
-              <Clock className="w-4 h-4" />
-              <span className="text-xs font-bold uppercase tracking-wider">Settlement Window</span>
-            </div>
-            <div>
-              <div className="text-lg font-medium data-mono">
-                {window.lstStart} – {window.lstEnd} <span className="text-sm text-muted-foreground">LST</span>
+            {win.dstActive && win.spillsToNextDay && win.spillsToDate && (
+              <div className="text-[10px] text-orange-600 font-medium mt-1 bg-orange-50 inline-block px-1.5 py-0.5">
+                DST active — window spills to {win.spillsToDate}
               </div>
-              <div className="text-sm text-muted-foreground data-mono">
-                {window.localStart} – {window.localEnd} <span className="text-xs">Local</span>
-              </div>
-              {window.dstActive && window.spillsToNextDay && window.spillsToDate && (
-                <div className="text-xs text-orange-600 font-medium mt-1 bg-orange-50 inline-block px-1.5 py-0.5 rounded-sm">
-                  DST active — window spills to {window.spillsToDate}
-                </div>
-              )}
-            </div>
-            <div className="mt-3 text-sm font-medium">
-              {Math.floor(window.hoursRemaining)}h {Math.floor((window.hoursRemaining % 1) * 60)}m remaining
-            </div>
+            )}
           </div>
 
-          <div className="border bg-card p-4 flex flex-col">
-            <div className="flex items-center gap-2 text-muted-foreground mb-2">
-              <Thermometer className="w-4 h-4" />
-              <span className="text-xs font-bold uppercase tracking-wider">Intraday High</span>
+          {/* Running high */}
+          <div className="text-right shrink-0">
+            <div className={cn("text-5xl font-bold tracking-tighter data-mono", stale && "opacity-50")}>
+              {detail.runningHighF.toFixed(1)}
+              <span className="text-xl text-muted-foreground font-light ml-1">°F</span>
             </div>
-            <div className="flex-1 h-20 w-full mt-2">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={detail.intradayObs}>
-                  <XAxis dataKey="timeLst" hide />
-                  <YAxis domain={['dataMin - 2', 'dataMax + 2']} hide />
-                  <Line 
-                    type="stepAfter" 
-                    dataKey="tempF" 
-                    stroke="hsl(var(--foreground))" 
-                    strokeWidth={2} 
-                    dot={false}
-                    isAnimationActive={false}
-                  />
-                  <ReferenceLine y={detail.runningHighF} stroke="hsl(var(--primary))" strokeDasharray="3 3" />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="flex justify-between text-xs text-muted-foreground mt-2 data-mono">
-              <span>{detail.intradayObs[0]?.timeLst}</span>
-              <span>{detail.intradayObs[detail.intradayObs.length - 1]?.timeLst}</span>
+            <div className="text-[10px] uppercase tracking-widest text-muted-foreground mt-0.5">
+              {stale ? "Last good high" : "Running High"}
             </div>
           </div>
         </div>
 
-        {/* Main Chart */}
-        <div className="border bg-card p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-bold">Probability Distribution</h3>
-            <div className="flex gap-4 text-sm">
-              <div className="flex items-center gap-1.5">
-                <div className="w-3 h-3 bg-primary rounded-sm"></div>
-                <span>Model</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-3 h-3 bg-foreground rounded-sm opacity-20"></div>
-                <span>Market Implied</span>
-              </div>
-            </div>
+        {/* Stale banner (1b) */}
+        {stale && (
+          <div className="border border-muted-foreground/30 bg-muted/40 px-4 py-2.5 text-sm text-muted-foreground flex items-center justify-between">
+            <span>
+              Observation feed stale — last reading {detail.obsTimestampLst ?? "unknown"}.
+              Track frozen at last-good high; eliminations and edge signals suspended.
+            </span>
+            <span className="text-[10px] font-bold uppercase tracking-widest ml-4 shrink-0">
+              Edge Signals Hidden
+            </span>
           </div>
+        )}
 
-          <div className="space-y-3">
-            {activeBrackets.map((b) => {
-              const isBest = dist.bestDivergencePts !== 0 && Math.abs(b.edgePts) === Math.abs(dist.bestDivergencePts);
-              const isDead = b.lockStatus === 'dead';
-              const maxBarWidth = 100; // %
-              
-              return (
-                <div key={b.label} className={cn("relative flex items-center group", isDead && "opacity-30")}>
-                  {/* Bracket Label */}
-                  <div className="w-20 shrink-0 text-sm font-bold data-mono text-right pr-4 whitespace-nowrap">
-                    {b.label}
-                  </div>
-                  
-                  {/* Bars Container */}
-                  <div className="flex-1 h-12 relative flex items-center border-l pl-4">
-                    <div className="w-full relative h-8 flex flex-col justify-center gap-1">
-                      {/* Model Bar */}
-                      <div 
-                        className="h-3 bg-primary transition-all duration-500 rounded-r-sm" 
-                        style={{ width: `${Math.max(b.modelPct, 1)}%` }}
-                      />
-                      {/* Implied Bar */}
-                      <div 
-                        className="h-3 bg-foreground opacity-20 transition-all duration-500 rounded-r-sm" 
-                        style={{ width: `${Math.max(b.impliedPct, 1)}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Values */}
-                  <div className="w-48 shrink-0 pl-4 flex flex-col justify-center">
-                    <div className="text-xs data-mono text-muted-foreground">
-                      Mod {b.modelPct.toFixed(0)}% · Mkt {b.impliedPct.toFixed(0)}%
-                    </div>
-                    {showEdge && !isDead && (
-                      <div className={cn("text-sm font-bold data-mono", 
-                        isBest ? "text-primary" : "text-foreground"
-                      )}>
-                        {formatPts(b.edgePts)} pts
-                      </div>
-                    )}
-                    {isDead && (
-                      <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground mt-0.5">
-                        Eliminated
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          
-          {/* NBM Spread annotation */}
-          {dist.nbmSpread && (
-            <div className="mt-4 pt-4 border-t">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                  NBM Spread
-                </div>
-                <div className={cn(
-                  "text-[10px] px-1.5 py-0.5 rounded-sm font-bold uppercase tracking-wider",
-                  dist.nbmSpread.source === 'nbm'
-                    ? "bg-primary/10 text-primary"
-                    : "bg-muted text-muted-foreground"
-                )}>
-                  {dist.nbmSpread.source === 'nbm' ? 'NBM' : 'Approx'}
-                </div>
-              </div>
-              <div className="relative h-6">
-                {/* Compute bar positions relative to P10–P90 range */}
-                {(() => {
-                  const spread = dist.nbmSpread;
-                  const rangeF = spread.p90F - spread.p10F;
-                  const pct = (v: number) =>
-                    rangeF > 0 ? Math.max(0, Math.min(100, ((v - spread.p10F) / rangeF) * 100)) : 50;
-                  return (
-                    <div className="relative w-full h-full flex items-center">
-                      {/* P10–P90 track */}
-                      <div className="absolute inset-x-0 h-1.5 rounded-full bg-muted" />
-                      {/* P25–P75 interquartile band */}
-                      <div
-                        className="absolute h-1.5 bg-primary/30 rounded-sm"
-                        style={{
-                          left: `${pct(spread.p25F)}%`,
-                          width: `${pct(spread.p75F) - pct(spread.p25F)}%`,
-                        }}
-                      />
-                      {/* P50 tick */}
-                      <div
-                        className="absolute w-1 h-4 bg-primary rounded-full -translate-x-0.5"
-                        style={{ left: `${pct(spread.p50F)}%` }}
-                      />
-                      {/* P10 label */}
-                      <span
-                        className="absolute text-[10px] data-mono text-muted-foreground -translate-x-1/2 top-4"
-                        style={{ left: `${pct(spread.p10F)}%` }}
-                      >
-                        {spread.p10F.toFixed(0)}°
-                      </span>
-                      {/* P50 label */}
-                      <span
-                        className="absolute text-[10px] data-mono font-bold text-primary -translate-x-1/2 top-4"
-                        style={{ left: `${pct(spread.p50F)}%` }}
-                      >
-                        {spread.p50F.toFixed(0)}°
-                      </span>
-                      {/* P90 label */}
-                      <span
-                        className="absolute text-[10px] data-mono text-muted-foreground -translate-x-1/2 top-4"
-                        style={{ left: `${pct(spread.p90F)}%` }}
-                      >
-                        {spread.p90F.toFixed(0)}°
-                      </span>
-                    </div>
-                  );
-                })()}
-              </div>
-              <div className="mt-6 flex gap-4 text-[10px] text-muted-foreground">
-                <span>P10={dist.nbmSpread.p10F.toFixed(1)}°</span>
-                <span>P25={dist.nbmSpread.p25F.toFixed(1)}°</span>
-                <span className="font-bold text-foreground">P50={dist.nbmSpread.p50F.toFixed(1)}°</span>
-                <span>P75={dist.nbmSpread.p75F.toFixed(1)}°</span>
-                <span>P90={dist.nbmSpread.p90F.toFixed(1)}°</span>
-              </div>
-            </div>
-          )}
-
-          <div className="mt-6 flex items-center justify-between text-xs text-muted-foreground border-t pt-4">
-            <div className="flex items-center gap-1">
-              <Info className="w-3 h-3" />
-              Faded = mathematically eliminated
-            </div>
-            <div>Snapshot {dist.bookSnapshotTimeLst}</div>
-          </div>
+        {/* ── Race Track ──────────────────────────────────────── */}
+        <div className="border bg-card p-5">
+          <RaceTrack
+            brackets={dist.brackets}
+            runningHighF={detail.runningHighF}
+            stationId={detail.id}
+            contractDate={win.contractDate}
+            stale={stale}
+          />
         </div>
 
-        <div>
-          <Link href="/markets" className="inline-flex items-center justify-center whitespace-nowrap text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground shadow hover:bg-primary/90 h-10 px-8 data-mono uppercase tracking-wider w-full md:w-auto">
-            Open {stationId} market board
-            <ArrowRight className="ml-2 w-4 h-4" />
-          </Link>
-        </div>
-
-      </div>
-
-      {/* Right Column: Calibration Sidebar */}
-      <div className="w-64 shrink-0 flex flex-col gap-4">
+        {/* ── Model Run Calibration card ───────────────────────── */}
         <div className="border bg-card p-4">
-          <div className="flex items-center gap-2 text-muted-foreground mb-4">
-            <Target className="w-4 h-4" />
-            <span className="text-xs font-bold uppercase tracking-wider">Calibration</span>
+          <div className="flex items-center gap-2 text-muted-foreground mb-3">
+            <Target className="w-3.5 h-3.5" />
+            <span className="text-[9px] font-bold uppercase tracking-widest">Model Run · Calibration Applied</span>
           </div>
-          
-          <div className="space-y-4">
+          <div className="grid grid-cols-4 gap-4">
             <div>
-              <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Mean Bias Applied</div>
-              <div className={cn("text-xl font-bold data-mono", detail.calibration.meanBias > 0 ? "text-primary" : "text-blue-600")}>
+              <div className="text-[9px] text-muted-foreground uppercase tracking-wider mb-1">Mean Bias</div>
+              <div className={cn("text-lg font-bold data-mono", detail.calibration.meanBias > 0 ? "text-primary" : "text-[oklch(0.55_0.09_250)]")}>
                 {detail.calibration.meanBias > 0 ? "+" : ""}{detail.calibration.meanBias.toFixed(2)}°F
               </div>
             </div>
-            
-            <div className="pt-4 border-t">
-              <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1">RMSE</div>
+            <div>
+              <div className="text-[9px] text-muted-foreground uppercase tracking-wider mb-1">RMSE</div>
               <div className="text-lg data-mono">{detail.calibration.rmse.toFixed(2)}</div>
             </div>
-            
-            <div className="pt-4 border-t">
-              <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Valid Pairs</div>
+            <div>
+              <div className="text-[9px] text-muted-foreground uppercase tracking-wider mb-1">Valid Pairs</div>
               <div className="text-lg data-mono">{detail.calibration.pairCount}</div>
             </div>
-
-            <div className="pt-4 border-t space-y-2 text-xs text-muted-foreground">
-              <div className="flex justify-between">
-                <span>Season</span>
-                <span className="font-medium text-foreground">{detail.calibration.season}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Source</span>
-                <span className="font-medium text-foreground text-right max-w-[120px] truncate" title={detail.calibration.dataSource}>{detail.calibration.dataSource}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Updated</span>
-                <span className="font-medium text-foreground data-mono">{new Date(detail.calibration.lastUpdated).toLocaleDateString()}</span>
-              </div>
+            <div>
+              <div className="text-[9px] text-muted-foreground uppercase tracking-wider mb-1">Last Run</div>
+              <div className="text-lg data-mono">{new Date(detail.calibration.lastUpdated).toLocaleDateString()}</div>
             </div>
+          </div>
+
+          {/* NBM Spread strip */}
+          {dist.nbmSpread && (() => {
+            const spread = dist.nbmSpread;
+            const rangeF = spread.p90F - spread.p10F;
+            const pct = (v: number) =>
+              rangeF > 0 ? Math.max(0, Math.min(100, ((v - spread.p10F) / rangeF) * 100)) : 50;
+            return (
+              <div className="mt-4 pt-3 border-t">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-[9px] uppercase tracking-wider text-muted-foreground font-bold">NBM Spread</span>
+                  <span className={cn(
+                    "text-[8px] px-1 py-0.5 font-bold uppercase tracking-wider",
+                    spread.source === 'nbm' ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+                  )}>
+                    {spread.source === 'nbm' ? 'NBM' : 'Approx'}
+                  </span>
+                </div>
+                <div className="relative h-5 mb-5">
+                  <div className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 bg-muted" />
+                  <div className="absolute h-1 top-1/2 -translate-y-1/2 bg-primary/30"
+                    style={{ left: `${pct(spread.p25F)}%`, width: `${pct(spread.p75F) - pct(spread.p25F)}%` }} />
+                  <div className="absolute w-0.5 h-4 top-1/2 -translate-y-1/2 bg-primary"
+                    style={{ left: `${pct(spread.p50F)}%`, transform: 'translateX(-50%) translateY(-50%)' }} />
+                  {[{ v: spread.p10F, label: `${spread.p10F.toFixed(0)}°` },
+                    { v: spread.p50F, label: `${spread.p50F.toFixed(0)}°`, bold: true },
+                    { v: spread.p90F, label: `${spread.p90F.toFixed(0)}°` }].map(({ v, label, bold }) => (
+                    <span key={v} className={cn("absolute text-[9px] data-mono top-4 -translate-x-1/2",
+                      bold ? "text-primary font-bold" : "text-muted-foreground")}
+                      style={{ left: `${pct(v)}%` }}>
+                      {label}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+
+        {/* Market board link */}
+        <div>
+          <Link href="/markets" className="inline-flex items-center justify-center text-sm font-bold bg-primary text-primary-foreground h-9 px-6 data-mono uppercase tracking-wider hover:bg-primary/90 transition-colors">
+            Open {stationId} market board
+            <ArrowRight className="ml-2 w-3.5 h-3.5" />
+          </Link>
+        </div>
+      </div>
+
+      {/* ── Right panel: Kill Feed + Calibration meta ─────────── */}
+      <div className="w-64 shrink-0 border-l flex flex-col overflow-hidden">
+
+        {/* Kill Feed */}
+        <div className="flex-1 overflow-hidden flex flex-col border-b">
+          <KillFeed
+            brackets={dist.brackets}
+            intradayObs={detail.intradayObs}
+            stationId={detail.id}
+            stale={stale}
+          />
+        </div>
+
+        {/* Intraday sparkline */}
+        <div className="p-3 shrink-0">
+          <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground mb-1.5">
+            Intraday High Trail
+          </div>
+          <div className="h-16 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={detail.intradayObs}>
+                <XAxis dataKey="timeLst" hide />
+                <YAxis domain={['dataMin - 1', 'dataMax + 1']} hide />
+                <Line
+                  type="stepAfter"
+                  dataKey="tempF"
+                  stroke="hsl(var(--foreground))"
+                  strokeWidth={1.5}
+                  dot={false}
+                  isAnimationActive={false}
+                />
+                <ReferenceLine y={detail.runningHighF} stroke="hsl(var(--primary))" strokeDasharray="2 2" />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="flex justify-between text-[9px] text-muted-foreground data-mono mt-1">
+            <span>{detail.intradayObs[0]?.timeLst}</span>
+            <span>{detail.intradayObs[detail.intradayObs.length - 1]?.timeLst}</span>
+          </div>
+        </div>
+
+        {/* Snapshot timestamp */}
+        <div className="px-3 pb-2 shrink-0">
+          <div className="text-[9px] text-muted-foreground data-mono">
+            Book snap {dist.bookSnapshotTimeLst}
           </div>
         </div>
       </div>
