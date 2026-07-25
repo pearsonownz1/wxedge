@@ -48,7 +48,7 @@ function buildUrl(iemId: string, start: Date, end: Date): string {
     hour1: String(s.hour),  minute1: String(s.minute),
     year2: String(e.year),  month2: String(e.month),  day2: String(e.day),
     hour2: String(e.hour),  minute2: String(e.minute),
-    "vars[]": "tmpf",
+    vars: "tmpf",           // Note: NOT "vars[]" — IEM uses plain "vars", not PHP array notation
     sample: "1min",
     what: "view",
     delim: "comma",

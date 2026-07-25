@@ -202,6 +202,20 @@ function pollingEnabled(): boolean {
   return v === undefined || v === "true" || v === "1";
 }
 
+// ─── 429 exponential backoff ───────────────────────────────────────────────────
+// Track consecutive rate-limit failures so we don't hammer Kalshi every 30s
+// during an overnight outage. Resets to 0 on any successful fetch.
+// Retry windows: 30s → 60s → 120s → 240s → 300s (cap).
+let consecutive429s = 0;
+const BACKOFF_BASE_MS  = 30_000;
+const BACKOFF_CAP_MS   = 5 * 60_000; // 5 min (= full Kalshi TTL)
+
+function staleCacheTtlMs(anyRateLimited: boolean): number {
+  if (!anyRateLimited) return BACKOFF_BASE_MS; // non-429 failures: always 30s
+  // Exponential: 30s, 60s, 120s, 240s, 300s
+  return Math.min(BACKOFF_BASE_MS * Math.pow(2, consecutive429s), BACKOFF_CAP_MS);
+}
+
 export async function fetchKalshiEvents(): Promise<KalshiFetchResult> {
   if (!pollingEnabled()) {
     return { events: [], usingStubData: false, allStaleFiltered: false, failureReason: null };
@@ -357,22 +371,29 @@ export async function fetchKalshiEvents(): Promise<KalshiFetchResult> {
     // All stations returned empty (429s or no contracts). Before giving up,
     // serve the last-known-good stale entry so the board stays visible.
     if (staleEntry && !staleEntry.value.usingStubData) {
+      if (anyRateLimited) consecutive429s++;
+      const staleTtl = staleCacheTtlMs(anyRateLimited);
       logger.warn(
-        { staleAgeMs: staleEntry.ageMs, anyFailed, allStaleFiltered },
+        { staleAgeMs: staleEntry.ageMs, anyFailed, allStaleFiltered, anyRateLimited,
+          consecutive429s, staleTtlMs: staleTtl },
         "Kalshi fetch returned no live events — serving stale cached data to avoid board blackout"
       );
-      // Re-cache the stale value for a short window so the next request doesn't also hammer Kalshi.
-      cache.set(key, staleEntry.value, Math.min(TTL.KALSHI_BOOK_MS / 4, 60_000));
+      // Re-cache the stale value using the back-off TTL — longer waits on repeated 429s
+      // so we don't self-DOS Kalshi during a rate-limit window.
+      cache.set(key, staleEntry.value, staleTtl);
       return staleEntry.value;
     }
 
+    if (anyRateLimited) consecutive429s++;
     logger.warn(
-      { hasApiKey: Boolean(process.env["KALSHI_API_KEY"]), anyFailed, allStaleFiltered },
+      { hasApiKey: Boolean(process.env["KALSHI_API_KEY"]), anyFailed, allStaleFiltered,
+        consecutive429s },
       allStaleFiltered
         ? "All Kalshi events are stale (yesterday's contracts) — today's not open yet"
         : "Kalshi returned no live events for any station — board will be empty"
     );
   } else {
+    consecutive429s = 0; // successful fetch — reset back-off counter
     logger.info(
       { stationsLive: result.length, anyFailed },
       "Kalshi events fetched live"
@@ -380,9 +401,9 @@ export async function fetchKalshiEvents(): Promise<KalshiFetchResult> {
   }
 
   const fetchResult: KalshiFetchResult = { events: result, usingStubData, allStaleFiltered, failureReason };
-  // Only use the full 5-min TTL for live results. Failed results use a 30s retry window
-  // so the system recovers quickly after a transient 429 or network error.
-  cache.set(key, fetchResult, usingStubData ? 30_000 : TTL.KALSHI_BOOK_MS);
+  // Live results: full 5-min TTL. Failed results: 30s base retry (backoff only applies
+  // when a stale entry exists to serve; otherwise we want to retry fast).
+  cache.set(key, fetchResult, usingStubData ? BACKOFF_BASE_MS : TTL.KALSHI_BOOK_MS);
   return fetchResult;
 }
 
