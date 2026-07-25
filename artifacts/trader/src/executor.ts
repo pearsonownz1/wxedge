@@ -1,23 +1,19 @@
 /**
- * Executor — shadow mode (Phase A).
+ * Executor — handles order placement across all execution modes.
  *
- * Shadow mode: identical code path to live; instead of calling Kalshi, writes
- * a shadow_order to the orders table with status='open'.
+ * approval: signal passes risk officer → createProposal() → human decides
+ * shadow:   identical code path to live; writes shadow_order to orders table
+ * live:     Phase C — signed Kalshi REST call (not yet implemented)
  *
- * Fill simulation (run every poll cycle via monitorOpenOrders):
- *   A YES limit buy at price P is assumed filled if the latest YES ask ≤ P in
- *   the subsequent book row for that ticker.  A NO limit buy at P_no is filled
- *   if the latest NO ask (= 100 − YES bid) ≤ P_no.
+ * Fill simulation (shadow/approval modes, run every poll via monitorOpenOrders):
+ *   A YES limit buy at price P is filled if the latest YES ask ≤ P.
+ *   A NO limit buy at P_no is filled if the latest NO ask (= 100 − YES bid) ≤ P_no.
  *   Fill price = limit_price (conservative; post-only semantics).
  *
  * Order lifecycle:
  *   open → filled          : fill condition met at next book check
  *          cancelled       : edge_net dropped below cancel_edge threshold
  *          expired         : TTL elapsed with no fill
- *
- * Live mode (Phase C): replace placeShadowOrder with a signed Kalshi REST call
- * and monitorOpenOrders with Kalshi order-status polling.  The risk officer
- * check is shared; only the transport differs.
  */
 
 import {
@@ -26,10 +22,12 @@ import {
   getOpenOrders,
   getLatestSignalInputs,
   insertRiskDecision,
+  markSignalPendingApproval,
   type OrderRow,
 } from "./db.js";
 import { checkRisk, type SignalCandidate } from "./riskOfficer.js";
 import { buildRiskState } from "./db.js";
+import { createProposal } from "./approvals.js";
 import type { RiskConfig } from "./config.js";
 import pino from "pino";
 
@@ -38,9 +36,10 @@ const logger = pino({ name: "executor" });
 // ─── Place ────────────────────────────────────────────────────────────────────
 
 /**
- * Evaluate signal through risk officer, then place a shadow order if approved.
- * Writes both a risk_decision and (if approved) an order row.
- * Returns the order id, or null if rejected.
+ * Evaluate signal through risk officer.
+ * In approval mode: create a pending proposal awaiting human decision.
+ * In shadow mode:   place a shadow order immediately.
+ * Returns the order/proposal id, or null if rejected or duplicate proposal.
  */
 export async function placeOrder(
   signalId: number,
@@ -67,12 +66,19 @@ export async function placeOrder(
     return null;
   }
 
-  if (config.mode === "shadow") {
-    return placeShadowOrder(signalId, candidate, config);
-  } else {
-    // Phase C: implement live Kalshi order placement here.
-    throw new Error("Live mode not implemented in Phase A");
+  if (config.execution_mode === "approval") {
+    // Mark signal as pending_approval, then create the proposal card.
+    await markSignalPendingApproval(signalId);
+    const approvalId = await createProposal(signalId, candidate, config);
+    return approvalId;
   }
+
+  if (config.mode === "shadow" || config.execution_mode === "auto") {
+    return placeShadowOrder(signalId, candidate, config);
+  }
+
+  // Phase C: implement live Kalshi order placement here.
+  throw new Error("Live mode not implemented in Phase A/B");
 }
 
 async function placeShadowOrder(
@@ -109,7 +115,7 @@ async function placeShadowOrder(
 // ─── Monitor open orders ──────────────────────────────────────────────────────
 
 /**
- * Called every poll cycle.  For each open shadow order:
+ * Called every poll cycle.  For each open order (shadow or approval mode):
  *   1. Check if it should be cancelled (edge dropped below cancel_edge or TTL exceeded).
  *   2. Check if it should be filled (fill condition from current book).
  */
@@ -117,7 +123,12 @@ export async function monitorOpenOrders(
   config: RiskConfig,
   now: Date
 ): Promise<void> {
-  const openOrders = await getOpenOrders(config.mode as "shadow" | "live");
+  // Monitor both shadow and approval-placed orders
+  const [shadowOrders, approvalOrders] = await Promise.all([
+    getOpenOrders("shadow"),
+    getOpenOrders("approval"),
+  ]);
+  const openOrders = [...shadowOrders, ...approvalOrders];
   if (openOrders.length === 0) return;
 
   // Latest book data keyed by ticker
@@ -138,7 +149,7 @@ export async function monitorOpenOrders(
         ts_cancelled:    now.toISOString(),
         book_state_json: book ? JSON.stringify(bookSnapshot(book)) : null,
       });
-      logger.info({ orderId: order.id, ticker: order.ticker }, "Shadow order expired (TTL)");
+      logger.info({ orderId: order.id, ticker: order.ticker }, "Order expired (TTL)");
       continue;
     }
 
@@ -154,7 +165,7 @@ export async function monitorOpenOrders(
       });
       logger.info(
         { orderId: order.id, ticker: order.ticker, currentEdge: currentEdge.toFixed(3) },
-        "Shadow order cancelled (edge below cancel threshold)"
+        "Order cancelled (edge below cancel threshold)"
       );
       continue;
     }
@@ -163,19 +174,20 @@ export async function monitorOpenOrders(
     const filled = isFilled(order, book);
     if (filled) {
       await updateOrderStatus(order.id!, {
-        status:          "filled",
-        ts_filled:       now.toISOString(),
+        status:           "filled",
+        ts_filled:        now.toISOString(),
         fill_price_cents: order.price_cents, // post-only: filled at limit price
-        book_state_json: JSON.stringify(bookSnapshot(book)),
+        book_state_json:  JSON.stringify(bookSnapshot(book)),
       });
       logger.info(
         {
-          orderId:    order.id,
-          ticker:     order.ticker,
-          side:       order.side,
-          fillCents:  order.price_cents,
+          orderId:   order.id,
+          ticker:    order.ticker,
+          side:      order.side,
+          fillCents: order.price_cents,
+          mode:      order.mode,
         },
-        "Shadow order filled"
+        "Order filled"
       );
     }
   }
@@ -183,14 +195,7 @@ export async function monitorOpenOrders(
 
 // ─── Fill condition ───────────────────────────────────────────────────────────
 
-/**
- * Shadow fill: order is filled if the current book shows the market has traded
- * at or through the limit price.
- *
- * YES buy at price P → filled if current YES ask ≤ P
- * NO  buy at price P → filled if current NO ask (= 100 − YES bid) ≤ P
- */
-function isFilled(
+export function isFilled(
   order: OrderRow,
   book: ReturnType<typeof getLatestSignalInputs> extends Promise<Array<infer T>> ? T : never
 ): boolean {

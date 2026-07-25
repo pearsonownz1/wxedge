@@ -2,7 +2,8 @@
  * Trader-side database layer.
  *
  * All reads and writes for the trading pipeline (signal engine, risk officer,
- * executor, auditor) live here.  Uses the shared @workspace/db Drizzle client.
+ * executor, auditor, approvals) live here.  Uses the shared @workspace/db
+ * Drizzle client.
  *
  * Convention: raw SQL via db.execute() for complex joins/aggregations; Drizzle
  * ORM for simple inserts and point lookups.
@@ -14,12 +15,13 @@ import {
   signals,
   riskDecisions,
   orders,
+  approvals,
   settlements,
   dailyPnl,
   outcomes,
   snapshots,
 } from "@workspace/db";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, isNull } from "drizzle-orm";
 import { existsSync } from "node:fs";
 
 // ─── Re-exported types ────────────────────────────────────────────────────────
@@ -69,6 +71,7 @@ export interface SignalRow {
   edge_net:         number;
   inputs_hash:      string;
   suppressed_reason: string | null;
+  status?:          string;
 }
 
 export interface RiskDecisionRow {
@@ -81,7 +84,8 @@ export interface RiskDecisionRow {
 export interface OrderRow {
   id?:              number;
   signal_id:        number;
-  mode:             "shadow" | "live";
+  approval_id?:     number | null;
+  mode:             "shadow" | "live" | "approval";
   ts_placed:        string;
   ticker:           string;
   station_id:       string;
@@ -104,6 +108,17 @@ export interface SettlementRow {
   kalshi_settled_bracket: string | null;
   match_flag:             boolean | null;
   ts_utc:                 string;
+}
+
+export interface ApprovalRow {
+  id?:         number;
+  signal_id:   number;
+  ticker:      string;
+  side:        string;
+  proposed_ts: string;
+  expires_ts:  string;
+  card_json:   string | null;
+  decision?:   string | null;
 }
 
 // ─── Reads for signal engine ──────────────────────────────────────────────────
@@ -164,6 +179,12 @@ export async function getLatestSignalInputs(): Promise<SnapshotSignalInput[]> {
   return (result.rows ?? []) as SnapshotSignalInput[];
 }
 
+/** Latest snapshot input for a specific ticker (for proposal card rendering). */
+export async function getLatestInputByTicker(ticker: string): Promise<SnapshotSignalInput | null> {
+  const inputs = await getLatestSignalInputs();
+  return inputs.find((i) => i.ticker === ticker) ?? null;
+}
+
 /** Most recent obs_age_s for a station (to check feed freshness). */
 export async function getDataAge(stationId: string): Promise<number | null> {
   const { rows } = await db.execute(sql`
@@ -189,7 +210,7 @@ export interface RiskState {
 
 export async function buildRiskState(
   date: string,
-  mode: "shadow" | "live",
+  mode: "shadow" | "live" | "approval",
   cooldownMin: number
 ): Promise<RiskState> {
   const [
@@ -201,7 +222,7 @@ export async function buildRiskState(
   ] = await Promise.all([
     db.execute(sql`
       SELECT station_id, COUNT(*) AS cnt
-      FROM   orders WHERE status = 'open' AND mode = ${mode}
+      FROM   orders WHERE status = 'open'
       GROUP BY station_id
     `),
     db.execute(sql`
@@ -209,19 +230,17 @@ export async function buildRiskState(
       FROM   orders
       WHERE  ts_placed::date = ${date}::date
         AND  status != 'cancelled'
-        AND  mode = ${mode}
       GROUP BY station_id
     `),
     db.execute(sql`
       SELECT COALESCE(SUM(price_cents),0)::int AS total
-      FROM   orders WHERE status = 'open' AND mode = ${mode}
+      FROM   orders WHERE status = 'open'
     `),
     db.execute(sql`
       SELECT COALESCE(SUM(price_cents),0)::int AS total
       FROM   orders
       WHERE  ts_placed::date = ${date}::date
         AND  status != 'cancelled'
-        AND  mode = ${mode}
     `),
     db.execute(sql`
       SELECT ticker, side, ts_utc FROM signals
@@ -256,8 +275,8 @@ export async function buildRiskState(
 
 // ─── Reads for executor / order management ───────────────────────────────────
 
-/** All open orders for the given mode. */
-export async function getOpenOrders(mode: "shadow" | "live"): Promise<OrderRow[]> {
+/** All open orders (any mode). */
+export async function getOpenOrders(mode: "shadow" | "live" | "approval"): Promise<OrderRow[]> {
   const rows = await db
     .select()
     .from(orders)
@@ -266,7 +285,8 @@ export async function getOpenOrders(mode: "shadow" | "live"): Promise<OrderRow[]
   return rows.map((r) => ({
     id:               r.id,
     signal_id:        r.signalId,
-    mode:             r.mode as "shadow" | "live",
+    approval_id:      r.approvalId ?? null,
+    mode:             r.mode as "shadow" | "live" | "approval",
     ts_placed:        r.tsPlaced.toISOString(),
     ticker:           r.ticker,
     station_id:       r.stationId,
@@ -280,6 +300,68 @@ export async function getOpenOrders(mode: "shadow" | "live"): Promise<OrderRow[]
     book_state_json:  r.bookStateJson ?? null,
     kalshi_order_id:  r.kalshiOrderId ?? null,
   }));
+}
+
+// ─── Reads for approvals ──────────────────────────────────────────────────────
+
+/** Check if an open proposal already exists for this ticker+side. */
+export async function getPendingApprovalForTicker(
+  ticker: string,
+  side: string
+): Promise<{ id: number } | null> {
+  const { rows } = await db.execute(sql`
+    SELECT id FROM approvals
+    WHERE ticker = ${ticker}
+      AND side   = ${side}
+      AND decision IS NULL
+      AND expires_ts > NOW()
+    LIMIT 1
+  `);
+  return (rows[0] as { id: number } | undefined) ?? null;
+}
+
+/** Insert a new approval proposal row. Returns the new id. */
+export async function insertApproval(row: {
+  signal_id:   number;
+  ticker:      string;
+  side:        string;
+  proposed_ts: string;
+  expires_ts:  string;
+  card_json:   string | null;
+}): Promise<number> {
+  const { rows } = await db.execute(sql`
+    INSERT INTO approvals (signal_id, ticker, side, proposed_ts, expires_ts, card_json)
+    VALUES (
+      ${row.signal_id}, ${row.ticker}, ${row.side},
+      ${row.proposed_ts}::timestamptz, ${row.expires_ts}::timestamptz,
+      ${row.card_json}
+    )
+    RETURNING id
+  `);
+  return Number((rows[0] as { id: number }).id);
+}
+
+/** Mark signal status as pending_approval. */
+export async function markSignalPendingApproval(signalId: number): Promise<void> {
+  await db.execute(sql`
+    UPDATE signals SET status = 'pending_approval' WHERE id = ${signalId}
+  `);
+}
+
+/**
+ * Sweep all proposals whose expires_ts has passed and decision is still NULL.
+ * Marks them as decision='expired'. Returns count of newly expired rows.
+ */
+export async function sweepExpiredApprovals(): Promise<number> {
+  const { rows } = await db.execute(sql`
+    UPDATE approvals
+    SET decision    = 'expired',
+        decision_ts = NOW()
+    WHERE decision IS NULL
+      AND expires_ts <= NOW()
+    RETURNING id
+  `);
+  return rows.length;
 }
 
 // ─── Reads for auditor ────────────────────────────────────────────────────────
@@ -353,7 +435,7 @@ export async function getBooksForDate(
 /** Shadow fills data for daily P&L computation (auditor 21:00 job). */
 export async function getFilledOrdersForDate(
   date: string,
-  mode: "shadow" | "live"
+  mode: "shadow" | "live" | "approval"
 ): Promise<Array<{
   id: number;
   ticker: string;
@@ -388,6 +470,7 @@ export async function insertSignal(row: SignalRow): Promise<number> {
       edgeNet:          row.edge_net,
       inputsHash:       row.inputs_hash,
       suppressedReason: row.suppressed_reason,
+      status:           row.status ?? "live",
     })
     .returning({ id: signals.id });
   return inserted!.id;
@@ -407,6 +490,7 @@ export async function insertOrder(row: OrderRow): Promise<number> {
     .insert(orders)
     .values({
       signalId:       row.signal_id,
+      approvalId:     row.approval_id ?? null,
       mode:           row.mode,
       tsPlaced:       new Date(row.ts_placed),
       ticker:         row.ticker,
@@ -460,7 +544,7 @@ export async function insertSettlement(row: SettlementRow): Promise<void> {
 
 export async function upsertDailyPnl(
   date: string,
-  mode: "shadow" | "live",
+  mode: string,
   gross: number,
   fees: number,
   net: number,

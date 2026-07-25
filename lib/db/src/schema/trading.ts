@@ -1,15 +1,13 @@
 /**
- * Trading layer schema — Phase A.
+ * Trading layer schema — Phase A + Approval Mode.
  *
  * books          — per-bracket order book snapshot, one row per ticker per poll.
  * signals        — signal engine output (ALL signals, suppressed or live).
  * risk_decisions — risk officer approve/reject log keyed to each signal.
- * orders         — append-only order lifecycle (shadow and live).
+ * orders         — append-only order lifecycle (shadow, approval, and live).
  * settlements    — daily reconciliation: CLI final high vs. Kalshi settlement.
  * daily_pnl      — rolled-up P&L per day per mode (written by auditor).
- *
- * Invariant: every row written by the trader is recoverable from this store
- * alone — no external logs are required to reconstruct a full day.
+ * approvals      — human-in-the-loop approval queue (Phase B).
  */
 
 import {
@@ -18,6 +16,7 @@ import {
   text,
   real,
   integer,
+  bigint,
   boolean,
   timestamp,
   uniqueIndex,
@@ -36,14 +35,10 @@ export const books = pgTable(
     bracketHi:    real("bracket_hi"),
     yesBid:       integer("yes_bid"),
     yesAsk:       integer("yes_ask"),
-    /** Derived: 100 − yes_ask */
     noBid:        integer("no_bid"),
-    /** Derived: 100 − yes_bid */
     noAsk:        integer("no_ask"),
-    /** NULL — the events list does not expose order-book depth. */
     bidSize:      integer("bid_size"),
     askSize:      integer("ask_size"),
-    /** False when the station's bracket sum fails the coherence invariant. */
     coherentFlag: boolean("coherent_flag").notNull().default(true),
   },
   (table) => [
@@ -53,8 +48,9 @@ export const books = pgTable(
 );
 
 /**
- * Signal engine output.  Every candidate signal is written here, whether it
- * passes the risk officer or not.  suppressed_reason is NULL for live signals.
+ * Signal engine output. Every candidate signal is written here, whether it
+ * passes the risk officer or not. suppressed_reason is NULL for live signals.
+ * status: 'live' | 'pending_approval' — set to pending_approval in approval mode.
  */
 export const signals = pgTable(
   "signals",
@@ -70,6 +66,8 @@ export const signals = pgTable(
     edgeNet:          real("edge_net").notNull(),
     inputsHash:       text("inputs_hash").notNull(),
     suppressedReason: text("suppressed_reason"),
+    /** 'live' (default) or 'pending_approval' in approval mode. */
+    status:           text("status").default("live"),
   },
   (table) => [
     index("signals_station_ts_idx").on(table.stationId, table.tsUtc),
@@ -93,7 +91,8 @@ export const riskDecisions = pgTable(
 );
 
 /**
- * Order lifecycle.  Append-only.
+ * Order lifecycle. Append-only.
+ * mode: 'shadow' | 'approval' | 'live'
  * status transitions: open → filled | cancelled | expired
  */
 export const orders = pgTable(
@@ -101,6 +100,7 @@ export const orders = pgTable(
   {
     id:             serial("id").primaryKey(),
     signalId:       integer("signal_id").notNull(),
+    approvalId:     integer("approval_id"),   // set when placed via human approval
     mode:           text("mode").notNull(),
     tsPlaced:       timestamp("ts_placed", { withTimezone: true }).notNull(),
     ticker:         text("ticker").notNull(),
@@ -119,6 +119,40 @@ export const orders = pgTable(
     index("orders_signal_idx").on(table.signalId),
     index("orders_station_status_idx").on(table.stationId, table.status),
     index("orders_ts_placed_idx").on(table.tsPlaced),
+    index("orders_approval_idx").on(table.approvalId),
+  ]
+);
+
+/**
+ * Human-in-the-loop approval queue.
+ *
+ * Partial unique index (enforced via raw SQL, not Drizzle):
+ *   CREATE UNIQUE INDEX one_open_proposal ON approvals (ticker, side)
+ *   WHERE decision IS NULL;
+ *
+ * Idempotency on approve: check decision IS NULL via CAS UPDATE before placing order.
+ */
+export const approvals = pgTable(
+  "approvals",
+  {
+    id:          serial("id").primaryKey(),
+    signalId:    integer("signal_id").notNull().unique(),
+    ticker:      text("ticker").notNull(),
+    side:        text("side").notNull(),
+    proposedTs:  timestamp("proposed_ts", { withTimezone: true }).notNull(),
+    expiresTs:   timestamp("expires_ts", { withTimezone: true }).notNull(),
+    /** Template trade card JSON; GPT enrichment is async/deferred. */
+    cardJson:    text("card_json"),
+    decision:    text("decision"),       // 'approved' | 'denied' | 'expired' | null (pending)
+    decisionTs:  timestamp("decision_ts", { withTimezone: true }),
+    latencyMs:   bigint("latency_ms", { mode: "number" }),
+    recheckOk:   boolean("recheck_ok"),
+    recheckNote: text("recheck_note"),
+  },
+  (table) => [
+    index("approvals_signal_idx").on(table.signalId),
+    index("approvals_ticker_side_idx").on(table.ticker, table.side),
+    index("approvals_proposed_ts_idx").on(table.proposedTs),
   ]
 );
 

@@ -5,9 +5,10 @@ import { Activity } from "lucide-react";
 export function Shell({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
 
-  const isDashboard = location === "/";
-  const isMarkets = location.startsWith("/markets") && !location.includes("tab=calibration");
+  const isDashboard  = location === "/";
+  const isMarkets    = location.startsWith("/markets") && !location.includes("tab=calibration");
   const isCalibration = location === "/markets" && window.location.search.includes("tab=calibration");
+  const isApprovals  = location === "/approvals";
 
   return (
     <div className="min-h-[100dvh] flex flex-col bg-background text-foreground">
@@ -27,6 +28,9 @@ export function Shell({ children }: { children: React.ReactNode }) {
           </Link>
           <Link href="/markets?tab=calibration" className={cn("px-3 h-full flex items-center text-sm font-medium border-b-2 transition-colors", isCalibration ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground hover:border-border")}>
             Calibration
+          </Link>
+          <Link href="/approvals" className={cn("px-3 h-full flex items-center text-sm font-medium border-b-2 transition-colors", isApprovals ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground hover:border-border")}>
+            Approvals
           </Link>
         </nav>
       </header>

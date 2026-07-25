@@ -1,20 +1,23 @@
 /**
- * Trader main loop — Phase A (shadow mode).
+ * Trader main loop — Phase A + Approval Mode.
  *
  * Architecture:
+ *   Startup:
+ *     - Sweep expired proposals (clear anything that lapsed while process was down)
+ *
  *   Every 4 minutes:
  *     1. runSignalEngine() — reads latest snapshots+books, emits signals
- *     2. For each live signal: placeOrder() — risk officer → shadow executor
+ *     2. For each live signal: placeOrder() — risk officer → shadow executor or proposal
  *     3. monitorOpenOrders() — simulate fills, expire TTLs, cancel on edge drop
- *     4. runSettlementAudit() — write settlements rows for closed days
+ *     4. sweepExpiredProposals() — expire any proposals past their TTL
+ *     5. runSettlementAudit() — write settlements rows for closed days
  *
  *   Scheduled:
  *     21:00 UTC daily  — runDailyDigest()
  *     21:00 UTC Sunday — runWeeklyGateReport()
  *
  * Health endpoint:
- *   GET /health → 200 { status: 'ok', mode, cycle_count, last_cycle_ts }
- *   Required for Replit workflow health check.
+ *   GET /health → 200 { status: 'ok', mode, execution_mode, cycle_count, last_cycle_ts }
  *
  * Kill switch:
  *   touch /tmp/trader_kill.flag  →  risk officer rejects all signals;
@@ -25,6 +28,7 @@ import http from "node:http";
 import { config } from "./config.js";
 import { runSignalEngine } from "./signalEngine.js";
 import { placeOrder, monitorOpenOrders } from "./executor.js";
+import { sweepExpiredProposals } from "./approvals.js";
 import { runSettlementAudit, runDailyDigest, runWeeklyGateReport } from "./auditor.js";
 import pino from "pino";
 
@@ -49,10 +53,11 @@ const healthServer = http.createServer((req, res) => {
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(
       JSON.stringify({
-        status:          "ok",
-        mode:            config.mode,
-        cycle_count:     cycleCount,
-        last_cycle_ts:   lastCycleTs || null,
+        status:         "ok",
+        mode:           config.mode,
+        execution_mode: config.execution_mode,
+        cycle_count:    cycleCount,
+        last_cycle_ts:  lastCycleTs || null,
       })
     );
   } else {
@@ -62,7 +67,10 @@ const healthServer = http.createServer((req, res) => {
 });
 
 healthServer.listen(PORT, () => {
-  logger.info({ port: PORT, mode: config.mode }, "Trader health endpoint listening");
+  logger.info(
+    { port: PORT, mode: config.mode, execution_mode: config.execution_mode },
+    "Trader health endpoint listening"
+  );
 });
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -92,7 +100,7 @@ async function runTradingCycle(now: Date): Promise<void> {
     }
   }
 
-  // 3. Monitor open orders
+  // 3. Monitor open orders (fill simulation, TTL expiry, cancel on edge drop)
   await monitorOpenOrders(config, now);
 }
 
@@ -102,6 +110,9 @@ async function runScheduledJobs(now: Date): Promise<void> {
   const date    = todayUtcDate();
   const utcHour = now.getUTCHours();
   const utcMin  = now.getUTCMinutes();
+
+  // Proposal expiry sweep — runs every tick (idempotent)
+  await sweepExpiredProposals();
 
   // Settlement audit runs every tick (idempotent; handles all stations internally)
   await runSettlementAudit(now);
@@ -123,13 +134,21 @@ async function runScheduledJobs(now: Date): Promise<void> {
 
 async function main(): Promise<void> {
   logger.info(
-    { mode: config.mode, initialDelayMs: INITIAL_DELAY_MS },
+    { mode: config.mode, execution_mode: config.execution_mode, initialDelayMs: INITIAL_DELAY_MS },
     "Trader starting — waiting for collector warmup"
   );
 
+  // Startup expiry sweep: clear proposals that lapsed while the process was down
+  try {
+    const swept = await sweepExpiredProposals();
+    logger.info({ swept }, "Startup proposal sweep complete");
+  } catch (err) {
+    logger.warn({ err }, "Startup proposal sweep failed (non-fatal)");
+  }
+
   await sleep(INITIAL_DELAY_MS);
 
-  logger.info("Trader main loop starting");
+  logger.info({ execution_mode: config.execution_mode }, "Trader main loop starting");
 
   while (true) {
     const tickStart = Date.now();

@@ -4,9 +4,8 @@
  * Reads config/risk.json relative to the trader package root.
  * Values can be overridden by environment variables:
  *
- *   TRADING_MODE=live  — switches from shadow to live mode
- *
- * Crashes fast with a clear message if required keys are missing.
+ *   TRADING_MODE=live          — switches from shadow to live mode
+ *   EXECUTION_MODE=approval    — approval | auto | shadow
  */
 
 import { readFileSync } from "node:fs";
@@ -16,6 +15,8 @@ import { dirname, resolve } from "node:path";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export interface RiskConfig {
+  /** Execution flow: 'approval' (human-in-loop) | 'auto' (shadow) | 'shadow' */
+  execution_mode: "approval" | "auto" | "shadow";
   mode: "shadow" | "live";
 
   // Per-trade limits
@@ -39,6 +40,9 @@ export interface RiskConfig {
   // Order lifecycle
   ttl_min:     number;
   cancel_edge: number;
+
+  /** Minutes a proposal is valid before auto-expiring. */
+  proposal_ttl_min: number;
 }
 
 function loadConfig(): RiskConfig {
@@ -52,6 +56,7 @@ function loadConfig(): RiskConfig {
   }
 
   const required: Array<keyof RiskConfig> = [
+    "execution_mode",
     "mode",
     "max_cost_per_trade_cents",
     "cooldown_min",
@@ -75,7 +80,17 @@ function loadConfig(): RiskConfig {
 
   const config = raw as unknown as RiskConfig;
 
-  // Env override for mode (credentials never go in the config file)
+  // Default proposal_ttl_min if absent in older configs
+  if (config.proposal_ttl_min === undefined) {
+    config.proposal_ttl_min = 30;
+  }
+
+  // Env overrides
+  const envExec = process.env["EXECUTION_MODE"];
+  if (envExec === "approval" || envExec === "auto" || envExec === "shadow") {
+    config.execution_mode = envExec;
+  }
+
   const envMode = process.env["TRADING_MODE"];
   if (envMode === "live" || envMode === "shadow") {
     config.mode = envMode;

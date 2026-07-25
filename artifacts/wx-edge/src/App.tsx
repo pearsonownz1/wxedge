@@ -7,6 +7,7 @@ import { Route, Switch, Router as WouterRouter } from 'wouter';
 import Dashboard from '@/pages/dashboard';
 import Markets from '@/pages/markets';
 import ContractDetail from '@/pages/contract-detail';
+import Approvals from '@/pages/approvals';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -23,6 +24,7 @@ function Router() {
       <Route path="/" component={Dashboard} />
       <Route path="/markets" component={Markets} />
       <Route path="/markets/:contractId" component={ContractDetail} />
+      <Route path="/approvals" component={Approvals} />
       <Route component={NotFound} />
     </Switch>
   );

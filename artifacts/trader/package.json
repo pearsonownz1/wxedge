@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "tsx --tsconfig tsconfig.json src/index.ts",
     "start": "tsx --tsconfig tsconfig.json src/index.ts",
-    "test": "node --import tsx/esm --test src/riskOfficer.test.ts"
+    "test": "node --import tsx/esm --test src/riskOfficer.test.ts",
+    "migrate": "tsx --tsconfig tsconfig.json scripts/migrate-approvals.ts"
   },
   "dependencies": {
     "@workspace/db": "workspace:*",

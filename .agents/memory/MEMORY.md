@@ -3,3 +3,4 @@
 - [Fee formula](fee-formula.md) — replaced flat 1pt with P×(1-P) shape (K=14); verify rate against kalshi.com/trading/fees before live sizing.
 - [DB schema bootstrap](db-schema-bootstrap.md) — drizzle-kit push silently skips new tables when schema/index.ts re-exports a module that didn't exist at push time; use raw SQL CREATE TABLE IF NOT EXISTS to recover.
 - [Trader workflow config](trader-workflow-config.md) — background services without artifact registration must not use waitForPort; configure with outputType="console" only. Trader config path is ../config/risk.json (one level up from src/).
+- [Approval Mode](approval-mode.md) — Phase B human-in-loop queue; schema live; snapshots have no ticker column (join via station_id + bracket_lo); CAS on decision IS NULL; migration script in trader/scripts/.
