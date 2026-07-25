@@ -36,7 +36,7 @@ const WORKSPACE_ROOT = resolve(
 
 const TRADER_HEALTH_PORT = 8091;
 const TRADER_RESTART_BASE_MS = 10_000;  // 10s initial restart delay
-const TRADER_RESTART_MAX_MS  = 5 * 60_000; // cap at 5 min
+const TRADER_RESTART_MAX_MS  = 30_000;  // cap at 30 s — DB kills idle conns; fast restart is better than long backoff
 
 function spawnTrader(restartDelayMs: number = TRADER_RESTART_BASE_MS): void {
   const traderEnv: NodeJS.ProcessEnv = {

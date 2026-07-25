@@ -74,6 +74,19 @@ async function tryAcquireLeaderLock(): Promise<boolean> {
       process.exit(1);
     });
 
+    // Keep-alive ping every 25 s.  Replit's managed Postgres kills connections
+    // that are idle for ~30 s with a 57P01 admin shutdown.  A cheap SELECT 1
+    // resets the idle timer and prevents the crash loop.
+    const keepAlive = setInterval(async () => {
+      try {
+        await client.query("SELECT 1");
+      } catch {
+        // The error handler above will fire simultaneously and call process.exit.
+        // Nothing to do here; just swallow so we don't double-log.
+      }
+    }, 25_000);
+    keepAlive.unref(); // don't keep the process alive for pings alone
+
     logger.info(
       { lockKey: ADVISORY_LOCK_KEY, mode: config.mode, execution_mode: config.execution_mode },
       "Advisory lock acquired — this instance is the trader leader"
