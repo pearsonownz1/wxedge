@@ -1,0 +1,129 @@
+# WX Edge — Approval Mode Spec (Human-in-the-Loop Trading)
+
+**Goal:** AI analyzes markets and proposes trades; the human reviews each proposal in the app and taps Approve or Deny; on Approve, the system places the real order (1-contract, cents scale). Every proposal and decision is logged. This is the grant's core demo flow.
+
+**Scope estimate:** ~1 dev-day. Nearly everything exists; this wires a human decision between the risk officer and the executor.
+
+---
+
+## 1. Execution mode flag
+
+Config: `EXECUTION_MODE = "approval" | "auto" | "shadow"` (default `approval`).
+
+- `approval`: signals that pass risk checks become *proposals* awaiting human decision. Executor fires only on Approve.
+- `auto`: current Phase A behavior (kept for comparison slides; leave gated).
+- `shadow`: unchanged.
+
+Mode is logged at startup and stamped on every order row.
+
+## 2. Data model (one new table, one new status)
+
+```sql
+CREATE TABLE approvals (
+  id            serial PRIMARY KEY,
+  signal_id     int NOT NULL REFERENCES signals(id) UNIQUE,
+  proposed_ts   timestamptz NOT NULL,
+  expires_ts    timestamptz NOT NULL,        -- proposed_ts + 30 min
+  card_json     jsonb,                       -- GPT trade card, generated at proposal time
+  decision      text CHECK (decision IN ('approved','denied','expired')) ,
+  decision_ts   timestamptz,
+  latency_s     int,                         -- decision_ts - proposed_ts
+  recheck_ok    boolean,                     -- approve-time revalidation result
+  recheck_note  text                         -- why revalidation failed, if it did
+);
+```
+
+**Additional constraints (per dev review):**
+- The business rule "one open proposal per ticker+side" is enforced in the DB, not just the risk officer:
+  `CREATE UNIQUE INDEX one_open_proposal ON approvals (ticker, side) WHERE decision IS NULL;`
+  (denormalize `ticker` and `side` onto the approvals row for this). The `signal_id UNIQUE` constraint stays — it's a different invariant (one proposal per signal).
+- `signals` has **no status column today** — adding `status` (with `pending_approval`) is an explicit schema migration, step 1 of the build order, not incidental.
+
+Orders placed via approval store `approvals.id` on the order row.
+
+## 3. Proposal lifecycle
+
+```
+signal passes risk officer
+        │  EXECUTION_MODE=approval
+        ▼
+create approvals row (pending) ──▶ render card v1 (template, synchronous, no LLM call)
+        ▼
+shows in /approvals queue ── waits ──▶ expires_ts passes ⇒ decision='expired'
+        (expiry sweep OWNER: the trader loop, at each 4-min tick, alongside the
+         settlement audit job — marks expired rows and logs the sweep count.
+         Also run the sweep once at trader startup to clear anything that
+         expired while the process was down.)
+        ▼
+human taps Approve ──▶ REVALIDATE (§4) ──ok──▶ executor places post-only limit order
+        │                                └─fail─▶ decision recorded, UI shows updated picture
+human taps Deny ──▶ decision='denied', logged, done
+```
+
+Rules:
+- One open proposal per ticker+side at a time (reuse duplicate_guard).
+- Proposals do NOT queue orders; nothing touches Kalshi until Approve passes revalidation.
+- **Card v1 is a pure template** rendered from the signal struct (headline, model % vs market %, edge, max loss, running high, hours to peak) — no LLM call, no latency, no new failure mode on the demo path. The GPT card from the LLM-layer spec becomes an **async enrichment/backfill** that upgrades the card text after the fact (and for the presentation export); if it never runs, the template stands. This keeps "AI explains" in the story without putting OpenAI availability between the human and the Approve button.
+
+## 4. Approve-time revalidation (P0)
+
+On Approve, before placing the order, re-run against the **latest** snapshot:
+1. Freshness: book + observation age ≤ `max_age_min`.
+2. Bracket still alive (not eliminated by running high).
+3. Edge still ≥ `cancel_edge` at the *current* executable price (not the proposal-time price).
+4. Risk officer full re-check (exposure may have changed since proposal).
+
+All pass ⇒ place order at current price or better; store `recheck_ok=true`.
+Any fail ⇒ no order; store `recheck_ok=false` + `recheck_note`; UI shows: "This proposal expired — here's what changed," with the stale vs. current numbers side by side. (This UI moment is presentation gold; make it look intentional, not like an error.)
+
+## 5. UI — Approval Queue
+
+New page `/approvals` in the existing app. **Desktop-only for v1** — mobile layout and notifications are explicitly deferred (P2); the demo runs in a browser tab that's already open during trading hours.
+
+Each pending proposal renders as a card:
+- **Headline** from trade card ("Buy YES on NYC 91-92° at 27¢ — model sees 34%")
+- Model % vs market %, edge in pts, **max loss in cents** (bold — this is the number the grant cares about)
+- Running high + hours to expected peak (the "why now")
+- Countdown to expiry
+- Two buttons: **Approve** / **Deny**. Approve requires one confirm tap ("Place order: 1 contract, max loss 27¢?").
+
+Below the queue: decision history (decided proposals with outcome once settled — proposal → decision → result on one line).
+
+No notification system in v1 (deferred with mobile). The queue page auto-refreshes on the poll interval so an open tab is sufficient.
+
+## 6. Logging & grant reporting
+
+- Every proposal, decision, latency, and revalidation result is queryable from `approvals`.
+- `GET /api/approvals/report?from=&to=` returns: proposals made, approved/denied/expired counts, median decision latency, orders placed, P&L of approved trades, and (nice stat) hypothetical P&L of *denied* trades once settled — "what the human's judgment added" is a headline slide.
+- Stamp `EXECUTION_MODE` and `approvals.id` on orders so the audit trail reads: signal → risk check → human approval → order → settlement, with timestamps end to end.
+
+## 7. What does NOT change
+
+- Risk officer limits still bind (a human Approve cannot exceed caps — if it would, the proposal is never shown).
+- Kill switch still cancels resting orders and freezes new proposals.
+- Deterministic alerts unchanged.
+- LLM remains explanation-only: the trade card describes the proposal; it does not score, rank, or recommend beyond the mechanical confidence_label already specced.
+
+## 8. Acceptance checklist
+
+- [ ] In approval mode, zero orders reach Kalshi without an `approvals` row with decision='approved' and recheck_ok=true
+- [ ] Expired proposals auto-mark and disappear from the queue
+- [ ] Approve on a gone-stale proposal places NO order and shows the changed-picture view
+- [ ] Deny is one tap, logged with latency
+- [ ] Duplicate proposal for same ticker+side while one is pending is suppressed
+- [ ] Kill switch clears the pending queue
+- [ ] Report endpoint returns correct counts against a seeded test dataset
+- [ ] Partial unique index rejects a second open proposal for the same ticker+side; allows one after the first is decided
+- [ ] Startup sweep expires proposals that lapsed while the trader was down
+- [ ] Card renders instantly from template with LLM enrichment disabled entirely
+
+## 9. Build order (suggested, ~1 day)
+
+1. Migrations: `approvals` table (+ partial unique index on ticker/side), `signals.status` column (1 h — explicit migration, verify with drizzle-kit push actually creating both, given the silent-skip issue from the Phase A session)
+2. Proposal creation path + template card renderer (1.5 h)
+3. Expiry sweep in trader loop tick + startup sweep (1 h)
+4. Revalidation-on-approve + executor hookup (2 h)
+5. `/approvals` page + confirm flow, desktop only (2 h)
+6. Report endpoint + history view (1 h)
+7. Acceptance tests (1-2 h)
+8. (Deferred/P2: GPT card enrichment backfill, mobile layout, notifications)
