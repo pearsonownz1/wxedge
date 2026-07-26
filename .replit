@@ -42,7 +42,6 @@ timeoutMs = 20000
 [userenv]
 
 [userenv.development]
-POLLING_ENABLED = "false"
 
 [userenv.production]
 POLLING_ENABLED = "true"
