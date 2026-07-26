@@ -135,24 +135,58 @@ export const orders = pgTable(
 export const approvals = pgTable(
   "approvals",
   {
-    id:          serial("id").primaryKey(),
-    signalId:    integer("signal_id").notNull().unique(),
-    ticker:      text("ticker").notNull(),
-    side:        text("side").notNull(),
-    proposedTs:  timestamp("proposed_ts", { withTimezone: true }).notNull(),
-    expiresTs:   timestamp("expires_ts", { withTimezone: true }).notNull(),
+    id:             serial("id").primaryKey(),
+    signalId:       integer("signal_id").notNull().unique(),
+    ticker:         text("ticker").notNull(),
+    side:           text("side").notNull(),
+    proposedTs:     timestamp("proposed_ts", { withTimezone: true }).notNull(),
+    expiresTs:      timestamp("expires_ts", { withTimezone: true }).notNull(),
     /** Template trade card JSON; GPT enrichment is async/deferred. */
-    cardJson:    text("card_json"),
-    decision:    text("decision"),       // 'approved' | 'denied' | 'expired' | null (pending)
-    decisionTs:  timestamp("decision_ts", { withTimezone: true }),
-    latencyMs:   bigint("latency_ms", { mode: "number" }),
-    recheckOk:   boolean("recheck_ok"),
-    recheckNote: text("recheck_note"),
+    cardJson:       text("card_json"),
+    decision:       text("decision"),       // 'approved' | 'denied' | 'expired' | null (pending)
+    decisionTs:     timestamp("decision_ts", { withTimezone: true }),
+    latencyMs:      bigint("latency_ms", { mode: "number" }),
+    recheckOk:      boolean("recheck_ok"),
+    recheckNote:    text("recheck_note"),
+    /** Who made the decision: 'human' | 'llm'. NULL until decided. */
+    decider:        text("decider"),
+    /** LLM's staged intent in llm_with_veto mode: 'approve' | 'deny'. NULL until LLM runs. */
+    llmDecision:    text("llm_decision"),
+    /** When the LLM expressed its intent (start of veto window). */
+    llmDecidedTs:   timestamp("llm_decided_ts", { withTimezone: true }),
+    /** 2-4 sentence rationale from the LLM. */
+    llmRationale:   text("llm_rationale"),
+    /** LLM decision confidence 0–1. */
+    llmConfidence:  real("llm_confidence"),
   },
   (table) => [
     index("approvals_signal_idx").on(table.signalId),
     index("approvals_ticker_side_idx").on(table.ticker, table.side),
     index("approvals_proposed_ts_idx").on(table.proposedTs),
+  ]
+);
+
+/**
+ * Full audit trail for every LLM approval decision.
+ * One row per LLM call: stores exactly what the LLM saw and what it returned.
+ * Allows "human vs LLM P&L" grant report and prompt debugging.
+ */
+export const llmDecisions = pgTable(
+  "llm_decisions",
+  {
+    id:            bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+    approvalId:    integer("approval_id").notNull(),
+    ts:            timestamp("ts", { withTimezone: true }).notNull(),
+    modelName:     text("model_name").notNull(),
+    promptVersion: text("prompt_version").notNull(),
+    payloadJson:   text("payload_json").notNull(),  // jsonb stored as text for simplicity
+    responseJson:  text("response_json"),
+    decision:      text("decision"),    // 'approve' | 'deny' | 'error'
+    latencyMs:     integer("latency_ms"),
+  },
+  (table) => [
+    index("llm_decisions_approval_idx").on(table.approvalId),
+    index("llm_decisions_ts_idx").on(table.ts),
   ]
 );
 

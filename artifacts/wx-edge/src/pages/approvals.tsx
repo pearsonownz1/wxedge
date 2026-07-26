@@ -50,6 +50,9 @@ interface ApprovalRecord {
   recheck_ok:       boolean | null;
   recheck_note:     string | null;
   limit_price_cents: number;
+  decider:          string | null;
+  llm_rationale:    string | null;
+  llm_confidence:   number | null;
 }
 
 interface ApprovalsResponse {
@@ -215,6 +218,8 @@ function StaleDiffPanel({
 // ─── History table ────────────────────────────────────────────────────────────
 
 function HistoryTable({ items }: { items: ApprovalRecord[] }) {
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+
   if (items.length === 0) {
     return <p className="text-sm text-muted-foreground text-center py-6">No decisions yet.</p>;
   }
@@ -233,31 +238,56 @@ function HistoryTable({ items }: { items: ApprovalRecord[] }) {
       <tbody>
         {items.map((item) => {
           const card: TradeCard | null = item.card_json ? JSON.parse(item.card_json) as TradeCard : null;
+          const isExpanded = expandedId === item.id;
+          const hasLlmRationale = item.decider === "llm" && item.llm_rationale;
           return (
-            <tr key={item.id} className="border-b border-border/40 hover:bg-muted/20">
-              <td className="py-2 pr-3 font-mono">{item.ticker}</td>
-              <td className="py-2 pr-3">
-                <Badge variant={item.side === "YES" ? "default" : "secondary"} className="text-[10px] px-1.5">
-                  {item.side}
-                </Badge>
-              </td>
-              <td className="py-2 pr-3 text-right tabular-nums">
-                {card ? `${card.max_loss_cents}¢` : `${item.limit_price_cents}¢`}
-              </td>
-              <td className="py-2 pr-3">
-                <DecisionBadge decision={item.decision} recheckOk={item.recheck_ok} />
-              </td>
-              <td className="py-2 pr-3 text-right tabular-nums text-muted-foreground">
-                {item.latency_ms !== null
-                  ? item.latency_ms < 60_000
-                    ? `${(item.latency_ms / 1000).toFixed(0)}s`
-                    : `${(item.latency_ms / 60_000).toFixed(1)}m`
-                  : "—"}
-              </td>
-              <td className="py-2 text-right text-muted-foreground">
-                {new Date(item.proposed_ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-              </td>
-            </tr>
+            <>
+              <tr
+                key={item.id}
+                className={`border-b border-border/40 hover:bg-muted/20 ${hasLlmRationale ? "cursor-pointer" : ""}`}
+                onClick={() => hasLlmRationale && setExpandedId(isExpanded ? null : item.id)}
+              >
+                <td className="py-2 pr-3 font-mono">{item.ticker}</td>
+                <td className="py-2 pr-3">
+                  <Badge variant={item.side === "YES" ? "default" : "secondary"} className="text-[10px] px-1.5">
+                    {item.side}
+                  </Badge>
+                </td>
+                <td className="py-2 pr-3 text-right tabular-nums">
+                  {card ? `${card.max_loss_cents}¢` : `${item.limit_price_cents}¢`}
+                </td>
+                <td className="py-2 pr-3">
+                  <DecisionBadge decision={item.decision} recheckOk={item.recheck_ok} decider={item.decider} />
+                  {item.llm_confidence !== null && item.decider === "llm" && (
+                    <span className="ml-1.5 text-muted-foreground tabular-nums">
+                      {Math.round(item.llm_confidence * 100)}%
+                    </span>
+                  )}
+                  {hasLlmRationale && (
+                    <span className="ml-1 text-muted-foreground">{isExpanded ? "▲" : "▼"}</span>
+                  )}
+                </td>
+                <td className="py-2 pr-3 text-right tabular-nums text-muted-foreground">
+                  {item.latency_ms !== null
+                    ? item.latency_ms < 60_000
+                      ? `${(item.latency_ms / 1000).toFixed(0)}s`
+                      : `${(item.latency_ms / 60_000).toFixed(1)}m`
+                    : "—"}
+                </td>
+                <td className="py-2 text-right text-muted-foreground">
+                  {new Date(item.proposed_ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                </td>
+              </tr>
+              {isExpanded && item.llm_rationale && (
+                <tr key={`${item.id}-rationale`} className="border-b border-border/40 bg-muted/10">
+                  <td colSpan={6} className="px-2 py-2">
+                    <p className="text-xs text-muted-foreground leading-relaxed italic">
+                      🤖 {item.llm_rationale}
+                    </p>
+                  </td>
+                </tr>
+              )}
+            </>
           );
         })}
       </tbody>
@@ -265,17 +295,35 @@ function HistoryTable({ items }: { items: ApprovalRecord[] }) {
   );
 }
 
-function DecisionBadge({ decision, recheckOk }: { decision: string | null; recheckOk: boolean | null }) {
+function DecisionBadge({
+  decision,
+  recheckOk,
+  decider,
+}: {
+  decision: string | null;
+  recheckOk: boolean | null;
+  decider: string | null;
+}) {
+  const deciderIcon = decider === "llm" ? "🤖" : decider === "human" ? "👤" : null;
+
   if (!decision) return <span className="text-muted-foreground">pending</span>;
   if (decision === "approved" && recheckOk === false) {
-    return <span className="text-yellow-500 font-medium">approved (stale)</span>;
+    return (
+      <span className="text-yellow-500 font-medium">
+        {deciderIcon} approved (stale)
+      </span>
+    );
   }
   const colors: Record<string, string> = {
     approved: "text-green-500",
     denied:   "text-muted-foreground",
     expired:  "text-destructive",
   };
-  return <span className={`font-medium ${colors[decision] ?? ""}`}>{decision}</span>;
+  return (
+    <span className={`font-medium ${colors[decision] ?? ""}`}>
+      {deciderIcon} {decision}
+    </span>
+  );
 }
 
 // ─── Main page ────────────────────────────────────────────────────────────────

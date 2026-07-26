@@ -90,10 +90,11 @@ router.patch("/approvals/:id", async (req: Request, res: Response) => {
   const id = parseInt(req.params["id"]!, 10);
   if (isNaN(id)) return void res.status(400).json({ error: "invalid_id" });
 
-  const { action } = req.body as { action?: string };
+  const { action, decider: rawDecider } = req.body as { action?: string; decider?: string };
   if (action !== "approve" && action !== "deny") {
     return void res.status(400).json({ error: "action must be approve or deny" });
   }
+  const decider: "human" | "llm" = rawDecider === "llm" ? "llm" : "human";
 
   try {
     const approval = await getApprovalById(id);
@@ -120,8 +121,8 @@ router.patch("/approvals/:id", async (req: Request, res: Response) => {
     if (action === "deny") {
       const now = new Date();
       const latencyMs = now.getTime() - new Date(approval.proposed_ts).getTime();
-      await decideApproval(id, "denied", latencyMs, true, null);
-      logger.info({ approvalId: id, ticker: approval.ticker, latencyMs }, "Proposal denied");
+      await decideApproval(id, "denied", latencyMs, true, null, decider);
+      logger.info({ approvalId: id, ticker: approval.ticker, latencyMs, decider }, "Proposal denied");
       return void res.json({ result: "denied" });
     }
 
@@ -225,11 +226,11 @@ router.patch("/approvals/:id", async (req: Request, res: Response) => {
     if (Object.keys(diff).length > 0) {
       const note = Object.keys(diff).join(", ");
       const latencyMs = now.getTime() - new Date(approval.proposed_ts).getTime();
-      const updated = await decideApproval(id, "approved", latencyMs, false, note);
+      const updated = await decideApproval(id, "approved", latencyMs, false, note, decider);
       if (!updated) {
         return void res.status(409).json({ result: "conflict", decision: "approved" });
       }
-      logger.warn({ approvalId: id, diff }, "Approve: revalidation failed — no order placed");
+      logger.warn({ approvalId: id, diff, decider }, "Approve: revalidation failed — no order placed");
       return void res.json({
         result: "stale",
         recheck_note: `Conditions changed: ${note}`,
@@ -239,7 +240,7 @@ router.patch("/approvals/:id", async (req: Request, res: Response) => {
 
     // ── All checks pass: CAS update then place order ──────────────────────────
     const latencyMs = now.getTime() - new Date(approval.proposed_ts).getTime();
-    const updated = await decideApproval(id, "approved", latencyMs, true, null);
+    const updated = await decideApproval(id, "approved", latencyMs, true, null, decider);
     if (!updated) {
       // Race condition: another request won the CAS — return existing order
       const { rows } = await db.execute(sql`
@@ -270,7 +271,7 @@ router.patch("/approvals/:id", async (req: Request, res: Response) => {
     });
 
     logger.info(
-      { approvalId: id, orderId, ticker: approval.ticker, side: approval.side, priceCents: currentPrice },
+      { approvalId: id, orderId, ticker: approval.ticker, side: approval.side, priceCents: currentPrice, decider },
       "Proposal approved — order placed"
     );
 

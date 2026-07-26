@@ -25,6 +25,12 @@ export interface ApprovalRecord {
   recheck_ok:       boolean | null;
   recheck_note:     string | null;
   limit_price_cents: number;
+  /** Who made the decision: 'human' | 'llm'. null until decided. */
+  decider:          string | null;
+  /** 2-4 sentence rationale from the LLM (null for human decisions). */
+  llm_rationale:    string | null;
+  /** LLM confidence 0-1 (null for human decisions). */
+  llm_confidence:   number | null;
 }
 
 export interface CurrentMarketState {
@@ -46,15 +52,20 @@ export interface ApprovalRiskState {
 
 // ─── Reads ────────────────────────────────────────────────────────────────────
 
+// Common SELECT fragment shared across all approval queries
+const APPROVAL_SELECT = sql`
+  a.id, a.signal_id, a.ticker, a.side,
+  s.station_id,
+  a.proposed_ts, a.expires_ts, a.card_json,
+  a.decision, a.decision_ts, a.latency_ms, a.recheck_ok, a.recheck_note,
+  s.limit_price AS limit_price_cents,
+  a.decider, a.llm_rationale, a.llm_confidence
+`;
+
 /** Pending (undecided, not yet expired) proposals, newest first. */
 export async function getPendingApprovals(): Promise<ApprovalRecord[]> {
   const { rows } = await db.execute(sql`
-    SELECT
-      a.id, a.signal_id, a.ticker, a.side,
-      s.station_id,
-      a.proposed_ts, a.expires_ts, a.card_json,
-      a.decision, a.decision_ts, a.latency_ms, a.recheck_ok, a.recheck_note,
-      s.limit_price AS limit_price_cents
+    SELECT ${APPROVAL_SELECT}
     FROM approvals a
     JOIN signals s ON s.id = a.signal_id
     WHERE a.decision IS NULL
@@ -67,12 +78,7 @@ export async function getPendingApprovals(): Promise<ApprovalRecord[]> {
 /** Last N decided proposals (approved, denied, expired), newest first. */
 export async function getApprovalHistory(limit = 50): Promise<ApprovalRecord[]> {
   const { rows } = await db.execute(sql`
-    SELECT
-      a.id, a.signal_id, a.ticker, a.side,
-      s.station_id,
-      a.proposed_ts, a.expires_ts, a.card_json,
-      a.decision, a.decision_ts, a.latency_ms, a.recheck_ok, a.recheck_note,
-      s.limit_price AS limit_price_cents
+    SELECT ${APPROVAL_SELECT}
     FROM approvals a
     JOIN signals s ON s.id = a.signal_id
     WHERE a.decision IS NOT NULL
@@ -85,12 +91,7 @@ export async function getApprovalHistory(limit = 50): Promise<ApprovalRecord[]> 
 /** Single approval row by id, including derived fields. */
 export async function getApprovalById(id: number): Promise<ApprovalRecord | null> {
   const { rows } = await db.execute(sql`
-    SELECT
-      a.id, a.signal_id, a.ticker, a.side,
-      s.station_id,
-      a.proposed_ts, a.expires_ts, a.card_json,
-      a.decision, a.decision_ts, a.latency_ms, a.recheck_ok, a.recheck_note,
-      s.limit_price AS limit_price_cents
+    SELECT ${APPROVAL_SELECT}
     FROM approvals a
     JOIN signals s ON s.id = a.signal_id
     WHERE a.id = ${id}
@@ -207,16 +208,18 @@ export async function decideApproval(
   decision: "approved" | "denied" | "expired",
   latencyMs: number | null,
   recheckOk: boolean | null,
-  recheckNote: string | null
+  recheckNote: string | null,
+  decider: "human" | "llm" = "human"
 ): Promise<boolean> {
   const { rows } = await db.execute(sql`
     UPDATE approvals
     SET
-      decision    = ${decision},
-      decision_ts = NOW(),
-      latency_ms  = ${latencyMs},
-      recheck_ok  = ${recheckOk},
-      recheck_note = ${recheckNote}
+      decision     = ${decision},
+      decision_ts  = NOW(),
+      latency_ms   = ${latencyMs},
+      recheck_ok   = ${recheckOk},
+      recheck_note = ${recheckNote},
+      decider      = ${decider}
     WHERE id = ${id}
       AND decision IS NULL
     RETURNING id

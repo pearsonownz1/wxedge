@@ -29,6 +29,7 @@ import { config } from "./config.js";
 import { runSignalEngine } from "./signalEngine.js";
 import { placeOrder, monitorOpenOrders } from "./executor.js";
 import { sweepExpiredProposals } from "./approvals.js";
+import { startLlmApprover } from "./llm-approver.js";
 import { runSettlementAudit, runDailyDigest, runWeeklyGateReport } from "./auditor.js";
 import { pool } from "@workspace/db";
 import pino from "pino";
@@ -232,6 +233,9 @@ async function main(): Promise<void> {
   } catch (err) {
     logger.warn({ err }, "Startup proposal sweep failed (non-fatal)");
   }
+
+  // Start LLM approver loop (no-op when APPROVER=human)
+  startLlmApprover(config);
 
   await sleep(INITIAL_DELAY_MS);
 

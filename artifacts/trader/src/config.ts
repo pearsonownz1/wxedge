@@ -43,6 +43,18 @@ export interface RiskConfig {
 
   /** Minutes a proposal is valid before auto-expiring. */
   proposal_ttl_min: number;
+
+  // ── LLM approver knobs (all optional; ignored when approver = 'human') ──────
+  /** Who decides proposals: 'human' | 'llm' | 'llm_with_veto'. Default: 'human'. */
+  approver?: "human" | "llm" | "llm_with_veto";
+  /** Proposal must be this many seconds old before the LLM will decide it. Default: 60. */
+  llm_min_age_s?: number;
+  /** In llm_with_veto mode: executor waits this many seconds for human override. Default: 180. */
+  llm_veto_window_s?: number;
+  /** Max LLM-approved spend today (cents). Defaults to max_daily_loss_cents. */
+  llm_daily_cap_cents?: number;
+  /** OpenAI model for approval decisions. Default: 'gpt-5.6-luna'. */
+  llm_model?: string;
 }
 
 function loadConfig(): RiskConfig {
@@ -95,6 +107,23 @@ function loadConfig(): RiskConfig {
   if (envMode === "live" || envMode === "shadow") {
     config.mode = envMode;
   }
+
+  // LLM approver env overrides
+  const envApprover = process.env["APPROVER"];
+  if (envApprover === "human" || envApprover === "llm" || envApprover === "llm_with_veto") {
+    config.approver = envApprover;
+  }
+  if (!config.approver) config.approver = "human";
+
+  if (process.env["LLM_MIN_AGE_S"])       config.llm_min_age_s       = parseInt(process.env["LLM_MIN_AGE_S"]!, 10);
+  if (process.env["LLM_VETO_WINDOW_S"])   config.llm_veto_window_s   = parseInt(process.env["LLM_VETO_WINDOW_S"]!, 10);
+  if (process.env["LLM_DAILY_CAP_CENTS"]) config.llm_daily_cap_cents = parseInt(process.env["LLM_DAILY_CAP_CENTS"]!, 10);
+  if (process.env["LLM_MODEL"])           config.llm_model           = process.env["LLM_MODEL"]!;
+
+  if (config.llm_min_age_s     === undefined) config.llm_min_age_s     = 60;
+  if (config.llm_veto_window_s === undefined) config.llm_veto_window_s = 180;
+  if (config.llm_model         === undefined) config.llm_model         = "gpt-5.6-luna";
+  if (config.llm_daily_cap_cents === undefined) config.llm_daily_cap_cents = config.max_daily_loss_cents;
 
   if (config.mode === "live") {
     if (!process.env["KALSHI_KEY_ID"] || !process.env["KALSHI_PRIVATE_KEY"]) {
