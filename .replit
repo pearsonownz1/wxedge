@@ -47,5 +47,8 @@ POLLING_ENABLED = "false"
 [userenv.production]
 POLLING_ENABLED = "true"
 
+[userenv.shared]
+APPROVER = "llm"
+
 [nix]
 channel = "stable-25_05"

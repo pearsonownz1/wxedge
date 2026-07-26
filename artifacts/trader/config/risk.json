@@ -9,7 +9,7 @@
   ],
 
   "execution_mode": "approval",
-  "mode": "shadow",
+  "mode": "live",
 
   "max_cost_per_trade_cents": 60,
   "max_open_orders_per_station": 1,
