@@ -21,6 +21,7 @@ import {
   fetchNbmPercentiles,
 } from "./nwsApi.js";
 import { getBracketsForStation, fetchOrderBook } from "./kalshiApi.js";
+import { resolveRunningHighF } from "./iemMetar.js";
 import { buildBracketDistribution } from "./distribution.js";
 import { computeSettlementWindow } from "./settlementWindow.js";
 import {
@@ -108,9 +109,9 @@ export async function logSnapshots(): Promise<void> {
           }
         }
 
-        const runningHighF = intradayObs.length > 0
-          ? intradayObs.reduce((m, p) => Math.max(m, p.tempF), -Infinity)
-          : 72;
+        // IEM METAR (T-groups + 6-hr max groups over the LST day) tracks the
+        // official CLI high to 0–1°F; NWS hourly obs serve as fallback/floor.
+        const runningHighF = await resolveRunningHighF(id, meta.lstOffset, intradayObs);
         const nbmMedianF = forecast?.maxTempF ?? runningHighF;
 
         const percentiles = await fetchNbmPercentiles(

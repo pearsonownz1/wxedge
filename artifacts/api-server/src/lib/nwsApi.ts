@@ -12,6 +12,7 @@
 
 import { cache, TTL } from "./cache.js";
 import { logger } from "./logger.js";
+import { lstDayStartUtcMs } from "./iemMetar.js";
 
 const NWS_BASE = "https://api.weather.gov";
 const UA = "WxEdge/1.0 (kalshi-weather-edge; contact@example.com)";
@@ -94,7 +95,7 @@ export interface IntradayPoint {
 export async function fetchIntradayObs(
   stationId: string,
   lstOffset: number,
-  count = 24
+  count = 72
 ): Promise<IntradayPoint[]> {
   const key = `nws:obs:intraday:${stationId}`;
   const cached = cache.get<IntradayPoint[]>(key);
@@ -120,11 +121,12 @@ export async function fetchIntradayObs(
       .filter((p): p is RawPoint => p !== null)
       .sort((a, b) => a.timestamp.localeCompare(b.timestamp));
 
-    // Filter to only today's LST observations (rough: last 24h)
-    const now = Date.now();
-    const oneDayAgo = now - 24 * 3600_000;
+    // Filter to the current LST settlement day (00:00–23:59 LST), matching
+    // the official CLI measurement window. A rolling "last 24h" window leaked
+    // yesterday's high into today's running high.
+    const dayStartMs = lstDayStartUtcMs(new Date(), lstOffset);
     const todayPoints = points.filter(
-      (p) => new Date(p.timestamp).getTime() > oneDayAgo
+      (p) => new Date(p.timestamp).getTime() >= dayStartMs
     );
 
     // Compute running high (monotonic max)

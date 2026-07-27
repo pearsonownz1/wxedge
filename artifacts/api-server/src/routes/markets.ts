@@ -27,6 +27,7 @@ import {
   MAX_SPREAD_CENTS,
 } from "../lib/distribution.js";
 import { cache, TTL } from "../lib/cache.js";
+import { resolveRunningHighF } from "../lib/iemMetar.js";
 
 const router: IRouter = Router();
 
@@ -43,10 +44,6 @@ function kalshiBookLatency(): number {
   return age === Infinity ? 0 : Math.round(age);
 }
 
-function runningHighFromObs(intradayObs: { tempF: number }[]): number {
-  if (intradayObs.length === 0) return 72;
-  return intradayObs.reduce((max, p) => Math.max(max, p.tempF), -Infinity);
-}
 
 /**
  * Book-quality gate — determines whether a bracket is actually ACTIONABLE.
@@ -98,7 +95,7 @@ router.get("/markets", async (req, res): Promise<void> => {
         return [];
       }
 
-      const runningHighF = runningHighFromObs(intradayObs);
+      const runningHighF = await resolveRunningHighF(stationId, meta.lstOffset, intradayObs);
       const nbmMedianF = forecast?.maxTempF ?? runningHighF;
 
       const percentiles = await fetchNbmPercentiles(
@@ -240,7 +237,7 @@ router.get("/markets/:contractId", async (req, res): Promise<void> => {
     return;
   }
 
-  const runningHighF = runningHighFromObs(intradayObs);
+  const runningHighF = await resolveRunningHighF(matchedStation, meta.lstOffset, intradayObs);
   const nbmMedianF = forecast?.maxTempF ?? runningHighF;
   const calibratedMedianF = parseFloat((nbmMedianF + bias).toFixed(1));
 

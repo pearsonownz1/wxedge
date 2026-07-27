@@ -24,18 +24,9 @@ import {
   bestEdge,
 } from "../lib/distribution.js";
 import { cache, TTL } from "../lib/cache.js";
+import { resolveRunningHighF } from "../lib/iemMetar.js";
 
 const router: IRouter = Router();
-
-/**
- * Compute the true intraday running high from the observation list.
- * Uses the monotonic max over all obs seen today, not the latest reading
- * (which may be lower if temps peaked earlier in the day).
- */
-function runningHighFromObs(intradayObs: { tempF: number }[]): number {
-  if (intradayObs.length === 0) return 72; // fallback when no data
-  return intradayObs.reduce((max, p) => Math.max(max, p.tempF), -Infinity);
-}
 
 /**
  * Build feed status for a station.
@@ -87,7 +78,7 @@ router.get("/stations", async (req, res): Promise<void> => {
         getBracketsForStation(id, meta.lstOffset),
       ]);
 
-      const runningHighF = runningHighFromObs(intradayObs);
+      const runningHighF = await resolveRunningHighF(id, meta.lstOffset, intradayObs);
       const nbmMedianF = forecast?.maxTempF ?? runningHighF;
 
       // Fetch NBM percentile spread (falls back to Normal approx if unavailable)
@@ -162,8 +153,8 @@ router.get("/stations/:stationId", async (req, res): Promise<void> => {
     fetchTodayMaxForecast(meta.lat, meta.lon, meta.lstOffset),
   ]);
 
-  // Running high = monotonic max over today's obs, not latest reading
-  const runningHighF = runningHighFromObs(intradayObs);
+  // Running high = IEM METAR (CLI-faithful) with NWS obs fallback
+  const runningHighF = await resolveRunningHighF(stationId, meta.lstOffset, intradayObs);
   const nbmMedianF = forecast?.maxTempF ?? runningHighF;
   const calibratedMedianF = parseFloat((nbmMedianF + bias).toFixed(1));
 
@@ -218,8 +209,8 @@ router.get(
       getBracketsForStation(stationId, meta.lstOffset),
     ]);
 
-    // True running high: intraday max, not latest obs temp
-    const runningHighF = runningHighFromObs(intradayObs);
+    // True running high: IEM METAR (CLI-faithful) with NWS obs fallback
+    const runningHighF = await resolveRunningHighF(stationId, meta.lstOffset, intradayObs);
     const nbmMedianF = forecast?.maxTempF ?? runningHighF;
     const calibratedMedianF = parseFloat((nbmMedianF + bias).toFixed(1));
 

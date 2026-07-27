@@ -16,6 +16,7 @@ import {
   type IntradayPoint,
 } from "./nwsApi.js";
 import { fetchKalshiEvents } from "./kalshiApi.js";
+import { resolveRunningHighF } from "./iemMetar.js";
 import { logSnapshots } from "./snapshotLogger.js";
 import { checkAndWriteOutcomes } from "./outcomeLogger.js";
 import { logger } from "./logger.js";
@@ -41,10 +42,11 @@ async function warmStation(id: string): Promise<void> {
   ]);
 
   // Derive nbmMedianF from forecast, falling back to running high, then 72°F.
-  const runningHighF = intradayObs.reduce<number>(
-    (max, p) => Math.max(max, p.tempF),
-    latestObs?.tempF ?? 72
-  );
+  // resolveRunningHighF also pre-warms the IEM METAR cache for this station.
+  const runningHighF = await resolveRunningHighF(id, meta.lstOffset, intradayObs).catch((err) => {
+    logger.warn({ err, stationId: id }, "warmup: resolveRunningHighF failed");
+    return latestObs?.tempF ?? 72;
+  });
   const nbmMedianF = forecast?.maxTempF ?? runningHighF;
 
   await fetchNbmPercentiles(
