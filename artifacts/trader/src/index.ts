@@ -31,7 +31,7 @@ import { placeOrder, monitorOpenOrders } from "./executor.js";
 import { sweepExpiredProposals } from "./approvals.js";
 import { startLlmApprover } from "./llm-approver.js";
 import { runSettlementAudit, runDailyDigest, runWeeklyGateReport } from "./auditor.js";
-import { pool } from "@workspace/db";
+import { pool, computePipelineHealth } from "@workspace/db";
 import pino from "pino";
 
 const logger = pino({ name: "trader", level: process.env["LOG_LEVEL"] ?? "info" });
@@ -208,6 +208,48 @@ async function runScheduledJobs(now: Date): Promise<void> {
   }
 }
 
+// ─── Pipeline watchdog ────────────────────────────────────────────────────────
+//
+// Guards against the silent failure where every signal is suppressed for days
+// (broken feed, over-eager safety gate, misbehaving cooldown) and it looks
+// identical to "no good trades today".  Checks the suppressed_reason mix in
+// the signals table once an hour and raises a log-level alert naming the
+// dominant suppression reason.  The same logic (computePipelineHealth in
+// @workspace/db) drives the WX Edge dashboard banner via the api-server.
+
+const WATCHDOG_INTERVAL_MS = 60 * 60 * 1000; // hourly
+let lastWatchdogTs = 0;
+
+async function runPipelineWatchdog(now: Date): Promise<void> {
+  if (now.getTime() - lastWatchdogTs < WATCHDOG_INTERVAL_MS) return;
+  lastWatchdogTs = now.getTime();
+
+  const health = await computePipelineHealth(24);
+  const ctx = {
+    pipeline_status: health.status,
+    window_hours: health.windowHours,
+    evaluated: health.evaluatedCount,
+    live: health.liveCount,
+    proposals: health.proposalCount,
+    dominant_reason: health.dominantReason,
+    reason_mix: health.reasonMix,
+    last_signal_ts: health.lastSignalTs,
+    last_proposal_ts: health.lastProposalTs,
+  };
+
+  switch (health.status) {
+    case "dark":
+    case "blocked":
+      logger.error(ctx, `PIPELINE ALERT: ${health.summary}`);
+      break;
+    case "stalled":
+      logger.warn(ctx, `PIPELINE ALERT: ${health.summary}`);
+      break;
+    default:
+      logger.info(ctx, `Pipeline watchdog: ${health.summary}`);
+  }
+}
+
 // ─── Main loop ────────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
@@ -255,6 +297,12 @@ async function main(): Promise<void> {
       await runScheduledJobs(now);
     } catch (err) {
       logger.error({ err }, "Scheduled jobs failed");
+    }
+
+    try {
+      await runPipelineWatchdog(now);
+    } catch (err) {
+      logger.warn({ err }, "Pipeline watchdog check failed (non-fatal)");
     }
 
     cycleCount++;

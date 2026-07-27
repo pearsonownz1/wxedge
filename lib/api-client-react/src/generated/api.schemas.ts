@@ -9,6 +9,39 @@ export interface HealthStatus {
   status: string;
 }
 
+export type PipelineHealthStatus = typeof PipelineHealthStatus[keyof typeof PipelineHealthStatus];
+
+
+export const PipelineHealthStatus = {
+  ok: 'ok',
+  quiet: 'quiet',
+  blocked: 'blocked',
+  stalled: 'stalled',
+  dark: 'dark',
+} as const;
+
+export type PipelineHealthReasonMix = {[key: string]: number};
+
+export interface PipelineHealth {
+  status: PipelineHealthStatus;
+  windowHours: number;
+  evaluatedCount: number;
+  liveCount: number;
+  proposalCount: number;
+  /** @nullable */
+  dominantReason: string | null;
+  /** @nullable */
+  dominantShare: number | null;
+  reasonMix: PipelineHealthReasonMix;
+  /** @nullable */
+  lastSignalTs: string | null;
+  /** @nullable */
+  lastLiveSignalTs: string | null;
+  /** @nullable */
+  lastProposalTs: string | null;
+  summary: string;
+}
+
 export interface ErrorResponse {
   error: string;
 }

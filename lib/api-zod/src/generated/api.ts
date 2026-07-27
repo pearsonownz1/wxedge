@@ -18,6 +18,26 @@ export const HealthCheckResponse = zod.object({
 
 
 /**
+ * Detects the pipeline going dark (zero evaluated signals or zero proposals over the window) and distinguishes it from a legitimately quiet market via the suppressed_reason mix
+ * @summary Trading pipeline watchdog status
+ */
+export const GetPipelineHealthResponse = zod.object({
+  "status": zod.enum(['ok', 'quiet', 'blocked', 'stalled', 'dark']),
+  "windowHours": zod.number(),
+  "evaluatedCount": zod.number(),
+  "liveCount": zod.number(),
+  "proposalCount": zod.number(),
+  "dominantReason": zod.string().nullable(),
+  "dominantShare": zod.number().nullable(),
+  "reasonMix": zod.record(zod.string(), zod.number()),
+  "lastSignalTs": zod.string().nullable(),
+  "lastLiveSignalTs": zod.string().nullable(),
+  "lastProposalTs": zod.string().nullable(),
+  "summary": zod.string()
+})
+
+
+/**
  * Returns all 6 Kalshi settlement stations sorted by best absolute edge
  * @summary List all settlement stations
  */

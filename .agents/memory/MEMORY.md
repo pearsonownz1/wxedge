@@ -9,4 +9,5 @@
 - [Trader workflow config](trader-workflow-config.md) — background services without artifact registration must not use waitForPort; configure with outputType="console" only. Trader config path is ../config/risk.json (one level up from src/).
 - [Approval Mode](approval-mode.md) — Phase B human-in-loop queue; schema live; snapshots have no ticker column (join via station_id + bracket_lo); CAS on decision IS NULL; migration script in trader/scripts/.
 - [Running-high vs CLI](running-high-cli.md) — CLI high = max(T-groups, 6-hr 1-groups) over LST day via one bulk IEM asos.py call; NWS hourly obs run 1–6°F off, fallback only.
+- [Pipeline watchdog](pipeline-watchdog.md) — shared computePipelineHealth drives trader log alert + dashboard banner; new suppressed_reason values must be classified systemic vs benign.
 - [LLM Approver](llm-approver.md) — APPROVER env var (human/llm/llm_with_veto); executes through PATCH endpoint; llm_decisions audit table; decider col on approvals for P&L split.

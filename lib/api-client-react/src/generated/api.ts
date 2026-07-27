@@ -20,6 +20,7 @@ import type {
   HealthStatus,
   MarketDetail,
   MarketList,
+  PipelineHealth,
   StationDetail,
   StationDistribution,
   StationSummary
@@ -118,6 +119,84 @@ export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getHealthCheckQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetPipelineHealthUrl = () => {
+
+
+
+
+  return `/api/pipeline-health`
+}
+
+/**
+ * Detects the pipeline going dark (zero evaluated signals or zero proposals over the window) and distinguishes it from a legitimately quiet market via the suppressed_reason mix
+ * @summary Trading pipeline watchdog status
+ */
+export const getPipelineHealth = async ( options?: RequestInit): Promise<PipelineHealth> => {
+
+  return customFetch<PipelineHealth>(getGetPipelineHealthUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPipelineHealthQueryKey = () => {
+    return [
+    `/api/pipeline-health`
+    ] as const;
+    }
+
+
+export const getGetPipelineHealthQueryOptions = <TData = Awaited<ReturnType<typeof getPipelineHealth>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPipelineHealth>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPipelineHealthQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPipelineHealth>>> = ({ signal }) => getPipelineHealth({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPipelineHealth>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPipelineHealthQueryResult = NonNullable<Awaited<ReturnType<typeof getPipelineHealth>>>
+export type GetPipelineHealthQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Trading pipeline watchdog status
+ */
+
+export function useGetPipelineHealth<TData = Awaited<ReturnType<typeof getPipelineHealth>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPipelineHealth>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPipelineHealthQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

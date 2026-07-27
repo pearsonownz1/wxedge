@@ -1,6 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { Activity } from "lucide-react";
+import { PipelineBanner } from "@/components/pipeline-banner";
 
 export function Shell({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
@@ -35,6 +36,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
         </nav>
       </header>
       <main className="flex-1 flex flex-col">
+        <PipelineBanner />
         {children}
       </main>
     </div>
