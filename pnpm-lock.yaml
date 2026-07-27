@@ -417,13 +417,13 @@ importers:
       pino:
         specifier: ^9.14.0
         version: 9.14.0
+      tsx:
+        specifier: 'catalog:'
+        version: 4.23.1
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
         version: 25.9.5
-      tsx:
-        specifier: 'catalog:'
-        version: 4.23.1
 
   artifacts/wx-edge:
     devDependencies:

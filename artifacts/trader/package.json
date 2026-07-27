@@ -14,10 +14,10 @@
     "@workspace/db": "workspace:*",
     "drizzle-orm": "catalog:",
     "openai": "^6.27.0",
-    "pino": "^9.14.0"
+    "pino": "^9.14.0",
+    "tsx": "catalog:"
   },
   "devDependencies": {
-    "@types/node": "catalog:",
-    "tsx": "catalog:"
+    "@types/node": "catalog:"
   }
 }
