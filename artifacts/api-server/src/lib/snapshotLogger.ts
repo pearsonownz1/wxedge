@@ -10,7 +10,8 @@
  * The signal engine reads from both tables; suppression of incoherent stations
  * and gap-flagged rows is the signal engine's responsibility.
  *
- * All external fetches hit the in-memory cache so this adds < 5 ms per poll.
+ * External fetches hit the in-memory cache (orderbook size lookups are cached
+ * ~5 min and shared with the dashboard's markets route).
  */
 
 import { STATION_IDS, STATIONS, getSeason } from "./stations.js";
@@ -19,7 +20,7 @@ import {
   fetchTodayMaxForecast,
   fetchNbmPercentiles,
 } from "./nwsApi.js";
-import { getBracketsForStation } from "./kalshiApi.js";
+import { getBracketsForStation, fetchOrderBook } from "./kalshiApi.js";
 import { buildBracketDistribution } from "./distribution.js";
 import { computeSettlementWindow } from "./settlementWindow.js";
 import {
@@ -48,16 +49,23 @@ function toIsoDate(utcNow: Date, lstOffset: number): string {
  *
  * In a well-formed exclusive binary market the YES prices must satisfy:
  *   sum(YES asks) ∈ [100, 115] cents  — below 100 is an arbitrage; above 115 is suspicious
- *   sum(YES bids) ≤ 100 cents         — above 100 would allow selling all for > $1
+ *   sum(YES bids) ≤ 105 cents         — the theoretical no-arb bound is 100, but Kalshi
+ *     fees (~7% × P(1-P) per leg, across 6-7 brackets) make a 1-5¢ overshoot
+ *     non-arbitrageable in practice. Live books routinely print sum(bids)=101-103;
+ *     flagging those suppressed ALL signals for the station (observed Jul 2026:
+ *     4,748 suppressions in one week, entire stations dark during trading hours).
+ *     Above 105 the book is genuinely suspicious and stays flagged.
  *
  * Returns true when the book passes both checks.
  */
+const MAX_BID_SUM_CENTS = 105;
+
 function isBookCoherent(
   brackets: Array<{ bidCents: number | null; askCents: number | null }>
 ): boolean {
   const sumAsk = brackets.reduce((s, b) => s + (b.askCents ?? 0), 0);
   const sumBid = brackets.reduce((s, b) => s + (b.bidCents ?? 0), 0);
-  return sumAsk >= 100 && sumAsk <= 115 && sumBid <= 100;
+  return sumAsk >= 100 && sumAsk <= 115 && sumBid <= MAX_BID_SUM_CENTS;
 }
 
 export async function logSnapshots(): Promise<void> {
@@ -144,7 +152,31 @@ export async function logSnapshots(): Promise<void> {
         }
 
         // ── Books rows ────────────────────────────────────────────────────────
+        // Top-of-book sizes come from the (cached ~5 min) orderbook endpoint —
+        // market objects carry prices only. The LLM approver uses these sizes
+        // to verify liquidity; without them every book reads as unverifiable
+        // and it denies the trade. Best-effort: prices still log if this fails.
+        const sizesByContract = new Map<string, { bidSize: number | null; askSize: number | null }>();
+        await Promise.all(
+          bracketResult.brackets
+            .filter((b) => b.contractId !== null)
+            .map(async (b) => {
+              try {
+                const ob = await fetchOrderBook(b.contractId!);
+                const bestBid = ob.levels.find((l) => l.side === "bid" && l.isBest);
+                const bestAsk = ob.levels.find((l) => l.side === "ask" && l.isBest);
+                sizesByContract.set(b.contractId!, {
+                  bidSize: bestBid ? Math.round(bestBid.size) : null,
+                  askSize: bestAsk ? Math.round(bestAsk.size) : null,
+                });
+              } catch {
+                /* size enrichment is best-effort */
+              }
+            })
+        );
+
         for (const b of bracketResult.brackets) {
+          const sizes = b.contractId !== null ? sizesByContract.get(b.contractId) : undefined;
           allBookRows.push({
             ts_utc:        tsUtc,
             station_id:    id,
@@ -155,6 +187,8 @@ export async function logSnapshots(): Promise<void> {
             yes_ask:       b.askCents,
             no_bid:        b.askCents !== null ? 100 - b.askCents : null,
             no_ask:        b.bidCents !== null ? 100 - b.bidCents : null,
+            bid_size:      sizes?.bidSize ?? null,
+            ask_size:      sizes?.askSize ?? null,
             coherent_flag: coherent,
           });
         }

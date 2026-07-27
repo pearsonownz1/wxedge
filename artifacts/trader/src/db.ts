@@ -173,6 +173,10 @@ export async function getLatestSignalInputs(): Promise<SnapshotSignalInput[]> {
     FROM snap
     JOIN bk ON bk.station_id = snap.station_id
            AND ABS(bk.bracket_lo - COALESCE(snap.bracket_lower_f, -9999)) < 0.01
+           -- Same-day markets only: ticker date token (e.g. 26JUL27) must match the
+           -- snapshot's settlement_date, otherwise today's model probabilities get
+           -- paired with tomorrow's tickers (same bracket temps, different event).
+           AND TO_DATE(split_part(bk.ticker, '-', 2), 'YYMONDD') = snap.settlement_date::date
     ORDER BY snap.station_id, snap.bracket_lower_f NULLS FIRST
   `);
 
@@ -204,6 +208,7 @@ export interface RiskState {
   totalOpenExposure:             number;
   /** Conservative daily-loss proxy: total cost of all non-cancelled orders today. */
   dailyCostToday:                number;
+  /** Recent PROPOSALS and ORDERS (ticker+side) for the cooldown duplicate guard. */
   recentSignals:                 Array<{ ticker: string; side: string; ts: Date }>;
   killSwitchActive:              boolean;
 }
@@ -243,9 +248,15 @@ export async function buildRiskState(
         AND  status != 'cancelled'
     `),
     db.execute(sql`
-      SELECT ticker, side, ts_utc FROM signals
-      WHERE  suppressed_reason IS NULL
-        AND  ts_utc > NOW() - (${cooldownMin} || ' minutes')::interval
+      -- Cooldown dedupe source: things we actually ACTED on (proposals + orders),
+      -- NOT the signals evaluation log. The signals table records every live
+      -- evaluation each tick, so sourcing the cooldown from it deadlocks
+      -- proposals permanently: each tick's logged signal blocks the next tick.
+      SELECT ticker, side, proposed_ts AS ts_utc FROM approvals
+      WHERE  proposed_ts > NOW() - (${cooldownMin} || ' minutes')::interval
+      UNION ALL
+      SELECT ticker, side, ts_placed AS ts_utc FROM orders
+      WHERE  ts_placed > NOW() - (${cooldownMin} || ' minutes')::interval
     `),
   ]);
 

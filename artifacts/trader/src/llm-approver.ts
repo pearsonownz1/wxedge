@@ -149,15 +149,15 @@ async function buildLlmPayload(row: PendingApprovalRow): Promise<object> {
       WHERE ticker = ${row.ticker}
       ORDER BY ts_utc DESC LIMIT 1
     `),
-    // Risk state
+    // Risk state. NOTE: decision/expires_ts live on approvals, not orders —
+    // open_proposals must come from a scalar subquery, not a FILTER over orders.
     db.execute(sql`
       SELECT
         COALESCE(SUM(price_cents) FILTER (WHERE ts_placed::date = ${today}::date AND status != 'cancelled'), 0)::int AS daily_spent,
         COALESCE(SUM(price_cents) FILTER (WHERE status = 'open'), 0)::int AS open_exposure,
         COALESCE(SUM(price_cents) FILTER (WHERE station_id = ${row.station_id} AND status = 'open'), 0)::int AS station_exposure,
-        COUNT(*) FILTER (WHERE decision IS NULL AND expires_ts > NOW()) AS open_proposals
+        (SELECT COUNT(*) FROM approvals WHERE decision IS NULL AND expires_ts > NOW())::int AS open_proposals
       FROM orders
-      CROSS JOIN (SELECT COUNT(*) AS open_proposals FROM approvals WHERE decision IS NULL AND expires_ts > NOW()) ap
     `),
     // Calibration for this station
     db.execute(sql`
@@ -216,12 +216,14 @@ async function buildLlmPayload(row: PendingApprovalRow): Promise<object> {
       model_prob_pct:  sig["model_prob"] !== undefined ? Math.round(Number(sig["model_prob"]) * 100) : null,
       implied_prob_pct: sig["implied_prob"] !== undefined ? Math.round(Number(sig["implied_prob"]) * 100) : null,
       edge_net_pts:    sig["edge_net"] !== undefined ? Math.round(Number(sig["edge_net"]) * 100 * 10) / 10 : null,
+      // Only advertise inputs we actually persist. sigma/eliminated-brackets
+      // live inside the api-server model and are never stored — including them
+      // as permanently-null fields made the LLM deny every proposal for
+      // "missing critical model inputs".
       model_inputs: {
-        calibrated_median_f:     card["nbm_median_f"] ?? null,
-        sigma_f:                 null,  // not stored in card
+        forecast_median_f:       card["nbm_median_f"] ?? null,
         running_high_f:          card["running_high_f"] ?? null,
         hours_to_expected_peak:  card["hours_to_settle"] ?? null,
-        eliminated_brackets:     null,
       },
     },
     book: {

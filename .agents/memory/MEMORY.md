@@ -3,7 +3,8 @@
 - [Postgres advisory lock keep-alive](pg-advisory-lock.md) — Replit managed PG kills idle conns (57P01 ~30s); held lock conn needs SELECT 1 every 25s or trader crash-loops.
 - [IEM data sources](iem-data-sources.md) — 3-letter station IDs (NYC not KNYC); NWS rawMessage always empty; IEM asos.py is primary METAR source; 1-min latency unknown (Phase 0 auditing).
 - [Snapshot collector](snapshot-collector.md) — PostgreSQL via @workspace/db; logSnapshots() called from warmup.ts after every warmCache(); setInterval only works on Reserved VM deployment.
-- [Fee formula](fee-formula.md) — replaced flat 1pt with P×(1-P) shape (K=14); verify rate against kalshi.com/trading/fees before live sizing.
+- [Fee formula](fee-formula.md) — VERIFIED Jul 2026 vs official PDF: taker round_up(0.07×C×P×(1-P)); maker 0.0175 with M=0 default; our whole-cent ceil is conservative.
+- [Signal pipeline suppression](signal-pipeline.md) — zero proposals ⇒ check suppressed_reason mix first; obs age ≠ snapshot age; books join needs ticker-date; settlement_date is TEXT.
 - [DB schema bootstrap](db-schema-bootstrap.md) — drizzle-kit push silently skips new tables when schema/index.ts re-exports a module that didn't exist at push time; use raw SQL CREATE TABLE IF NOT EXISTS to recover.
 - [Trader workflow config](trader-workflow-config.md) — background services without artifact registration must not use waitForPort; configure with outputType="console" only. Trader config path is ../config/risk.json (one level up from src/).
 - [Approval Mode](approval-mode.md) — Phase B human-in-loop queue; schema live; snapshots have no ticker column (join via station_id + bracket_lo); CAS on decision IS NULL; migration script in trader/scripts/.

@@ -56,6 +56,8 @@ export interface BookRow {
   yes_ask:       number | null;
   no_bid:        number | null;
   no_ask:        number | null;
+  bid_size:      number | null;
+  ask_size:      number | null;
   coherent_flag: boolean;
 }
 
@@ -111,6 +113,8 @@ export async function insertBooks(rows: BookRow[]): Promise<void> {
       yesAsk:       r.yes_ask,
       noBid:        r.no_bid,
       noAsk:        r.no_ask,
+      bidSize:      r.bid_size,
+      askSize:      r.ask_size,
       coherentFlag: r.coherent_flag,
     }))
   );

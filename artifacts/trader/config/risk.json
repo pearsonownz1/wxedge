@@ -3,9 +3,17 @@
     "Risk Officer and Signal Engine configuration.",
     "All dollar amounts in CENTS unless the key ends in _prob, _min, or _rate.",
     "",
-    "⚑ UNVERIFIED: fee_rate is an approximation (~7% of P*(1-P) per leg).",
-    "   Verify the exact rate from kalshi.com/trading/fees before going live.",
-    "   Update fee_rate here — the code reads it from this file."
+    "fee_rate VERIFIED 2026-07-27 against Kalshi's official fee-schedule PDF:",
+    "   taker fee = round_up(0.07 x C x P x (1-P)) per contract — matches this config.",
+    "   Maker/resting orders: 0.0175 with M=0 default (usually free).",
+    "   Our feeCeil rounds up to a whole cent — slightly conservative vs Kalshi's",
+    "   centicent rounding, so computed edges are understated, never overstated.",
+    "",
+    "max_age_min bounds SNAPSHOT age (collector writes every ~4 min).",
+    "max_obs_age_min bounds METAR OBSERVATION age — METARs arrive ~hourly",
+    "(typically :51-:53 past the hour), so 75 min tolerates a normal cycle",
+    "plus ingest latency while still blocking dead feeds. Tighten it to only",
+    "trade right after fresh observations."
   ],
 
   "execution_mode": "approval",
@@ -22,6 +30,7 @@
   "min_edge": 0.05,
   "slippage_buffer": 0.01,
   "max_age_min": 10,
+  "max_obs_age_min": 75,
 
   "fee_rate": 0.07,
 

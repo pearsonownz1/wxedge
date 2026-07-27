@@ -34,7 +34,10 @@ export interface RiskConfig {
   // Signal engine
   min_edge:        number;
   slippage_buffer: number;
+  /** Max SNAPSHOT age (collector cadence is ~4 min). */
   max_age_min:     number;
+  /** Max METAR OBSERVATION age — METARs are ~hourly, so this is a separate, looser bound. */
+  max_obs_age_min: number;
   fee_rate:        number;
 
   // Order lifecycle
@@ -79,6 +82,7 @@ function loadConfig(): RiskConfig {
     "min_edge",
     "slippage_buffer",
     "max_age_min",
+    "max_obs_age_min",
     "fee_rate",
     "ttl_min",
     "cancel_edge",

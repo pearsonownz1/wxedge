@@ -75,6 +75,7 @@ function renderCard(candidate: SignalCandidate, input: {
     max_loss_cents:   candidate.limit_price,
     running_high_f:   input?.running_high_f ?? null,
     hours_to_settle:  input?.hours_to_settle ?? null,
+    nbm_median_f:     input?.nbm_median_f ?? null,
     bracket_label:    label,
     station_id:       candidate.station_id,
     ticker:           candidate.ticker,

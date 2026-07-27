@@ -94,11 +94,19 @@ export function checkRisk(
     };
   }
 
-  // 7. Duplicate guard: same ticker+side within cooldown window.
+  // 7. Duplicate guard: same ticker+side proposed/ordered within the cooldown
+  //    window (state.recentSignals is sourced from approvals + orders).
+  //    Only STRICTLY EARLIER rows count, as defense in depth: anything sharing
+  //    this signal's exact timestamp originated in the same trading cycle and
+  //    is not a prior action.
   const cooldownMs = config.cooldown_min * 60_000;
   const cutoff = new Date(signal.ts.getTime() - cooldownMs);
   const duplicate = state.recentSignals.find(
-    (r) => r.ticker === signal.ticker && r.side === signal.side && r.ts > cutoff
+    (r) =>
+      r.ticker === signal.ticker &&
+      r.side === signal.side &&
+      r.ts > cutoff &&
+      r.ts.getTime() < signal.ts.getTime()
   );
   if (duplicate) {
     return {

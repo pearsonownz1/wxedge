@@ -40,6 +40,7 @@ interface RiskConfig {
   min_edge:                             number;
   slippage_buffer:                      number;
   max_age_min:                          number;
+  max_obs_age_min:                      number;
   fee_rate:                             number;
   ttl_min:                              number;
   cancel_edge:                          number;
@@ -62,12 +63,26 @@ function loadRiskConfig(): RiskConfig {
     max_cost_per_trade_cents: 60, cooldown_min: 30,
     max_open_orders_per_station: 1, max_daily_exposure_per_station_cents: 200,
     max_total_open_exposure_cents: 500, max_daily_loss_cents: 300,
-    min_edge: 0.05, slippage_buffer: 0.01, max_age_min: 10,
+    min_edge: 0.05, slippage_buffer: 0.01, max_age_min: 10, max_obs_age_min: 75,
     fee_rate: 0.07, ttl_min: 15, cancel_edge: 0.01, proposal_ttl_min: 30,
   };
 }
 
 const riskConfig = loadRiskConfig();
+
+// ─── Per-station approve mutex ────────────────────────────────────────────────
+// Serializes risk re-check + order insert per station so two concurrent
+// approvals cannot both pass the caps (read-then-write race). In-process only,
+// which is sufficient while a single api-server instance handles approvals
+// (dev and Reserved VM prod both run one instance). If approvals ever run
+// multi-instance, replace with pg_advisory_xact_lock inside a transaction.
+const stationLocks = new Map<string, Promise<unknown>>();
+function withStationLock<T>(stationId: string, fn: () => Promise<T>): Promise<T> {
+  const prev = stationLocks.get(stationId) ?? Promise.resolve();
+  const run = prev.then(fn, fn);
+  stationLocks.set(stationId, run.then(() => undefined, () => undefined));
+  return run;
+}
 
 // ─── GET /approvals ───────────────────────────────────────────────────────────
 
@@ -150,8 +165,10 @@ router.patch("/approvals/:id", async (req: Request, res: Response) => {
         diff["book_age_min"] = { at_proposal: 0, now: bookAgeMin };
       }
 
-      // obs age
-      if (current.obs_age_s !== null && current.obs_age_s > riskConfig.max_age_min * 60) {
+      // obs age — METARs are ~hourly, so this uses max_obs_age_min (75), NOT
+      // max_age_min (10, which bounds book/snapshot age). Must stay consistent
+      // with the trader's signal engine or approvals fail that signals passed.
+      if (current.obs_age_s !== null && current.obs_age_s > riskConfig.max_obs_age_min * 60) {
         diff["obs_age_s"] = { at_proposal: 0, now: current.obs_age_s };
       }
 
@@ -193,7 +210,9 @@ router.patch("/approvals/:id", async (req: Request, res: Response) => {
       diff["kill_switch"] = { at_proposal: false, now: true };
     }
 
-    // 5. Risk state re-check
+    // 5. Risk state re-check, decision, and order insert run under the
+    //    per-station mutex — see withStationLock above.
+    return void await withStationLock(approval.station_id, async () => {
     const today = now.toISOString().slice(0, 10);
     const riskState = await buildApprovalRiskState(today, riskConfig);
     if (riskState.dailyCostToday >= riskConfig.max_daily_loss_cents) {
@@ -213,6 +232,13 @@ router.patch("/approvals/:id", async (req: Request, res: Response) => {
       diff["open_orders_per_station"] = {
         at_proposal: 0,
         now: stationOpen,
+      };
+    }
+    const stationDaily = riskState.dailyExposurePerStation[approval.station_id] ?? 0;
+    if (stationDaily + approval.limit_price_cents > riskConfig.max_daily_exposure_per_station_cents) {
+      diff["daily_exposure_per_station"] = {
+        at_proposal: "ok",
+        now: `station_today=${stationDaily} + this=${approval.limit_price_cents} > limit=${riskConfig.max_daily_exposure_per_station_cents}`,
       };
     }
     if (riskState.totalOpenExposure + approval.limit_price_cents > riskConfig.max_total_open_exposure_cents) {
@@ -286,6 +312,7 @@ router.patch("/approvals/:id", async (req: Request, res: Response) => {
         status:           "open",
       },
     });
+    }); // end withStationLock
   } catch (err) {
     logger.error({ err, approvalId: id }, "PATCH /approvals/:id failed");
     res.status(500).json({ error: "internal_error" });

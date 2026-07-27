@@ -16,7 +16,8 @@
  * calibration curve can be built across all market conditions.
  *
  * Suppression reasons:
- *   - 'staleness'       — any input ts_utc older than max_age_min
+ *   - 'staleness'       — snapshot ts_utc older than max_age_min
+ *   - 'obs_stale'       — METAR observation older than max_obs_age_min
  *   - 'book_incoherent' — station failed sum-of-asks invariant check
  *   - 'lock_dead'       — bracket is mathematically eliminated
  *   - 'gap_data'        — snapshot follows a collector gap
@@ -124,9 +125,10 @@ export async function runSignalEngine(
         if (row.lock_status === "dead") return "lock_dead";
         if (stale)              return "staleness";
         if (!row.ask_cents || !row.bid_cents) return "no_price";
-        // obs_age_s staleness (if available)
-        if (row.obs_age_s !== null && row.obs_age_s > config.max_age_min * 60) {
-          return "staleness";
+        // Observation age — METARs arrive ~hourly, so this uses its own bound
+        // (max_obs_age_min) rather than the 4-minute-cadence snapshot bound.
+        if (row.obs_age_s !== null && row.obs_age_s > config.max_obs_age_min * 60) {
+          return "obs_stale";
         }
         return null;
       })();
