@@ -285,51 +285,66 @@ export async function fetchKalshiEvents(): Promise<KalshiFetchResult> {
     stationEntries.map(async ([_stationId, series], i) => {
       if (i > 0) await new Promise((r) => setTimeout(r, i * 150));
       return (async () => {
+        // limit MUST be > 1: Kalshi keeps yesterday's event status=open until it
+        // settles (~4am UTC), so with limit=1 the response is ONLY the stale
+        // event and the new trading day's markets are never discovered — the
+        // collector then tracks settled 99¢/1¢ books all night (2026-07-27
+        // incident). Fetch several open events and take the first non-stale one.
         const data = (await kalshiFetch(
-          `/events?series_ticker=${series}&status=open&with_nested_markets=true&limit=1`
+          `/events?series_ticker=${series}&status=open&with_nested_markets=true&limit=5`
         )) as Record<string, unknown>;
 
-        const events = (data["events"] as unknown[]) ?? [];
-        if (events.length === 0) return null;
+        const allEvents = (data["events"] as unknown[]) ?? [];
+        if (allEvents.length === 0) return null;
 
-        const event = events[0] as Record<string, unknown>;
-        const eventTicker = event["event_ticker"] as string;
+        let event: Record<string, unknown> | null = null;
+        let eventTicker = "";
+        for (const rawEvent of allEvents) {
+          const candidate = rawEvent as Record<string, unknown>;
+          const candidateTicker = candidate["event_ticker"] as string;
 
-        // Primary filter: use the API's own strike_date timestamp.
-        // Kalshi returns strike_date on the event object (not close_time, which lives on markets).
-        // strike_date is when settlement occurs — events settling in the past are stale.
-        const strikeTimeRaw = event["strike_date"] as string | undefined;
-        const strikeTime = strikeTimeRaw ? new Date(strikeTimeRaw) : null;
+          // Primary filter: use the API's own strike_date timestamp.
+          // Kalshi returns strike_date on the event object (not close_time, which
+          // lives on markets). strike_date is when settlement occurs — events
+          // settling in the past are stale.
+          const strikeTimeRaw = candidate["strike_date"] as string | undefined;
+          const strikeTime = strikeTimeRaw ? new Date(strikeTimeRaw) : null;
 
-        if (strikeTime && !isNaN(strikeTime.getTime()) && strikeTime < todayUtc) {
-          logger.warn(
-            { eventTicker, strikeTime: strikeTime.toISOString(), todayUtc: todayUtc.toISOString() },
-            "Skipping event whose strike_date is in the past"
-          );
-          return null;
-        }
-
-        // Cross-check: parsed ticker date vs strike_date (or vs today if absent).
-        // A disagreement >2 days is a format bug we want to catch early.
-        const tickerDate = parseEventSettlementDate(eventTicker);
-        if (tickerDate) {
-          if (!strikeTime) {
-            // No strike_date — fall back to ticker date as the stale guard.
-            if (tickerDate < todayUtc) {
-              logger.warn(
-                { eventTicker, tickerDate: tickerDate.toISOString(), todayUtc: todayUtc.toISOString() },
-                "Skipping stale event (no strike_date; ticker date in the past)"
-              );
-              return null;
-            }
-          } else if (Math.abs(tickerDate.getTime() - strikeTime.getTime()) > 2 * 24 * 3600 * 1000) {
-            // Ticker date and strike_date disagree by more than 2 days — log as invariant alarm.
+          if (strikeTime && !isNaN(strikeTime.getTime()) && strikeTime < todayUtc) {
             logger.warn(
-              { eventTicker, tickerDate: tickerDate.toISOString(), strikeTime: strikeTime.toISOString() },
-              "INVARIANT: parsed ticker date disagrees with API strike_date by >2 days — check format"
+              { eventTicker: candidateTicker, strikeTime: strikeTime.toISOString(), todayUtc: todayUtc.toISOString() },
+              "Skipping event whose strike_date is in the past"
             );
+            continue;
           }
+
+          // Cross-check: parsed ticker date vs strike_date (or vs today if absent).
+          // A disagreement >2 days is a format bug we want to catch early.
+          const tickerDate = parseEventSettlementDate(candidateTicker);
+          if (tickerDate) {
+            if (!strikeTime) {
+              // No strike_date — fall back to ticker date as the stale guard.
+              if (tickerDate < todayUtc) {
+                logger.warn(
+                  { eventTicker: candidateTicker, tickerDate: tickerDate.toISOString(), todayUtc: todayUtc.toISOString() },
+                  "Skipping stale event (no strike_date; ticker date in the past)"
+                );
+                continue;
+              }
+            } else if (Math.abs(tickerDate.getTime() - strikeTime.getTime()) > 2 * 24 * 3600 * 1000) {
+              // Ticker date and strike_date disagree by more than 2 days — log as invariant alarm.
+              logger.warn(
+                { eventTicker: candidateTicker, tickerDate: tickerDate.toISOString(), strikeTime: strikeTime.toISOString() },
+                "INVARIANT: parsed ticker date disagrees with API strike_date by >2 days — check format"
+              );
+            }
+          }
+
+          event = candidate;
+          eventTicker = candidateTicker;
+          break;
         }
+        if (!event) return null;
 
         const rawMarkets = (event["markets"] as unknown[]) ?? [];
 
