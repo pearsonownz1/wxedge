@@ -23,7 +23,7 @@
   "max_open_orders_per_station": 1,
   "max_daily_exposure_per_station_cents": 200,
   "max_total_open_exposure_cents": 500,
-  "max_daily_loss_cents": 300,
+  "max_daily_loss_cents": 1000,
 
   "cooldown_min": 30,
 
