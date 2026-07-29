@@ -7,6 +7,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
 
   const isDashboard  = location === "/";
+  const isLive       = location === "/live";
   const isMarkets    = location.startsWith("/markets") && !location.includes("tab=calibration");
   const isCalibration = location === "/markets" && window.location.search.includes("tab=calibration");
   const isApprovals  = location === "/approvals";
@@ -23,6 +24,9 @@ export function Shell({ children }: { children: React.ReactNode }) {
         <nav className="flex items-center h-full gap-1">
           <Link href="/" className={cn("px-3 h-full flex items-center text-sm font-medium border-b-2 transition-colors", isDashboard ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground hover:border-border")}>
             Dashboard
+          </Link>
+          <Link href="/live" className={cn("px-3 h-full flex items-center text-sm font-medium border-b-2 transition-colors", isLive ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground hover:border-border")}>
+            Live
           </Link>
           <Link href="/markets" className={cn("px-3 h-full flex items-center text-sm font-medium border-b-2 transition-colors", isMarkets ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground hover:border-border")}>
             Markets
