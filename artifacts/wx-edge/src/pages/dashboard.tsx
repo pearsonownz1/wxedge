@@ -1,324 +1,478 @@
-import { useState, useMemo, useEffect } from "react";
-import { Link } from "wouter";
-import { 
-  useListStations, 
-  getListStationsQueryKey,
-  useGetStation,
-  getGetStationQueryKey,
-  useGetStationDistribution,
-  getGetStationDistributionQueryKey
-} from "@workspace/api-client-react";
-import { cn, formatPts } from "@/lib/utils";
+/**
+ * Trading Performance Dashboard
+ *
+ * TV-friendly overview of the AI trader's P&L, win rate, per-station
+ * performance, and a live feed of recent decisions.
+ * Auto-refreshes every 30 s.
+ */
+
+import { useState, useEffect, useCallback } from "react";
 import { Shell } from "@/components/shell";
-import { FeedBanner } from "@/components/feed-banner";
-import { RaceTrack } from "@/components/race-track";
-import { KillFeed } from "@/components/kill-feed";
-import { ArrowRight, Clock, Target } from "lucide-react";
-import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, ReferenceLine } from "recharts";
+import { Badge } from "@/components/ui/badge";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+  ReferenceLine,
+} from "recharts";
 
-export default function Dashboard() {
-  const { data: stations, isLoading: loadingStations } = useListStations({
-    query: {
-      refetchInterval: 300000,
-      queryKey: getListStationsQueryKey(),
-    }
-  });
+// ─── Types ────────────────────────────────────────────────────────────────────
 
-  const sortedStations = useMemo(() => {
-    if (!stations) return [];
-    return [...stations].sort((a, b) => {
-      const edgeA = a.bestEdgePts ? Math.abs(a.bestEdgePts) : 0;
-      const edgeB = b.bestEdgePts ? Math.abs(b.bestEdgePts) : 0;
-      return edgeB - edgeA;
-    });
-  }, [stations]);
+interface DashboardSummary {
+  pnl_cents:        number;
+  total_placed:     number;
+  settled_count:    number;
+  pending_count:    number;
+  win_count:        number;
+  loss_count:       number;
+  win_rate_pct:     number | null;
+  cost_today_cents: number;
+  daily_cap_cents:  number;
+}
 
-  const [selectedStationId, setSelectedStationId] = useState<string | null>(null);
+interface DayRow {
+  date:        string;
+  pnl_cents:   number;
+  cost_cents:  number;
+  trade_count: number;
+}
 
-  useEffect(() => {
-    if (sortedStations.length > 0 && !selectedStationId) {
-      setSelectedStationId(sortedStations[0].id);
-    }
-  }, [sortedStations, selectedStationId]);
+interface StationRow {
+  station_id:   string;
+  total_placed: number;
+  settled:      number;
+  win_count:    number;
+  loss_count:   number;
+  pnl_cents:    number;
+}
 
-  const station = sortedStations.find(s => s.id === selectedStationId);
+interface FeedItem {
+  id:                 number;
+  ticker:             string;
+  side:               string;
+  station_id:         string;
+  proposed_ts:        string;
+  decision:           string | null;
+  decider:            string | null;
+  llm_confidence:     number | null;
+  recheck_ok:         boolean | null;
+  settlement_outcome: string | null;
+  pnl_cents:          number | null;
+  limit_price_cents:  number;
+}
 
+interface DashboardData {
+  summary:     DashboardSummary;
+  pnl_by_day:  DayRow[];
+  by_station:  StationRow[];
+  recent_feed: FeedItem[];
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+function fmt$(cents: number): string {
+  const dollars = cents / 100;
+  const sign = dollars >= 0 ? "+" : "";
+  return `${sign}$${Math.abs(dollars).toFixed(2)}`;
+}
+
+function fmtDate(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleDateString([], { month: "short", day: "numeric" });
+}
+
+function fmtTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+// ─── Stat card ────────────────────────────────────────────────────────────────
+
+function StatCard({
+  label,
+  value,
+  sub,
+  valueClass,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  valueClass?: string;
+}) {
   return (
-    <Shell>
-      {station && <FeedBanner fresh={station.feedFresh} timestampLst={station.obsTimestampLst} hideEdgeSignal />}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar */}
-        <div className="w-64 border-r bg-card shrink-0 flex flex-col overflow-y-auto">
-          <div className="p-4 border-b">
-            <h2 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Settlement Stations</h2>
-          </div>
-          <div className="flex-1">
-            {loadingStations && <div className="p-4 text-sm text-muted-foreground">Loading stations...</div>}
-            {sortedStations.map(s => {
-              const isSelected = s.id === selectedStationId;
-              const hasActionableEdge = s.isActionable && s.feedFresh;
-              return (
-                <button
-                  key={s.id}
-                  onClick={() => setSelectedStationId(s.id)}
-                  className={cn(
-                    "w-full text-left px-4 py-3 border-b flex items-center justify-between transition-colors",
-                    isSelected ? "bg-accent" : "hover:bg-accent/50"
-                  )}
-                >
-                  <div>
-                    <div className="font-bold">{s.id}</div>
-                    <div className="text-xs text-muted-foreground">{s.name.split(',')[0]}</div>
-                  </div>
-                  <div className="text-right">
-                    {s.feedFresh ? (
-                      <div className={cn("text-sm data-mono", hasActionableEdge ? "edge-positive" : "edge-neutral")}>
-                        {formatPts(s.bestEdgePts)}
-                      </div>
-                    ) : (
-                      <div className="text-sm data-mono edge-neutral" title="Feed Stale">—</div>
-                    )}
-                    <div className="text-[10px] text-muted-foreground uppercase">{s.bestBracket || "—"}</div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Main Panel */}
-        <div className="flex-1 bg-background overflow-y-auto">
-          {selectedStationId ? (
-            <StationView stationId={selectedStationId} />
-          ) : (
-            <div className="flex items-center justify-center h-full text-muted-foreground">
-              Select a station
-            </div>
-          )}
-        </div>
-      </div>
-    </Shell>
+    <div className="border bg-card p-5 flex flex-col gap-1">
+      <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{label}</div>
+      <div className={`text-3xl font-bold tabular-nums tracking-tight ${valueClass ?? ""}`}>{value}</div>
+      {sub && <div className="text-xs text-muted-foreground">{sub}</div>}
+    </div>
   );
 }
 
-function StationView({ stationId }: { stationId: string }) {
-  const { data: detail } = useGetStation(stationId, {
-    query: {
-      enabled: !!stationId,
-      refetchInterval: 300000,
-      queryKey: getGetStationQueryKey(stationId),
-    }
-  });
+// ─── P&L bar chart ────────────────────────────────────────────────────────────
 
-  const { data: dist } = useGetStationDistribution(stationId, {
-    query: {
-      enabled: !!stationId,
-      refetchInterval: 300000,
-      queryKey: getGetStationDistributionQueryKey(stationId),
-    }
-  });
-
-  if (!detail || !dist) {
-    return <div className="p-8 text-sm text-muted-foreground">Loading station data...</div>;
+function PnlChart({ data }: { data: DayRow[] }) {
+  if (data.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
+        No trade history yet
+      </div>
+    );
   }
 
-  const { settlementWindow: win } = detail;
-  // Observation staleness (IEM/NWS) — freezes the race track and kill feed.
-  // Separate from Kalshi/book staleness, which only suppresses edge signals
-  // and is already surfaced by the top FeedBanner.
-  const obsStale = !dist.feedStatus.nwsFresh;
-  // Book staleness — hides edge signals in the divergence table.
-  const bookStale = !dist.feedFresh;
-  // The race track and kill feed care about obs, not book.
-  const stale = obsStale;
+  // Cumulative P&L line overlay data
+  let cum = 0;
+  const chartData = data.map(d => {
+    cum += d.pnl_cents;
+    return { ...d, cumulative: cum };
+  });
 
   return (
-    <div className="flex h-full overflow-hidden">
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 4 }}>
+        <XAxis
+          dataKey="date"
+          tickFormatter={fmtDate}
+          tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+          axisLine={false}
+          tickLine={false}
+        />
+        <YAxis
+          tickFormatter={v => `${v}¢`}
+          tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+          axisLine={false}
+          tickLine={false}
+          width={38}
+        />
+        <Tooltip
+          formatter={(value: number, name: string) => {
+            if (name === "pnl_cents") return [`${value}¢`, "P&L"];
+            return [value, name];
+          }}
+          labelFormatter={(label: string) => fmtDate(label)}
+          contentStyle={{
+            background: "hsl(var(--card))",
+            border: "1px solid hsl(var(--border))",
+            borderRadius: 4,
+            fontSize: 11,
+          }}
+        />
+        <ReferenceLine y={0} stroke="hsl(var(--border))" strokeDasharray="3 3" />
+        <Bar dataKey="pnl_cents" radius={[2, 2, 0, 0]}>
+          {chartData.map((entry, i) => (
+            <Cell
+              key={i}
+              fill={entry.pnl_cents >= 0
+                ? "hsl(142 71% 45%)"   // green
+                : "hsl(var(--destructive))"}
+            />
+          ))}
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
 
-      {/* ── Main column ─────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-6 min-w-0">
+// ─── Station leaderboard ──────────────────────────────────────────────────────
 
-        {/* Header row */}
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2 mb-0.5">
-              <h1 className="text-2xl font-bold tracking-tight">{detail.id}</h1>
-              <span className="text-2xl text-muted-foreground font-light">·</span>
-              <h2 className="text-2xl font-medium text-muted-foreground">{win.contractDate}</h2>
+function StationLeaderboard({ rows }: { rows: StationRow[] }) {
+  if (rows.length === 0) {
+    return <p className="text-sm text-muted-foreground text-center py-6">No trades yet.</p>;
+  }
+  return (
+    <table className="w-full text-xs">
+      <thead>
+        <tr className="border-b text-muted-foreground">
+          <th className="text-left py-2 pr-3 font-medium">Station</th>
+          <th className="text-right py-2 pr-2 font-medium">W</th>
+          <th className="text-right py-2 pr-2 font-medium">L</th>
+          <th className="text-right py-2 pr-2 font-medium">Rate</th>
+          <th className="text-right py-2 font-medium">P&L</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map(r => {
+          const total = r.win_count + r.loss_count;
+          const rate  = total > 0 ? Math.round(r.win_count / total * 100) : null;
+          const pnlPositive = r.pnl_cents >= 0;
+          return (
+            <tr key={r.station_id} className="border-b border-border/40">
+              <td className="py-2 pr-3 font-mono font-bold">{r.station_id}</td>
+              <td className="py-2 pr-2 text-right text-green-500 font-semibold tabular-nums">{r.win_count}</td>
+              <td className="py-2 pr-2 text-right text-destructive font-semibold tabular-nums">{r.loss_count}</td>
+              <td className="py-2 pr-2 text-right tabular-nums text-muted-foreground">
+                {rate !== null ? `${rate}%` : "—"}
+              </td>
+              <td className={`py-2 text-right tabular-nums font-semibold ${pnlPositive ? "text-green-500" : "text-destructive"}`}>
+                {r.pnl_cents > 0 ? "+" : ""}{r.pnl_cents}¢
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+
+// ─── Live trading feed ────────────────────────────────────────────────────────
+
+function TradingFeed({ items }: { items: FeedItem[] }) {
+  if (items.length === 0) {
+    return (
+      <div className="text-sm text-muted-foreground text-center py-8">
+        No decisions yet — waiting for the first signal.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-0">
+      {items.map(item => {
+        const isApproved = item.decision === "approved" && item.recheck_ok;
+        const isDenied   = item.decision === "denied";
+        const isExpired  = item.decision === "expired";
+        const outcome    = item.settlement_outcome;
+
+        let outcomeNode: React.ReactNode = null;
+        if (outcome === "won") {
+          outcomeNode = (
+            <span className="text-green-500 font-bold text-xs tabular-nums">
+              WON {item.pnl_cents !== null ? `+${item.pnl_cents}¢` : ""}
+            </span>
+          );
+        } else if (outcome === "lost") {
+          outcomeNode = (
+            <span className="text-destructive font-bold text-xs tabular-nums">
+              LOST {item.pnl_cents !== null ? `${item.pnl_cents}¢` : ""}
+            </span>
+          );
+        } else if (outcome === "pending") {
+          outcomeNode = <span className="text-muted-foreground text-[10px] uppercase tracking-wide">live</span>;
+        }
+
+        const deciderIcon = item.decider === "llm" ? "🤖" : item.decider === "human" ? "👤" : "";
+
+        return (
+          <div
+            key={item.id}
+            className="flex items-center gap-3 px-0 py-2.5 border-b border-border/40 text-xs hover:bg-muted/10 transition-colors"
+          >
+            {/* Time */}
+            <span className="text-muted-foreground tabular-nums shrink-0 w-12">
+              {fmtTime(item.proposed_ts)}
+            </span>
+
+            {/* Station */}
+            <span className="font-mono font-bold text-muted-foreground shrink-0 w-11">
+              {item.station_id.replace(/^K/, "")}
+            </span>
+
+            {/* Ticker (truncated) */}
+            <span className="font-mono text-[10px] text-muted-foreground flex-1 min-w-0 truncate">
+              {item.ticker}
+            </span>
+
+            {/* Side */}
+            <Badge
+              variant={item.side === "YES" ? "default" : "secondary"}
+              className="text-[10px] px-1.5 shrink-0"
+            >
+              {item.side}
+            </Badge>
+
+            {/* Decision */}
+            <span className={`shrink-0 font-medium ${
+              isApproved ? "text-green-500" :
+              isDenied   ? "text-muted-foreground" :
+              isExpired  ? "text-destructive" : ""
+            }`}>
+              {deciderIcon} {item.decision ?? "pending"}
+              {item.llm_confidence !== null && item.decider === "llm" && (
+                <span className="ml-1 text-muted-foreground font-normal">
+                  {Math.round(item.llm_confidence * 100)}%
+                </span>
+              )}
+            </span>
+
+            {/* Settlement outcome */}
+            <span className="shrink-0 w-20 text-right">
+              {outcomeNode ?? <span className="text-border">—</span>}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Daily spend bar ──────────────────────────────────────────────────────────
+
+function SpendBar({ spent, cap }: { spent: number; cap: number }) {
+  const pct = cap > 0 ? Math.min(100, Math.round(spent / cap * 100)) : 0;
+  const critical = pct >= 85;
+  return (
+    <div className="space-y-1">
+      <div className="flex justify-between text-[10px] text-muted-foreground">
+        <span>Today's spend</span>
+        <span className={critical ? "text-destructive font-semibold" : ""}>{spent}¢ / {cap}¢</span>
+      </div>
+      <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all ${critical ? "bg-destructive" : "bg-primary"}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+// ─── Main page ────────────────────────────────────────────────────────────────
+
+export default function Dashboard() {
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+
+  const fetchData = useCallback(async () => {
+    try {
+      const res = await fetch(`${BASE}/api/dashboard`);
+      if (!res.ok) throw new Error(`${res.status}`);
+      const json = await res.json() as DashboardData;
+      setData(json);
+      setError(null);
+      setLastRefresh(new Date());
+    } catch {
+      setError("Failed to load dashboard");
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchData();
+    const t = setInterval(() => void fetchData(), 30_000);
+    return () => clearInterval(t);
+  }, [fetchData]);
+
+  const s = data?.summary;
+
+  return (
+    <Shell>
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-lg font-bold tracking-tight">Trading Dashboard</h1>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                All-time performance · auto-refreshes every 30 s
+                {lastRefresh && (
+                  <span className="ml-2 opacity-60">· last updated {fmtTime(lastRefresh.toISOString())}</span>
+                )}
+              </p>
             </div>
-            <div className="text-sm text-muted-foreground">
-              {detail.name} · window {win.lstStart}–{win.lstEnd} LST
-              {' · '}
-              <span className="data-mono">
-                {Math.floor(win.hoursRemaining)}h {Math.floor((win.hoursRemaining % 1) * 60)}m remaining
-              </span>
+            <button
+              onClick={() => void fetchData()}
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors border rounded px-2.5 py-1"
+            >
+              Refresh
+            </button>
+          </div>
+
+          {error && (
+            <div className="border border-destructive/40 rounded-md p-3 text-sm text-destructive">{error}</div>
+          )}
+
+          {/* ── Stat cards ─────────────────────────────────────────────────── */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <StatCard
+              label="Net P&L"
+              value={s ? fmt$(s.pnl_cents) : "—"}
+              sub={s ? `${s.settled_count} settled trade${s.settled_count !== 1 ? "s" : ""}` : undefined}
+              valueClass={s
+                ? s.pnl_cents > 0 ? "text-green-500" : s.pnl_cents < 0 ? "text-destructive" : ""
+                : ""}
+            />
+            <StatCard
+              label="Win Rate"
+              value={s?.win_rate_pct !== null && s?.win_rate_pct !== undefined ? `${s.win_rate_pct}%` : "—"}
+              sub={s ? `${s.win_count}W · ${s.loss_count}L` : undefined}
+              valueClass={s?.win_rate_pct !== null && (s?.win_rate_pct ?? 0) >= 50 ? "text-green-500" : ""}
+            />
+            <StatCard
+              label="Trades Placed"
+              value={s ? String(s.total_placed) : "—"}
+              sub={s ? `${s.pending_count} awaiting settlement` : undefined}
+            />
+            <div className="border bg-card p-5 flex flex-col gap-3">
+              <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Today's Budget</div>
+              {s ? (
+                <>
+                  <div className="text-3xl font-bold tabular-nums tracking-tight">
+                    {s.cost_today_cents}¢
+                  </div>
+                  <SpendBar spent={s.cost_today_cents} cap={s.daily_cap_cents} />
+                </>
+              ) : (
+                <div className="text-3xl font-bold">—</div>
+              )}
             </div>
-            {win.dstActive && win.spillsToNextDay && win.spillsToDate && (
-              <div className="text-[10px] text-orange-600 font-medium mt-1 bg-orange-50 inline-block px-1.5 py-0.5">
-                DST active — window spills to {win.spillsToDate}
+          </div>
+
+          {/* ── Chart + leaderboard ────────────────────────────────────────── */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+            {/* P&L chart — takes 2/3 width */}
+            <div className="md:col-span-2 border bg-card p-4">
+              <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">
+                Daily P&L (¢)
               </div>
+              <div className="h-48">
+                {data ? <PnlChart data={data.pnl_by_day} /> : (
+                  <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
+                    Loading…
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Station leaderboard — 1/3 width */}
+            <div className="border bg-card p-4">
+              <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">
+                Station Performance
+              </div>
+              {data ? (
+                <StationLeaderboard rows={data.by_station} />
+              ) : (
+                <p className="text-sm text-muted-foreground">Loading…</p>
+              )}
+            </div>
+          </div>
+
+          {/* ── Live trading feed ───────────────────────────────────────────── */}
+          <div className="border bg-card p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                Live Trading Feed
+              </div>
+              {data && (
+                <span className="text-[10px] text-muted-foreground">
+                  Last {data.recent_feed.length} decisions
+                </span>
+              )}
+            </div>
+            {data ? (
+              <TradingFeed items={data.recent_feed} />
+            ) : (
+              <p className="text-sm text-muted-foreground py-4 text-center">Loading…</p>
             )}
           </div>
 
-          {/* Running high */}
-          <div className="text-right shrink-0">
-            <div className={cn("text-5xl font-bold tracking-tighter data-mono", stale && "opacity-50")}>
-              {detail.runningHighF.toFixed(1)}
-              <span className="text-xl text-muted-foreground font-light ml-1">°F</span>
-            </div>
-            <div className="text-[10px] uppercase tracking-widest text-muted-foreground mt-0.5">
-              {stale ? "Last good high" : "Running High"}
-            </div>
-          </div>
-        </div>
-
-        {/* Stale banner (1b) */}
-        {stale && (
-          <div className="border border-muted-foreground/30 bg-muted/40 px-4 py-2.5 text-sm text-muted-foreground flex items-center justify-between">
-            <span>
-              Observation feed stale — last reading {detail.obsTimestampLst ?? "unknown"}.
-              Track frozen at last-good high; eliminations and edge signals suspended.
-            </span>
-            <span className="text-[10px] font-bold uppercase tracking-widest ml-4 shrink-0">
-              Edge Signals Hidden
-            </span>
-          </div>
-        )}
-
-        {/* ── Race Track ──────────────────────────────────────── */}
-        <div className="border bg-card p-5">
-          <RaceTrack
-            brackets={dist.brackets}
-            runningHighF={detail.runningHighF}
-            stationId={detail.id}
-            contractDate={win.contractDate}
-            stale={stale}
-          />
-        </div>
-
-        {/* ── Model Run Calibration card ───────────────────────── */}
-        <div className="border bg-card p-4">
-          <div className="flex items-center gap-2 text-muted-foreground mb-3">
-            <Target className="w-3.5 h-3.5" />
-            <span className="text-[9px] font-bold uppercase tracking-widest">Model Run · Calibration Applied</span>
-          </div>
-          <div className="grid grid-cols-4 gap-4">
-            <div>
-              <div className="text-[9px] text-muted-foreground uppercase tracking-wider mb-1">Mean Bias</div>
-              <div className={cn("text-lg font-bold data-mono", detail.calibration.meanBias > 0 ? "text-primary" : "text-[oklch(0.55_0.09_250)]")}>
-                {detail.calibration.meanBias > 0 ? "+" : ""}{detail.calibration.meanBias.toFixed(2)}°F
-              </div>
-            </div>
-            <div>
-              <div className="text-[9px] text-muted-foreground uppercase tracking-wider mb-1">RMSE</div>
-              <div className="text-lg data-mono">{detail.calibration.rmse.toFixed(2)}</div>
-            </div>
-            <div>
-              <div className="text-[9px] text-muted-foreground uppercase tracking-wider mb-1">Valid Pairs</div>
-              <div className="text-lg data-mono">{detail.calibration.pairCount}</div>
-            </div>
-            <div>
-              <div className="text-[9px] text-muted-foreground uppercase tracking-wider mb-1">Last Run</div>
-              <div className="text-lg data-mono">{new Date(detail.calibration.lastUpdated).toLocaleDateString()}</div>
-            </div>
-          </div>
-
-          {/* NBM Spread strip */}
-          {dist.nbmSpread && (() => {
-            const spread = dist.nbmSpread;
-            const rangeF = spread.p90F - spread.p10F;
-            const pct = (v: number) =>
-              rangeF > 0 ? Math.max(0, Math.min(100, ((v - spread.p10F) / rangeF) * 100)) : 50;
-            return (
-              <div className="mt-4 pt-3 border-t">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-[9px] uppercase tracking-wider text-muted-foreground font-bold">NBM Spread</span>
-                  <span className={cn(
-                    "text-[8px] px-1 py-0.5 font-bold uppercase tracking-wider",
-                    spread.source === 'nbm' ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
-                  )}>
-                    {spread.source === 'nbm' ? 'NBM' : 'Approx'}
-                  </span>
-                </div>
-                <div className="relative h-5 mb-5">
-                  <div className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 bg-muted" />
-                  <div className="absolute h-1 top-1/2 -translate-y-1/2 bg-primary/30"
-                    style={{ left: `${pct(spread.p25F)}%`, width: `${pct(spread.p75F) - pct(spread.p25F)}%` }} />
-                  <div className="absolute w-0.5 h-4 top-1/2 -translate-y-1/2 bg-primary"
-                    style={{ left: `${pct(spread.p50F)}%`, transform: 'translateX(-50%) translateY(-50%)' }} />
-                  {[{ v: spread.p10F, label: `${spread.p10F.toFixed(0)}°` },
-                    { v: spread.p50F, label: `${spread.p50F.toFixed(0)}°`, bold: true },
-                    { v: spread.p90F, label: `${spread.p90F.toFixed(0)}°` }].map(({ v, label, bold }) => (
-                    <span key={v} className={cn("absolute text-[9px] data-mono top-4 -translate-x-1/2",
-                      bold ? "text-primary font-bold" : "text-muted-foreground")}
-                      style={{ left: `${pct(v)}%` }}>
-                      {label}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            );
-          })()}
-        </div>
-
-        {/* Market board link */}
-        <div>
-          <Link href="/markets" className="inline-flex items-center justify-center text-sm font-bold bg-primary text-primary-foreground h-9 px-6 data-mono uppercase tracking-wider hover:bg-primary/90 transition-colors">
-            Open {stationId} market board
-            <ArrowRight className="ml-2 w-3.5 h-3.5" />
-          </Link>
         </div>
       </div>
-
-      {/* ── Right panel: Kill Feed + Calibration meta ─────────── */}
-      <div className="w-64 shrink-0 border-l flex flex-col overflow-hidden">
-
-        {/* Kill Feed */}
-        <div className="flex-1 overflow-hidden flex flex-col border-b">
-          <KillFeed
-            brackets={dist.brackets}
-            intradayObs={detail.intradayObs}
-            stationId={detail.id}
-            stale={stale}
-          />
-        </div>
-
-        {/* Intraday sparkline */}
-        <div className="p-3 shrink-0">
-          <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground mb-1.5">
-            Intraday High Trail
-          </div>
-          <div className="h-16 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={detail.intradayObs}>
-                <XAxis dataKey="timeLst" hide />
-                <YAxis domain={['dataMin - 1', 'dataMax + 1']} hide />
-                <Line
-                  type="stepAfter"
-                  dataKey="tempF"
-                  stroke="hsl(var(--foreground))"
-                  strokeWidth={1.5}
-                  dot={false}
-                  isAnimationActive={false}
-                />
-                <ReferenceLine y={detail.runningHighF} stroke="hsl(var(--primary))" strokeDasharray="2 2" />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="flex justify-between text-[9px] text-muted-foreground data-mono mt-1">
-            <span>{detail.intradayObs[0]?.timeLst}</span>
-            <span>{detail.intradayObs[detail.intradayObs.length - 1]?.timeLst}</span>
-          </div>
-        </div>
-
-        {/* Snapshot timestamp */}
-        <div className="px-3 pb-2 shrink-0">
-          <div className="text-[9px] text-muted-foreground data-mono">
-            Book snap {dist.bookSnapshotTimeLst}
-          </div>
-        </div>
-      </div>
-
-    </div>
+    </Shell>
   );
 }

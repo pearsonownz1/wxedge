@@ -31,6 +31,10 @@ export interface ApprovalRecord {
   llm_rationale:    string | null;
   /** LLM confidence 0-1 (null for human decisions). */
   llm_confidence:   number | null;
+  /** Settlement outcome for approved+placed trades: 'won' | 'lost' | 'pending' | null */
+  settlement_outcome: string | null;
+  /** Net P&L in cents once settled; null if not settled or not an actual placed trade. */
+  pnl_cents:        number | null;
 }
 
 export interface CurrentMarketState {
@@ -62,6 +66,32 @@ const APPROVAL_SELECT = sql`
   a.decider, a.llm_rationale, a.llm_confidence
 `;
 
+// Settlement outcome + P&L fragment — requires LEFT JOINs on orders o and settlements st
+const SETTLEMENT_SELECT = sql`
+  CASE
+    WHEN a.decision != 'approved' OR a.recheck_ok IS NOT TRUE THEN NULL
+    WHEN st.kalshi_settled_bracket IS NULL              THEN 'pending'
+    WHEN a.side = 'YES' AND st.kalshi_settled_bracket = a.ticker  THEN 'won'
+    WHEN a.side = 'YES'                                 THEN 'lost'
+    WHEN a.side = 'NO'  AND st.kalshi_settled_bracket != a.ticker THEN 'won'
+    ELSE 'lost'
+  END AS settlement_outcome,
+  CASE
+    WHEN a.decision = 'approved' AND a.recheck_ok IS NOT DISTINCT FROM true
+         AND st.kalshi_settled_bracket IS NOT NULL
+    THEN CASE
+      WHEN a.side = 'YES' AND st.kalshi_settled_bracket = a.ticker
+        THEN 100 - COALESCE(o.fill_price_cents, o.price_cents)
+      WHEN a.side = 'YES'
+        THEN -COALESCE(o.fill_price_cents, o.price_cents)
+      WHEN a.side = 'NO' AND st.kalshi_settled_bracket != a.ticker
+        THEN 100 - COALESCE(o.fill_price_cents, o.price_cents)
+      ELSE -COALESCE(o.fill_price_cents, o.price_cents)
+    END
+    ELSE NULL
+  END AS pnl_cents
+`;
+
 /** Pending (undecided, not yet expired) proposals, newest first. */
 export async function getPendingApprovals(): Promise<ApprovalRecord[]> {
   const { rows } = await db.execute(sql`
@@ -75,12 +105,16 @@ export async function getPendingApprovals(): Promise<ApprovalRecord[]> {
   return rows as ApprovalRecord[];
 }
 
-/** Last N decided proposals (approved, denied, expired), newest first. */
+/** Last N decided proposals (approved, denied, expired), newest first. Includes settlement outcome. */
 export async function getApprovalHistory(limit = 50): Promise<ApprovalRecord[]> {
   const { rows } = await db.execute(sql`
-    SELECT ${APPROVAL_SELECT}
+    SELECT ${APPROVAL_SELECT}, ${SETTLEMENT_SELECT}
     FROM approvals a
     JOIN signals s ON s.id = a.signal_id
+    LEFT JOIN orders o ON o.approval_id = a.id AND o.status = 'filled'
+    LEFT JOIN settlements st
+      ON st.station_id = s.station_id
+     AND st.settlement_date = a.proposed_ts::date::text
     WHERE a.decision IS NOT NULL
     ORDER BY a.proposed_ts DESC
     LIMIT ${limit}

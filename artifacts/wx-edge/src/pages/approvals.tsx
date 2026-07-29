@@ -53,6 +53,8 @@ interface ApprovalRecord {
   decider:          string | null;
   llm_rationale:    string | null;
   llm_confidence:   number | null;
+  settlement_outcome: string | null;
+  pnl_cents:        number | null;
 }
 
 interface ApprovalsResponse {
@@ -231,6 +233,7 @@ function HistoryTable({ items }: { items: ApprovalRecord[] }) {
           <th className="text-left py-2 pr-3 font-medium">Side</th>
           <th className="text-right py-2 pr-3 font-medium">Max loss</th>
           <th className="text-left py-2 pr-3 font-medium">Decision</th>
+          <th className="text-left py-2 pr-3 font-medium">Result</th>
           <th className="text-right py-2 pr-3 font-medium">Latency</th>
           <th className="text-right py-2 font-medium">Proposed</th>
         </tr>
@@ -241,57 +244,69 @@ function HistoryTable({ items }: { items: ApprovalRecord[] }) {
           const isExpanded = expandedId === item.id;
           const hasLlmRationale = item.decider === "llm" && item.llm_rationale;
           return (
-            <>
-              <tr
-                key={item.id}
-                className={`border-b border-border/40 hover:bg-muted/20 ${hasLlmRationale ? "cursor-pointer" : ""}`}
-                onClick={() => hasLlmRationale && setExpandedId(isExpanded ? null : item.id)}
-              >
-                <td className="py-2 pr-3 font-mono">{item.ticker}</td>
-                <td className="py-2 pr-3">
-                  <Badge variant={item.side === "YES" ? "default" : "secondary"} className="text-[10px] px-1.5">
-                    {item.side}
-                  </Badge>
-                </td>
-                <td className="py-2 pr-3 text-right tabular-nums">
-                  {card ? `${card.max_loss_cents}¢` : `${item.limit_price_cents}¢`}
-                </td>
-                <td className="py-2 pr-3">
-                  <DecisionBadge decision={item.decision} recheckOk={item.recheck_ok} decider={item.decider} />
-                  {item.llm_confidence !== null && item.decider === "llm" && (
-                    <span className="ml-1.5 text-muted-foreground tabular-nums">
-                      {Math.round(item.llm_confidence * 100)}%
-                    </span>
-                  )}
-                  {hasLlmRationale && (
-                    <span className="ml-1 text-muted-foreground">{isExpanded ? "▲" : "▼"}</span>
-                  )}
-                </td>
-                <td className="py-2 pr-3 text-right tabular-nums text-muted-foreground">
-                  {item.latency_ms !== null
-                    ? item.latency_ms < 60_000
-                      ? `${(item.latency_ms / 1000).toFixed(0)}s`
-                      : `${(item.latency_ms / 60_000).toFixed(1)}m`
-                    : "—"}
-                </td>
-                <td className="py-2 text-right text-muted-foreground">
-                  {new Date(item.proposed_ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                </td>
-              </tr>
-              {isExpanded && item.llm_rationale && (
-                <tr key={`${item.id}-rationale`} className="border-b border-border/40 bg-muted/10">
-                  <td colSpan={6} className="px-2 py-2">
-                    <p className="text-xs text-muted-foreground leading-relaxed italic">
-                      🤖 {item.llm_rationale}
-                    </p>
-                  </td>
-                </tr>
-              )}
-            </>
+            <tr key={item.id} className={`border-b border-border/40 hover:bg-muted/20 ${hasLlmRationale ? "cursor-pointer" : ""}`}
+              onClick={() => hasLlmRationale && setExpandedId(isExpanded ? null : item.id)}
+            >
+              <td className="py-2 pr-3 font-mono">{item.ticker}</td>
+              <td className="py-2 pr-3">
+                <Badge variant={item.side === "YES" ? "default" : "secondary"} className="text-[10px] px-1.5">
+                  {item.side}
+                </Badge>
+              </td>
+              <td className="py-2 pr-3 text-right tabular-nums">
+                {card ? `${card.max_loss_cents}¢` : `${item.limit_price_cents}¢`}
+              </td>
+              <td className="py-2 pr-3">
+                <DecisionBadge decision={item.decision} recheckOk={item.recheck_ok} decider={item.decider} />
+                {item.llm_confidence !== null && item.decider === "llm" && (
+                  <span className="ml-1.5 text-muted-foreground tabular-nums">
+                    {Math.round(item.llm_confidence * 100)}%
+                  </span>
+                )}
+                {hasLlmRationale && (
+                  <span className="ml-1 text-muted-foreground">{isExpanded ? "▲" : "▼"}</span>
+                )}
+              </td>
+              <td className="py-2 pr-3">
+                <SettlementBadge outcome={item.settlement_outcome} pnlCents={item.pnl_cents} />
+              </td>
+              <td className="py-2 pr-3 text-right tabular-nums text-muted-foreground">
+                {item.latency_ms !== null
+                  ? item.latency_ms < 60_000
+                    ? `${(item.latency_ms / 1000).toFixed(0)}s`
+                    : `${(item.latency_ms / 60_000).toFixed(1)}m`
+                  : "—"}
+              </td>
+              <td className="py-2 text-right text-muted-foreground">
+                {new Date(item.proposed_ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+              </td>
+            </tr>
           );
         })}
       </tbody>
     </table>
+  );
+}
+
+function SettlementBadge({
+  outcome,
+  pnlCents,
+}: {
+  outcome: string | null;
+  pnlCents: number | null;
+}) {
+  if (!outcome) return <span className="text-muted-foreground">—</span>;
+  if (outcome === "pending") return <span className="text-muted-foreground text-[10px] uppercase tracking-wide">open</span>;
+  const won = outcome === "won";
+  return (
+    <span className={`font-semibold tabular-nums ${won ? "text-green-500" : "text-destructive"}`}>
+      {won ? "WON" : "LOST"}
+      {pnlCents !== null && (
+        <span className="ml-1 font-normal text-muted-foreground">
+          {pnlCents > 0 ? "+" : ""}{pnlCents}¢
+        </span>
+      )}
+    </span>
   );
 }
 
