@@ -261,23 +261,26 @@ export async function decideApproval(
   return rows.length > 0;
 }
 
-/** Insert a shadow order placed via human approval. Returns the order id. */
+/** Insert an order placed via human/LLM approval. Returns the order id. */
 export async function insertApprovalOrder(row: {
-  signal_id:   number;
-  approval_id: number;
-  mode:        string;
-  ticker:      string;
-  station_id:  string;
-  side:        string;
-  price_cents: number;
-  count:       number;
+  signal_id:      number;
+  approval_id:    number;
+  mode:           string;
+  ticker:         string;
+  station_id:     string;
+  side:           string;
+  price_cents:    number;
+  count:          number;
+  /** Kalshi order ID when a real order was placed; null for simulated/shadow orders. */
+  kalshi_order_id?: string | null;
 }): Promise<number> {
   const { rows } = await db.execute(sql`
     INSERT INTO orders
-      (signal_id, approval_id, mode, ts_placed, ticker, station_id, side, price_cents, count, status)
+      (signal_id, approval_id, mode, ts_placed, ticker, station_id, side, price_cents, count, status, kalshi_order_id)
     VALUES
       (${row.signal_id}, ${row.approval_id}, ${row.mode}, NOW(),
-       ${row.ticker}, ${row.station_id}, ${row.side}, ${row.price_cents}, ${row.count}, 'open')
+       ${row.ticker}, ${row.station_id}, ${row.side}, ${row.price_cents}, ${row.count}, 'open',
+       ${row.kalshi_order_id ?? null})
     RETURNING id
   `);
   return Number((rows[0] as { id: number }).id);

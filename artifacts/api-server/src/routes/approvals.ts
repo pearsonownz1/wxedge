@@ -23,6 +23,7 @@ import {
   buildApprovalRiskState,
   getApprovalReport,
 } from "../lib/approvalsDb.js";
+import { placeKalshiOrder, kalshiLiveOrdersEnabled } from "../lib/kalshiOrderApi.js";
 
 const router = Router();
 
@@ -277,7 +278,7 @@ router.patch("/approvals/:id", async (req: Request, res: Response) => {
       return void res.status(409).json({ result: "conflict", decision: "approved", order });
     }
 
-    // Place shadow order
+    // ── Place order — real Kalshi call in production, simulation in dev ───────
     const execMode = riskConfig.execution_mode === "approval" ? "approval" : riskConfig.mode;
     const currentPrice = current
       ? (approval.side === "YES"
@@ -285,31 +286,65 @@ router.patch("/approvals/:id", async (req: Request, res: Response) => {
           : (current.bid_cents !== null ? 100 - current.bid_cents : approval.limit_price_cents))
       : approval.limit_price_cents;
 
+    let kalshiOrderId: string | null = null;
+    let kalshiStatus = "open";
+
+    if (kalshiLiveOrdersEnabled()) {
+      try {
+        const kalshiResult = await placeKalshiOrder(
+          approval.ticker,
+          approval.side as "YES" | "NO",
+          currentPrice,
+          1,
+        );
+        kalshiOrderId = kalshiResult.order_id;
+        kalshiStatus  = kalshiResult.status;
+        logger.info(
+          { approvalId: id, kalshiOrderId, ticker: approval.ticker, side: approval.side, status: kalshiStatus },
+          "Real Kalshi order placed"
+        );
+      } catch (kalshiErr) {
+        // Log prominently but don't block — still record the approval in our DB
+        // so the decision is auditable. The order will show kalshi_order_id = null.
+        logger.error(
+          { approvalId: id, ticker: approval.ticker, err: kalshiErr },
+          "Kalshi order placement FAILED — recording approval without live fill"
+        );
+      }
+    } else {
+      logger.info(
+        { approvalId: id, ticker: approval.ticker },
+        "Development mode — skipping real Kalshi order (simulation only)"
+      );
+    }
+
     const orderId = await insertApprovalOrder({
-      signal_id:   approval.signal_id,
-      approval_id: id,
-      mode:        execMode as "shadow" | "approval" | "live",
-      ticker:      approval.ticker,
-      station_id:  approval.station_id,
-      side:        approval.side as "YES" | "NO",
-      price_cents: currentPrice,
-      count:       1,
+      signal_id:      approval.signal_id,
+      approval_id:    id,
+      mode:           execMode as "shadow" | "approval" | "live",
+      ticker:         approval.ticker,
+      station_id:     approval.station_id,
+      side:           approval.side as "YES" | "NO",
+      price_cents:    currentPrice,
+      count:          1,
+      kalshi_order_id: kalshiOrderId,
     });
 
     logger.info(
-      { approvalId: id, orderId, ticker: approval.ticker, side: approval.side, priceCents: currentPrice, decider },
-      "Proposal approved — order placed"
+      { approvalId: id, orderId, kalshiOrderId, ticker: approval.ticker, side: approval.side, priceCents: currentPrice, decider },
+      "Proposal approved — order recorded"
     );
 
     return void res.json({
       result: "order_placed",
       order: {
-        id:               orderId,
-        ticker:           approval.ticker,
-        side:             approval.side,
+        id:                orderId,
+        ticker:            approval.ticker,
+        side:              approval.side,
         limit_price_cents: currentPrice,
-        contracts:        1,
-        status:           "open",
+        contracts:         1,
+        status:            kalshiOrderId ? kalshiStatus : "open",
+        kalshi_order_id:   kalshiOrderId,
       },
     });
     }); // end withStationLock
