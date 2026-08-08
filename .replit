@@ -48,6 +48,7 @@ POLLING_ENABLED = "true"
 
 [userenv.shared]
 APPROVER = "llm"
+KALSHI_LIVE_ORDERS = "true"
 
 [nix]
 channel = "stable-25_05"

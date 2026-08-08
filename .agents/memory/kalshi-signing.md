@@ -16,8 +16,20 @@ description: The KALSHI_PRIVATE_KEY secret is PKCS1 with spaces instead of newli
 2. If a `-----BEGIN ... -----` header is present, **extract the base64 body, strip ALL whitespace, and re-wrap at 64 chars/line**
 3. If no header, wrap raw base64 as `-----BEGIN PRIVATE KEY-----` (PKCS8 fallback)
 
-The key is PKCS1 (RSA), not PKCS8 — `createSign("SHA256").sign(pem, "base64")` works for both; the header tells Node which format to parse.
+The key is PKCS1 (RSA), not PKCS8.
 
-## Verified
-Signing test with normalised PEM produced a 344-byte base64 signature without error.
-`KALSHI_KEY_ID` = UUID format, confirms this is the production Kalshi API key.
+## CRITICAL: RSA-PSS Required (NOT PKCS1 v1.5)
+Kalshi v2 uses **RSA-PSS**, not the old `createSign("SHA256").sign(pem)` (PKCS1 v1.5).
+The old `/portfolio/orders` endpoint never checked auth (returned 410 immediately), so PKCS1 v1.5 was never caught. The v2 `/portfolio/events/orders` does check → INCORRECT_API_KEY_SIGNATURE.
+
+Correct signing (Node.js):
+```js
+const pk = createPrivateKey({ key: pem });
+cryptoSign("sha256", Buffer.from(message), {
+  key: pk,
+  padding: constants.RSA_PKCS1_PSS_PADDING,
+  saltLength: constants.RSA_PSS_SALTLEN_DIGEST,
+}).toString("base64");
+```
+
+See kalshi-order-api-v2.md for full request format details.

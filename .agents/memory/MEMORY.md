@@ -1,5 +1,6 @@
 - [Kalshi API structure](kalshi-api.md) — public reads; YYMMMDD tickers; per-station series; orderbook_fp = STRING tuples sorted ASC (index 0 = worst); 0¢ bid/100¢ ask = empty side; KDFW has no series.
-- [Kalshi signing key format](kalshi-signing.md) — PKCS1 key stored with spaces not newlines; normalisePem must strip all whitespace and re-wrap at 64 chars or Node crypto rejects it.
+- [Kalshi signing key format](kalshi-signing.md) — PKCS1 key stored with spaces not newlines; normalisePem must strip all whitespace and re-wrap at 64 chars; auth MUST use RSA-PSS not PKCS1-v1.5.
+- [Kalshi Order API v2](kalshi-order-api-v2.md) — POST /portfolio/events/orders; side=bid/ask; price=decimal dollar string; count=string; tif=good_till_canceled; stp=taker_at_cross; flat response {order_id,fill_count,remaining_count}.
 - [Deployment env snapshot trap](deployment-env-snapshot.md) — deployments freeze env at publish; dev-only switches leak into prod and silently blank features; prod ignores POLLING_ENABLED=false.
 - [Postgres advisory lock keep-alive](pg-advisory-lock.md) — Replit managed PG kills idle conns (57P01 ~30s); held lock conn needs SELECT 1 every 25s or trader crash-loops.
 - [IEM data sources](iem-data-sources.md) — 3-letter station IDs (NYC not KNYC); NWS rawMessage always empty; IEM asos.py is primary METAR source; 1-min latency unknown (Phase 0 auditing).

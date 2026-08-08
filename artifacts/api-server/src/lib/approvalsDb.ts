@@ -273,13 +273,16 @@ export async function insertApprovalOrder(row: {
   count:          number;
   /** Kalshi order ID when a real order was placed; null for simulated/shadow orders. */
   kalshi_order_id?: string | null;
+  /** Order fill status from Kalshi ("resting" | "filled") or "open" for simulation. */
+  status?: string;
 }): Promise<number> {
+  const status = row.status ?? "open";
   const { rows } = await db.execute(sql`
     INSERT INTO orders
       (signal_id, approval_id, mode, ts_placed, ticker, station_id, side, price_cents, count, status, kalshi_order_id)
     VALUES
       (${row.signal_id}, ${row.approval_id}, ${row.mode}, NOW(),
-       ${row.ticker}, ${row.station_id}, ${row.side}, ${row.price_cents}, ${row.count}, 'open',
+       ${row.ticker}, ${row.station_id}, ${row.side}, ${row.price_cents}, ${row.count}, ${status},
        ${row.kalshi_order_id ?? null})
     RETURNING id
   `);

@@ -1,20 +1,24 @@
 /**
  * Kalshi authenticated order placement.
  *
- * Auth scheme: RSA-SHA256, PKCS1 v1.5
+ * Auth scheme: RSA-PSS SHA-256 (NOT PKCS1 v1.5!)
  *   Message  = timestampMs + METHOD.upper() + path
  *   Headers  = KALSHI-ACCESS-KEY, KALSHI-ACCESS-TIMESTAMP, KALSHI-ACCESS-SIGNATURE
+ *
+ * v2 endpoint: POST /trade-api/v2/portfolio/events/orders
+ * v2 response: flat JSON { order_id, fill_count, remaining_count, ts_ms } — no nested "order" wrapper
  *
  * Only called when NODE_ENV !== 'development'.
  * Requires KALSHI_KEY_ID + KALSHI_PRIVATE_KEY env vars.
  */
 
-import { createSign } from "node:crypto";
+import { createPrivateKey, sign as cryptoSign, constants } from "node:crypto";
 import { logger } from "./logger.js";
 
-// Kalshi's primary trading API — used for all authenticated (portfolio) endpoints.
-// Market-data reads use api.elections.kalshi.com; that domain does not support auth'd writes.
-const TRADING_BASE = "https://trading-api.kalshi.co/trade-api/v2";
+// Kalshi consolidated trading + market-data at a single domain.
+// Per Kalshi's own error message: "API has been moved to https://api.elections.kalshi.com/"
+// Both reads (kalshiApi.ts) and authenticated writes (this file) use the same base.
+const TRADING_BASE = "https://api.elections.kalshi.com/trade-api/v2";
 
 // ─── Signing ──────────────────────────────────────────────────────────────────
 
@@ -65,8 +69,16 @@ function buildSignatureHeaders(
   const timestampMs = Date.now().toString();
   const message     = timestampMs + method.toUpperCase() + path;
 
-  const pem       = normalisePem(privateKey);
-  const signature = createSign("SHA256").update(message).sign(pem, "base64");
+  // Kalshi v2 uses RSA-PSS (not PKCS1 v1.5).
+  // Verified from official Kalshi JS client:
+  //   sign("sha256", data, { key: pk, padding: RSA_PKCS1_PSS_PADDING, saltLength: RSA_PSS_SALTLEN_DIGEST })
+  const pem = normalisePem(privateKey);
+  const pk  = createPrivateKey({ key: pem });
+  const signature = cryptoSign(
+    "sha256",
+    Buffer.from(message),
+    { key: pk, padding: constants.RSA_PKCS1_PSS_PADDING, saltLength: constants.RSA_PSS_SALTLEN_DIGEST },
+  ).toString("base64");
 
   return {
     "KALSHI-ACCESS-KEY":       keyId,
@@ -79,15 +91,14 @@ function buildSignatureHeaders(
 
 // ─── Order placement ──────────────────────────────────────────────────────────
 
+/** Flat response shape returned by POST /portfolio/events/orders (v2). */
 export interface KalshiOrderResult {
-  order_id:     string;
-  status:       string;   // "resting" | "filled" | "canceled" | "pending"
-  ticker:       string;
-  side:         string;
-  yes_price?:   number;
-  no_price?:    number;
-  count:        number;
-  filled_count?: number;
+  order_id:        string;   // UUID
+  fill_count:      string;   // decimal string e.g. "0.00"
+  remaining_count: string;   // decimal string e.g. "1.00"
+  ts_ms:           number;   // epoch ms
+  // Synthesized by us — not in the raw API response
+  status?:         string;   // "resting" | "filled" (derived from fill/remaining)
 }
 
 /**
@@ -109,23 +120,39 @@ export async function placeKalshiOrder(
     throw new Error("KALSHI_KEY_ID and KALSHI_PRIVATE_KEY are required for live order placement");
   }
 
-  const apiPath = "/trade-api/v2/portfolio/orders";
+  // Confirmed via live probe: /portfolio/events/orders returns "signature_is_missing_from_headers"
+  // (meaning the path is valid and requires RSA auth), while the old /portfolio/orders returns 410.
+  // /markets/{ticker}/orders returns 404 — does not exist.
+  const apiPath = "/trade-api/v2/portfolio/events/orders";
+
+  // ── v2 body format (confirmed by live probing) ──────────────────────────────
+  // - side:  "bid" (buy YES contracts) | "ask" (sell YES = buy NO)
+  // - price: decimal dollar STRING, e.g. "0.37" (NOT cents, NOT yes_price/no_price)
+  //   - YES buy: price = limitPriceCents / 100
+  //   - NO  buy: price = (100 - limitPriceCents) / 100  (implied YES ask price)
+  // - count:  STRING (Go struct unmarshal requires string)
+  // - time_in_force: "good_till_canceled"
+  // - self_trade_prevention_type: "taker_at_cross"
+  const bookSide  = side === "YES" ? "bid" : "ask";
+  const priceYes  = side === "YES" ? limitPriceCents : 100 - limitPriceCents;
+  const priceDollars = (priceYes / 100).toFixed(2);
 
   const body = {
     ticker,
-    action: "buy",
-    type:   "limit",
-    count,
-    ...(side === "YES"
-      ? { side: "yes", yes_price: limitPriceCents }
-      : { side: "no",  no_price:  limitPriceCents }),
+    action:                      "buy",
+    type:                        "limit",
+    count:                       String(count),
+    side:                        bookSide,
+    price:                       priceDollars,
+    time_in_force:               "good_till_canceled",
+    self_trade_prevention_type:  "taker_at_cross",
   };
 
   const headers = buildSignatureHeaders(keyId, privateKey, "POST", apiPath);
 
-  logger.info({ ticker, side, limitPriceCents, count }, "Placing Kalshi order");
+  logger.info({ ticker, side, bookSide, limitPriceCents, priceDollars, count }, "Placing Kalshi order");
 
-  const resp = await fetch(`${TRADING_BASE}/portfolio/orders`, {
+  const resp = await fetch(`${TRADING_BASE}/portfolio/events/orders`, {
     method:  "POST",
     headers,
     body:    JSON.stringify(body),
@@ -139,16 +166,27 @@ export async function placeKalshiOrder(
     );
   }
 
-  const json = JSON.parse(text) as { order: KalshiOrderResult };
+  // v2 response is a flat object — NOT wrapped in { order: ... }
+  const raw = JSON.parse(text) as KalshiOrderResult;
+  const fillCents    = parseFloat(raw.fill_count);
+  const remainCents  = parseFloat(raw.remaining_count);
+  const derivedStatus = fillCents > 0 && remainCents === 0 ? "filled" : "resting";
+  const result: KalshiOrderResult = { ...raw, status: derivedStatus };
+
   logger.info(
-    { ticker, side, limitPriceCents, orderId: json.order.order_id, status: json.order.status },
+    { ticker, side, limitPriceCents, orderId: result.order_id, status: derivedStatus },
     "Kalshi order placed successfully"
   );
 
-  return json.order;
+  return result;
 }
 
-/** True when we should attempt real Kalshi order placement (i.e. not running in dev). */
+/**
+ * True when we should attempt real Kalshi order placement.
+ * Normally gated to non-dev environments, but can be force-enabled in dev
+ * by setting KALSHI_LIVE_ORDERS=true (for manual testing without a deploy).
+ */
 export function kalshiLiveOrdersEnabled(): boolean {
+  if (process.env["KALSHI_LIVE_ORDERS"] === "true") return true;
   return process.env["NODE_ENV"] !== "development";
 }

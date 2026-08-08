@@ -328,6 +328,7 @@ router.patch("/approvals/:id", async (req: Request, res: Response) => {
       price_cents:    currentPrice,
       count:          1,
       kalshi_order_id: kalshiOrderId,
+      status:         kalshiOrderId ? kalshiStatus : "open",
     });
 
     logger.info(
