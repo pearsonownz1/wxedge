@@ -20,17 +20,40 @@ const TRADING_BASE = "https://trading-api.kalshi.co/trade-api/v2";
 
 /**
  * Normalise the private key stored in the env var.
- * Secrets are sometimes stored with literal \n instead of real newlines,
- * or without PEM headers. We handle all common formats.
+ *
+ * Secrets can arrive in several broken forms:
+ *   • Spaces instead of newlines between base64 lines (most common on Replit)
+ *   • Literal "\n" escape sequences instead of real newlines
+ *   • Raw base64 with no PEM header/footer at all
+ *   • PKCS1 header ("RSA PRIVATE KEY") or PKCS8 header ("PRIVATE KEY")
+ *
+ * We always extract the base64 payload, strip ALL whitespace, and re-wrap
+ * at 64 chars per line so Node's crypto stack gets a well-formed PEM.
  */
 function normalisePem(raw: string): string {
-  // Replace literal backslash-n with real newlines
-  let pem = raw.replace(/\\n/g, "\n").trim();
+  // Collapse literal \n escapes → real newlines, then trim
+  const s = raw.replace(/\\n/g, "\n").trim();
 
-  if (pem.includes("-----BEGIN")) return pem;   // already PEM
+  if (s.includes("-----BEGIN")) {
+    // Extract header and footer (handles both RSA PRIVATE KEY and PRIVATE KEY)
+    const headerMatch = s.match(/-----BEGIN[^-]*-----/);
+    const footerMatch = s.match(/-----END[^-]*-----/);
+    if (headerMatch && footerMatch) {
+      const header = headerMatch[0]!;
+      const footer = footerMatch[0]!;
+      // Strip ALL whitespace from the body (handles spaces or newlines)
+      const b64 = s
+        .slice(header.length, s.lastIndexOf(footer))
+        .replace(/\s+/g, "");
+      const lines = b64.match(/.{1,64}/g) ?? [];
+      return `${header}\n${lines.join("\n")}\n${footer}`;
+    }
+  }
 
-  // Raw base64 payload — wrap it. Try PKCS8 first (most common for Kalshi keys).
-  return `-----BEGIN PRIVATE KEY-----\n${pem}\n-----END PRIVATE KEY-----`;
+  // Raw base64 with no PEM header — wrap as PKCS8 (Kalshi default)
+  const b64 = s.replace(/\s+/g, "");
+  const lines = b64.match(/.{1,64}/g) ?? [];
+  return `-----BEGIN PRIVATE KEY-----\n${lines.join("\n")}\n-----END PRIVATE KEY-----`;
 }
 
 function buildSignatureHeaders(
