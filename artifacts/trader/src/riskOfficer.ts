@@ -25,6 +25,17 @@ export interface SignalCandidate {
   limit_price: number;  // cents
   edge_net:   number;
   ts:         Date;
+  // Optional: pre-computed metadata set by sports signals
+  headline?:       string;
+  model_pct?:      number;
+  market_type?:    "weather" | "sports";
+  sports_context?: {
+    pitcher_name: string;
+    threshold:    number;
+    lambda:       number;  // expected strikeouts (Poisson λ)
+    k9:           number;  // pitcher's K/9 this season
+    avg_ip:       number;  // avg innings per start this season
+  };
 }
 
 export interface RiskDecision {

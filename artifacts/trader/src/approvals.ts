@@ -43,6 +43,7 @@ interface TradeCard {
   max_loss_cents:   number;
   running_high_f:   number | null;
   hours_to_settle:  number | null;
+  nbm_median_f:     number | null;
   bracket_label:    string;
   station_id:       string;
   ticker:           string;
@@ -50,6 +51,15 @@ interface TradeCard {
   limit_price_cents: number;
   generated_at:     string;
   template_version: 1;
+  // Sports-specific (null for weather)
+  market_type:      "weather" | "sports";
+  sports_context:   {
+    pitcher_name: string;
+    threshold:    number;
+    lambda:       number;
+    k9:           number;
+    avg_ip:       number;
+  } | null;
 }
 
 function renderCard(candidate: SignalCandidate, input: {
@@ -58,24 +68,28 @@ function renderCard(candidate: SignalCandidate, input: {
   running_high_f:  number;
   hours_to_settle: number;
 } | null): TradeCard {
-  const city    = STATION_NAMES[candidate.station_id] ?? candidate.station_id;
-  const label   = input?.bracket_label ?? "?";
-  const price   = candidate.limit_price;
-  const modelPct = input ? Math.round(input.model_pct) : null;
+  const isSports = candidate.market_type === "sports";
+  const city     = STATION_NAMES[candidate.station_id] ?? candidate.station_id;
+  const label    = input?.bracket_label ?? (isSports ? `${candidate.sports_context?.threshold}+ Ks` : "?");
+  const price    = candidate.limit_price;
+  const modelPct = candidate.model_pct ?? (input ? Math.round(input.model_pct) : null);
 
-  const headline = modelPct !== null
-    ? `Buy ${candidate.side} on ${city} ${label} at ${price}¢ — model sees ${modelPct}%`
-    : `Buy ${candidate.side} on ${city} ${label} at ${price}¢`;
+  // Sports signals supply a pre-computed headline; weather signals build theirs here
+  const headline = candidate.headline ?? (
+    modelPct !== null
+      ? `Buy ${candidate.side} on ${city} ${label} at ${price}¢ — model sees ${modelPct}%`
+      : `Buy ${candidate.side} on ${city} ${label} at ${price}¢`
+  );
 
   return {
     headline,
-    model_pct:        input?.model_pct ?? 0,
+    model_pct:        candidate.model_pct ?? input?.model_pct ?? 0,
     implied_pct:      candidate.limit_price,
     edge_pts:         Math.round(candidate.edge_net * 100 * 10) / 10,
     max_loss_cents:   candidate.limit_price,
     running_high_f:   input?.running_high_f ?? null,
     hours_to_settle:  input?.hours_to_settle ?? null,
-    nbm_median_f:     input?.nbm_median_f ?? null,
+    nbm_median_f:     (input as Record<string, unknown> | null)?.["nbm_median_f"] as number | null ?? null,
     bracket_label:    label,
     station_id:       candidate.station_id,
     ticker:           candidate.ticker,
@@ -83,6 +97,9 @@ function renderCard(candidate: SignalCandidate, input: {
     limit_price_cents: candidate.limit_price,
     generated_at:     new Date().toISOString(),
     template_version: 1,
+    // Sports context (null for weather proposals)
+    market_type:      candidate.market_type ?? "weather",
+    sports_context:   candidate.sports_context ?? null,
   };
 }
 

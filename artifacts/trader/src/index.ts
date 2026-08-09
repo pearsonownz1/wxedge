@@ -27,6 +27,7 @@
 import http from "node:http";
 import { config } from "./config.js";
 import { runSignalEngine } from "./signalEngine.js";
+import { runSportsSignalEngine } from "./sportsSignalEngine.js";
 import { placeOrder, monitorOpenOrders } from "./executor.js";
 import { sweepExpiredProposals } from "./approvals.js";
 import { startLlmApprover } from "./llm-approver.js";
@@ -166,11 +167,19 @@ function todayUtcDate(): string {
 async function runTradingCycle(now: Date): Promise<void> {
   const date = now.toISOString().slice(0, 10);
 
-  // 1. Signal engine
+  // 1a. Weather signal engine
   const liveSignals = await runSignalEngine(config, now);
 
+  // 1b. Sports signal engine (MLB pitcher strikeout props via Poisson model)
+  const liveSportsSignals = await runSportsSignalEngine(config, now).catch((err) => {
+    logger.warn({ err }, "Sports signal engine failed — skipping this cycle");
+    return [] as Awaited<ReturnType<typeof runSportsSignalEngine>>;
+  });
+
+  const allSignals = [...liveSignals, ...liveSportsSignals];
+
   // 2. Risk officer → executor (in series to keep risk state consistent)
-  for (const { candidate, signalId } of liveSignals) {
+  for (const { candidate, signalId } of allSignals) {
     try {
       await placeOrder(signalId, candidate, config, date);
     } catch (err) {
