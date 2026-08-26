@@ -45,7 +45,31 @@ export interface CurrentMarketState {
   obs_age_s:    number | null;
   lock_status:  string;
   book_age_min: number;
+  /** Contracts resting at yes_ask / yes_bid — used to bound max-tilt sizing for rain approvals. */
+  ask_size:     number | null;
+  bid_size:     number | null;
 }
+
+// Rain contracts settle on their own local contract date (embedded in the
+// ticker), which can differ from the UTC placement/proposal date near
+// midnight. Both fragments derive the join date from the ticker for rain
+// orders/proposals instead of assuming placement date == settlement date,
+// leaving every other market type's join unchanged.
+const ORDER_SETTLEMENT_DATE = sql`
+  CASE
+    WHEN o.ticker LIKE 'KXRAIN-%'
+      THEN TO_CHAR(TO_DATE(split_part(o.ticker, '-', 2), 'YYMONDD'), 'YYYY-MM-DD')
+    ELSE o.ts_placed::date::text
+  END
+`;
+
+const APPROVAL_SETTLEMENT_DATE = sql`
+  CASE
+    WHEN a.ticker LIKE 'KXRAIN-%'
+      THEN TO_CHAR(TO_DATE(split_part(a.ticker, '-', 2), 'YYMONDD'), 'YYYY-MM-DD')
+    ELSE a.proposed_ts::date::text
+  END
+`;
 
 export interface ApprovalRiskState {
   openOrdersPerStation:    Record<string, number>;
@@ -114,7 +138,7 @@ export async function getApprovalHistory(limit = 50): Promise<ApprovalRecord[]> 
     LEFT JOIN orders o ON o.approval_id = a.id AND o.status = 'filled'
     LEFT JOIN settlements st
       ON st.station_id = s.station_id
-     AND st.settlement_date = a.proposed_ts::date::text
+     AND st.settlement_date = ${APPROVAL_SETTLEMENT_DATE}
     WHERE a.decision IS NOT NULL
     ORDER BY a.proposed_ts DESC
     LIMIT ${limit}
@@ -142,6 +166,7 @@ export async function getCurrentMarketState(ticker: string): Promise<CurrentMark
   const { rows } = await db.execute(sql`
     WITH latest_book AS (
       SELECT b.ticker, b.station_id, b.yes_ask, b.yes_bid,
+             b.ask_size, b.bid_size,
              b.bracket_lo,
              EXTRACT(EPOCH FROM (NOW() - b.ts_utc)) / 60.0 AS book_age_min
       FROM books b
@@ -171,6 +196,8 @@ export async function getCurrentMarketState(ticker: string): Promise<CurrentMark
       lb.ticker,
       lb.yes_ask     AS ask_cents,
       lb.yes_bid     AS bid_cents,
+      lb.ask_size,
+      lb.bid_size,
       COALESCE(ls.model_pct, sig.model_pct, 0) AS model_pct,
       ls.obs_age_s,
       ls.lock_status,
@@ -186,6 +213,8 @@ export async function getCurrentMarketState(ticker: string): Promise<CurrentMark
     ticker:       r["ticker"] as string,
     ask_cents:    r["ask_cents"] !== null ? Number(r["ask_cents"]) : null,
     bid_cents:    r["bid_cents"] !== null ? Number(r["bid_cents"]) : null,
+    ask_size:     r["ask_size"] !== null && r["ask_size"] !== undefined ? Number(r["ask_size"]) : null,
+    bid_size:     r["bid_size"] !== null && r["bid_size"] !== undefined ? Number(r["bid_size"]) : null,
     model_pct:    r["model_pct"] !== null ? Number(r["model_pct"]) : 0,
     obs_age_s:    r["obs_age_s"] !== null ? Number(r["obs_age_s"]) : null,
     lock_status:  (r["lock_status"] as string | null) ?? "live",
@@ -333,7 +362,7 @@ export async function getApprovalReport(from?: string, to?: string): Promise<unk
     FROM orders o
     JOIN approvals a ON a.id = o.approval_id
     JOIN settlements st ON st.station_id = o.station_id
-                       AND st.settlement_date = o.ts_placed::date::text
+                       AND st.settlement_date = ${ORDER_SETTLEMENT_DATE}
     WHERE o.approval_id IS NOT NULL
       AND o.status = 'filled'
       AND o.fill_price_cents IS NOT NULL

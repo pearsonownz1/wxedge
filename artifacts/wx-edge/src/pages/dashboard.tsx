@@ -63,6 +63,8 @@ interface FeedItem {
   settlement_outcome: string | null;
   pnl_cents:          number | null;
   limit_price_cents:  number;
+  market_type:        string;
+  contract_date:      string | null;
 }
 
 interface DashboardData {
@@ -268,8 +270,21 @@ function TradingFeed({ items }: { items: FeedItem[] }) {
 
             {/* Station */}
             <span className="font-mono font-bold text-muted-foreground shrink-0 w-11">
-              {item.station_id.replace(/^K/, "")}
+              {item.station_id.replace(/^K/, "").replace(/^RAIN_/, "")}
             </span>
+
+            {/* Market type badge — rain trades settle on their own local
+                contract date, not the placement date, so they're called out
+                distinctly from temperature/sports trades. */}
+            {item.market_type === "rain" ? (
+              <Badge variant="outline" className="text-[9px] px-1 shrink-0 border-sky-500/50 text-sky-500 uppercase tracking-wide">
+                Rain{item.contract_date ? ` · ${item.contract_date.slice(5)}` : ""}
+              </Badge>
+            ) : item.market_type === "sports" ? (
+              <Badge variant="outline" className="text-[9px] px-1 shrink-0 uppercase tracking-wide">
+                Sports
+              </Badge>
+            ) : null}
 
             {/* Ticker (truncated) */}
             <span className="font-mono text-[10px] text-muted-foreground flex-1 min-w-0 truncate">

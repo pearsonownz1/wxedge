@@ -32,6 +32,35 @@ function loadDailyCap(): number {
   return 300;
 }
 
+// Rain contracts settle on their own local contract date (embedded in the
+// ticker), which can differ from the UTC placement date near midnight.
+// Both fragments below derive the join date from the ticker for rain orders
+// instead of assuming placement date == settlement date, while leaving the
+// placement-date join unchanged for every other market type.
+const ORDER_SETTLEMENT_DATE = sql`
+  CASE
+    WHEN o.ticker LIKE 'KXRAIN-%'
+      THEN TO_CHAR(TO_DATE(split_part(o.ticker, '-', 2), 'YYMONDD'), 'YYYY-MM-DD')
+    ELSE o.ts_placed::date::text
+  END
+`;
+
+const APPROVAL_SETTLEMENT_DATE = sql`
+  CASE
+    WHEN a.ticker LIKE 'KXRAIN-%'
+      THEN TO_CHAR(TO_DATE(split_part(a.ticker, '-', 2), 'YYMONDD'), 'YYYY-MM-DD')
+    ELSE a.proposed_ts::date::text
+  END
+`;
+
+const MARKET_TYPE_CASE = sql`
+  CASE
+    WHEN a.ticker LIKE 'KXRAIN-%' THEN 'rain'
+    WHEN a.ticker LIKE 'KXMLBKS%' THEN 'sports'
+    ELSE 'weather'
+  END
+`;
+
 // Reusable P&L CASE fragment — YES wins when settled bracket = ticker; NO wins when it doesn't.
 // Uses COALESCE(fill_price_cents, price_cents) because fill_price_cents isn't always populated.
 const PNL_CASE = sql`
@@ -74,7 +103,7 @@ router.get("/dashboard", async (_req: Request, res: Response) => {
         JOIN approvals a ON a.id = o.approval_id AND a.recheck_ok = true
         LEFT JOIN settlements st
           ON st.station_id = o.station_id
-         AND st.settlement_date = o.ts_placed::date::text
+         AND st.settlement_date = ${ORDER_SETTLEMENT_DATE}
         WHERE o.status = 'filled'
       `),
 
@@ -89,7 +118,7 @@ router.get("/dashboard", async (_req: Request, res: Response) => {
         JOIN approvals a ON a.id = o.approval_id AND a.recheck_ok = true
         LEFT JOIN settlements st
           ON st.station_id = o.station_id
-         AND st.settlement_date = o.ts_placed::date::text
+         AND st.settlement_date = ${ORDER_SETTLEMENT_DATE}
         WHERE o.status = 'filled'
         GROUP BY o.ts_placed::date
         ORDER BY trade_date ASC
@@ -116,7 +145,7 @@ router.get("/dashboard", async (_req: Request, res: Response) => {
         JOIN approvals a ON a.id = o.approval_id AND a.recheck_ok = true
         LEFT JOIN settlements st
           ON st.station_id = o.station_id
-         AND st.settlement_date = o.ts_placed::date::text
+         AND st.settlement_date = ${ORDER_SETTLEMENT_DATE}
         WHERE o.status = 'filled'
         GROUP BY o.station_id
         ORDER BY pnl_cents DESC
@@ -144,6 +173,12 @@ router.get("/dashboard", async (_req: Request, res: Response) => {
           a.llm_confidence,
           a.recheck_ok,
           s.limit_price AS limit_price_cents,
+          ${MARKET_TYPE_CASE} AS market_type,
+          CASE
+            WHEN a.ticker LIKE 'KXRAIN-%'
+              THEN TO_CHAR(TO_DATE(split_part(a.ticker, '-', 2), 'YYMONDD'), 'YYYY-MM-DD')
+            ELSE NULL
+          END AS contract_date,
           CASE
             WHEN a.decision != 'approved' OR a.recheck_ok IS NOT TRUE THEN NULL
             WHEN st.kalshi_settled_bracket IS NULL              THEN 'pending'
@@ -171,7 +206,7 @@ router.get("/dashboard", async (_req: Request, res: Response) => {
         LEFT JOIN orders o ON o.approval_id = a.id AND o.status = 'filled'
         LEFT JOIN settlements st
           ON st.station_id = s.station_id
-         AND st.settlement_date = a.proposed_ts::date::text
+         AND st.settlement_date = ${APPROVAL_SETTLEMENT_DATE}
         WHERE a.decision IS NOT NULL
         ORDER BY a.proposed_ts DESC
         LIMIT 30
@@ -237,6 +272,8 @@ router.get("/dashboard", async (_req: Request, res: Response) => {
             ? Number(row["pnl_cents"])
             : null,
           limit_price_cents:  Number(row["limit_price_cents"] ?? 0),
+          market_type:        String(row["market_type"] ?? "weather"),
+          contract_date:      row["contract_date"] ? String(row["contract_date"]) : null,
         };
       }),
     });

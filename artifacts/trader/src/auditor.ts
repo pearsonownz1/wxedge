@@ -187,39 +187,68 @@ export async function runRainSettlementAudit(now: Date): Promise<void> {
 
 // ─── Daily P&L digest (21:00 UTC) ────────────────────────────────────────────
 
-/** Compute and write the daily P&L row for a given date and mode. */
-export async function runDailyDigest(
-  date: string,
-  mode: "shadow" | "live",
-  config: RiskConfig
-): Promise<void> {
-  const filled = await getFilledOrdersForDate(date, mode);
-  if (filled.length === 0) {
-    logger.info({ date, mode }, "Daily digest: no filled orders");
-    return;
-  }
+/**
+ * Given a KXRAIN ticker, returns its true local settlement date (YYYY-MM-DD)
+ * as embedded in the ticker itself — e.g. "KXRAIN-26AUG26-NYC" -> "2026-08-26".
+ * Returns null for non-rain tickers or an unparseable date segment.
+ */
+export function rainTickerSettlementDate(ticker: string): string | null {
+  const match = /^KXRAIN-(\d{2})([A-Z]{3})(\d{2})-/.exec(ticker);
+  if (!match) return null;
+  const months: Record<string, number> = {
+    JAN: 1, FEB: 2, MAR: 3, APR: 4, MAY: 5, JUN: 6,
+    JUL: 7, AUG: 8, SEP: 9, OCT: 10, NOV: 11, DEC: 12,
+  };
+  const month = months[match[2]!];
+  if (!month) return null;
+  return `${2000 + Number(match[1])}-${String(month).padStart(2, "0")}-${match[3]}`;
+}
 
-  // For P&L, we need to know if the bracket resolved YES.
-  // Join against settlements table.
-  const { rows: settlementRows } = await db.execute(sql`
-    SELECT station_id, kalshi_settled_bracket
-    FROM   settlements
-    WHERE  settlement_date = ${date}
-  `);
+export interface FilledOrderForPnl {
+  ticker: string;
+  side: "YES" | "NO";
+  price_cents: number;
+  fill_price_cents: number | null;
+  count: number;
+  station_id: string;
+}
 
-  const settledByStation = new Map<string, string | null>();
-  for (const r of settlementRows) {
-    settledByStation.set(
-      r.station_id as string,
-      r.kalshi_settled_bracket as string | null
-    );
-  }
-
+/**
+ * Pure P&L computation for a digest run. Each order is settled against the
+ * key `${station_id}::${its own true settlement date}` (ticker-derived for
+ * rain, otherwise `fallbackDate` — the placement-date bucket this digest run
+ * covers). This per-order-date keying is required because a single rain
+ * station can have both a today-contract and a tomorrow-contract filled on
+ * the same placement date; collapsing them into one station-keyed slot would
+ * let one contract's settlement silently overwrite the other's.
+ *
+ * An order whose key is absent from `settledByKey` has not settled yet —
+ * it is excluded from this run's totals (not scored as a loss) and counted
+ * in `pendingCount` so the caller can log it and this date can be safely
+ * recomputed later once the settlement lands (recomputation is idempotent:
+ * `upsertDailyPnl` fully overwrites the row for `(date, mode)`).
+ */
+export function computeDailyPnl(
+  filled: FilledOrderForPnl[],
+  settledByKey: Map<string, string | null>,
+  fallbackDate: string,
+  feeRate: number
+): { grossCents: number; feesCents: number; netCents: number; tradeCount: number; pendingCount: number } {
   let grossCents = 0;
   let feesCents  = 0;
+  let tradeCount = 0;
+  let pendingCount = 0;
 
   for (const order of filled) {
-    const settledBracket = settledByStation.get(order.station_id) ?? null;
+    const settlementDate = rainTickerSettlementDate(order.ticker) ?? fallbackDate;
+    const key = `${order.station_id}::${settlementDate}`;
+
+    if (!settledByKey.has(key)) {
+      pendingCount += 1;
+      continue;
+    }
+
+    const settledBracket = settledByKey.get(key) ?? null;
     const fillCents      = order.fill_price_cents ?? order.price_cents;
 
     // YES buy: win if ticker === settled bracket
@@ -233,19 +262,76 @@ export async function runDailyDigest(
       }
     }
 
-    const gross       = payout - fillCents;  // cents
-    const fee         = Math.ceil(config.fee_rate * (fillCents / 100) * (1 - fillCents / 100) * 100);
-    grossCents       += gross * order.count;
-    feesCents        += fee * order.count;
+    const gross = payout - fillCents;  // cents
+    const fee   = Math.ceil(feeRate * (fillCents / 100) * (1 - fillCents / 100) * 100);
+    grossCents += gross * order.count;
+    feesCents  += fee * order.count;
+    tradeCount += 1;
   }
 
-  const netCents = grossCents - feesCents;
+  return { grossCents, feesCents, netCents: grossCents - feesCents, tradeCount, pendingCount };
+}
 
-  await upsertDailyPnl(date, mode, grossCents, feesCents, netCents, filled.length);
+/**
+ * Compute and write the daily P&L row for a given placement date and mode.
+ * Idempotent and safe to re-run for a past date: it always recomputes the
+ * full row from current settlement data, so calling it again after a
+ * previously-pending rain contract settles corrects that date's numbers
+ * in place (see index.ts's periodic digest recheck).
+ */
+export async function runDailyDigest(
+  date: string,
+  mode: "shadow" | "live",
+  config: RiskConfig
+): Promise<void> {
+  const filled = await getFilledOrdersForDate(date, mode);
+  if (filled.length === 0) {
+    logger.info({ date, mode }, "Daily digest: no filled orders");
+    return;
+  }
+
+  // Each order settles against its own true date: rain contracts settle on
+  // their ticker-derived local contract date (which can differ from this
+  // placement-date bucket near UTC midnight); everything else settles on
+  // this digest's placement date. Collect the distinct dates we need.
+  const neededDates = new Set<string>();
+  for (const order of filled) {
+    neededDates.add(rainTickerSettlementDate(order.ticker) ?? date);
+  }
+
+  const settledByKey = new Map<string, string | null>();
+  for (const settlementDate of neededDates) {
+    const { rows } = await db.execute(sql`
+      SELECT station_id, kalshi_settled_bracket
+      FROM   settlements
+      WHERE  settlement_date = ${settlementDate}
+    `);
+    for (const r of rows) {
+      settledByKey.set(
+        `${r.station_id as string}::${settlementDate}`,
+        r.kalshi_settled_bracket as string | null
+      );
+    }
+  }
+
+  const { grossCents, feesCents, netCents, tradeCount, pendingCount } =
+    computeDailyPnl(filled, settledByKey, date, config.fee_rate);
+
+  if (tradeCount === 0) {
+    logger.info(
+      { date, mode, pendingCount },
+      "Daily digest: all filled orders still awaiting settlement — will recheck later"
+    );
+    return;
+  }
+
+  await upsertDailyPnl(date, mode, grossCents, feesCents, netCents, tradeCount);
 
   logger.info(
-    { date, mode, grossCents, feesCents, netCents, trades: filled.length },
-    "Daily P&L digest written"
+    { date, mode, grossCents, feesCents, netCents, trades: tradeCount, pendingCount },
+    pendingCount > 0
+      ? "Daily P&L digest written (some orders still pending — will recheck)"
+      : "Daily P&L digest written"
   );
 
   if (netCents < 0) {
@@ -281,7 +367,11 @@ export async function runWeeklyGateReport(now: Date): Promise<void> {
     JOIN signals s ON s.id = o.signal_id
     LEFT JOIN settlements st
       ON  st.station_id = o.station_id
-      AND st.settlement_date = (o.ts_placed::date)::text
+      AND st.settlement_date = CASE
+        WHEN o.ticker LIKE 'KXRAIN-%'
+          THEN TO_CHAR(TO_DATE(split_part(o.ticker, '-', 2), 'YYMONDD'), 'YYYY-MM-DD')
+        ELSE (o.ts_placed::date)::text
+      END
     WHERE o.mode = 'shadow' AND o.status = 'filled'
   `);
 

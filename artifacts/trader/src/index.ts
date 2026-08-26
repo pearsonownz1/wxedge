@@ -123,6 +123,13 @@ let cycleCount      = 0;
 let lastCycleTs     = "";
 let lastDigestDate  = "";
 let lastGateDate    = "";
+let lastDigestRecheckMs = 0;
+
+/** How many past UTC calendar days (plus today) to keep recomputing, so a
+ *  rain contract that settles a day or two after placement still corrects
+ *  its placement-date digest row once the settlement lands. */
+const DIGEST_RECHECK_LOOKBACK_DAYS = 3;
+const DIGEST_RECHECK_INTERVAL_MS   = 15 * 60 * 1000; // 15 min
 
 // ─── Health server ────────────────────────────────────────────────────────────
 
@@ -222,6 +229,24 @@ async function runScheduledJobs(now: Date): Promise<void> {
   if (utcHour === 21 && utcMin < 5 && now.getUTCDay() === 0 && lastGateDate !== date) {
     lastGateDate = date;
     await runWeeklyGateReport(now);
+  }
+
+  // Recheck & correct recent digest rows. runDailyDigest is idempotent
+  // (upsertDailyPnl fully overwrites the row), so recomputing recent dates
+  // is safe. This is what actually revisits a rain order whose contract
+  // hadn't settled yet when its placement-date digest first ran — once
+  // runRainSettlementAudit writes the settlement, the next recheck picks it
+  // up and corrects that date's P&L in place.
+  if (now.getTime() - lastDigestRecheckMs > DIGEST_RECHECK_INTERVAL_MS) {
+    lastDigestRecheckMs = now.getTime();
+    for (let i = 0; i <= DIGEST_RECHECK_LOOKBACK_DAYS; i++) {
+      const d = new Date(now.getTime() - i * 86_400_000).toISOString().slice(0, 10);
+      try {
+        await runDailyDigest(d, config.mode, config);
+      } catch (err) {
+        logger.warn({ err, date: d }, "Digest recheck failed for date — will retry next cycle");
+      }
+    }
   }
 }
 

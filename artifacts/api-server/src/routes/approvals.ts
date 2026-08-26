@@ -27,6 +27,35 @@ import { placeKalshiOrder, kalshiLiveOrdersEnabled } from "../lib/kalshiOrderApi
 
 const router = Router();
 
+// ─── Rain liquidity-bound sizing ───────────────────────────────────────────────
+
+/** The subset of current market state this cap needs. */
+export interface RainDepthState {
+  ask_size: number | null;
+  bid_size: number | null;
+}
+
+/**
+ * Fail-closed liquidity cap for rain order sizing: caps `requestedContracts`
+ * at the resting book depth on our side (yes-ask for a YES buy, yes-bid for
+ * a NO buy — a NO buy lifts the yes-bid side), or returns `null` to signal
+ * the order must be blocked entirely.
+ *
+ * Unknown depth (`current === null`, or a book that doesn't report a size
+ * for this side) returns `null` rather than falling back to uncapped
+ * max-cost sizing — sizing must never proceed on a depth number we don't
+ * actually have.
+ */
+export function capRainContractsByLiquidity(
+  current: RainDepthState | null,
+  side: "YES" | "NO",
+  requestedContracts: number
+): number | null {
+  const availableSize = current ? (side === "YES" ? current.ask_size : current.bid_size) : null;
+  if (availableSize === null || availableSize < 1) return null;
+  return Math.min(requestedContracts, availableSize);
+}
+
 // ─── Load risk config (shared with trader; read from filesystem) ──────────────
 
 interface RiskConfig {
@@ -216,9 +245,30 @@ router.patch("/approvals/:id", async (req: Request, res: Response) => {
     return void await withStationLock(approval.station_id, async () => {
     const today = now.toISOString().slice(0, 10);
     const riskState = await buildApprovalRiskState(today, riskConfig);
-    const contracts = Math.max(1, Math.floor(
+    let contracts = Math.max(1, Math.floor(
       riskConfig.max_cost_per_trade_cents / approval.limit_price_cents
     ));
+
+    // Liquidity-bound sizing for rain approvals: cap contracts at the book
+    // depth resting on our side (yes-ask for a YES buy, yes-bid for a NO buy
+    // — a NO buy lifts the yes-bid side). Mirrors the trader executor's
+    // `available_size` cap so approval-mode rain trades can't tilt past what
+    // the book can actually fill. Weather/sports approvals are unaffected.
+    //
+    // Fails closed: an unknown side depth (no current book at all, or a book
+    // that doesn't report a size for this side) blocks the order rather than
+    // falling back to uncapped max-cost sizing — we only ever size against a
+    // depth number we actually have.
+    if (approval.ticker.startsWith("KXRAIN-")) {
+      const capped = capRainContractsByLiquidity(current, approval.side as "YES" | "NO", contracts);
+      if (capped === null) {
+        const availableSize = current ? (approval.side === "YES" ? current.ask_size : current.bid_size) : null;
+        diff["insufficient_liquidity"] = { at_proposal: "ok", now: `available_size=${availableSize}` };
+      } else {
+        contracts = capped;
+      }
+    }
+
     const orderCost = approval.limit_price_cents * contracts;
     if (riskState.dailyCostToday + orderCost > riskConfig.max_daily_loss_cents) {
       diff["daily_loss_cap"] = {

@@ -62,11 +62,19 @@ interface TradeCard {
     avg_ip:       number;
   } | null;
   rain_context: {
-    city: string;
-    contract_date: string;
-    forecast_rain_pct: number;
-    settlement_source: string;
+    city:                      string;
+    contract_date:             string;
+    forecast_rain_pct:         number;
+    settlement_source:         string;
+    probability_source?:       string;
+    probability_fetched_at?:   string;
+    nws_forecast_updated_at?:  string | null;
+    kalshi_quote_fetched_at?:  string;
+    kalshi_quote_stale?:       boolean;
+    settlement_terms_verified?: boolean;
   } | null;
+  /** Contracts resting on the book at this price when the signal reported it (rain only). */
+  available_size: number | null;
 }
 
 function renderCard(candidate: SignalCandidate, input: {
@@ -114,6 +122,7 @@ function renderCard(candidate: SignalCandidate, input: {
     market_type:      candidate.market_type ?? "weather",
     sports_context:   candidate.sports_context ?? null,
     rain_context:     candidate.rain_context ?? null,
+    available_size:   candidate.available_size ?? null,
   };
 }
 

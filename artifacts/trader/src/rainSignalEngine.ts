@@ -5,6 +5,17 @@
  * 0 inches of precipitation on the contract date. The model uses the maximum
  * NWS hourly precipitation probability during that city's contract day.
  *
+ * Safety (see .local/tasks/rain-markets-safe-live.md):
+ *   - Every discovered market is run through checkRainEligibility() before it
+ *     can produce a live signal. Ineligible markets are recorded as suppressed
+ *     signals (never silently dropped) and never reach the risk officer.
+ *   - Every live/suppressed signal carries reproducible evidence in
+ *     rain_context: exactly which forecast/quote was used and when it was
+ *     fetched, so a proposal or a suppression can be explained after the fact.
+ *   - Kalshi book data served from the rate-limit fallback cache is
+ *     staleness-bounded by config.max_age_min — old cached quotes never feed
+ *     a live trade.
+ *
  * Orders still go through the shared risk officer, approval queue, LLM, and
  * signed Kalshi order endpoint. This engine only discovers markets, calculates
  * probabilities, persists current books, and emits signal candidates.
@@ -57,13 +68,81 @@ interface RainMarket {
   ticker: string;
   cityCode: string;
   cityName: string;
+  status: string;
+  eventTicker: string;
+  rawTitle: string | null;
+  rawSubtitle: string | null;
+  rawRules: string | null;
   yesBid: number | null;
   yesAsk: number | null;
   yesBidSize: number | null;
   yesAskSize: number | null;
 }
 
-let cachedDiscovery: { date: string; markets: RainMarket[] } | null = null;
+interface CachedDiscovery {
+  date: string;
+  markets: RainMarket[];
+  fetchedAt: number; // epoch ms
+}
+
+let cachedDiscovery: CachedDiscovery | null = null;
+
+/** Text that would indicate a market is NOT a daily-precipitation contract, even if it matched the KXRAIN ticker pattern. */
+const DISALLOWED_SETTLEMENT_KEYWORDS = ["snow", "temperature", "wind speed", "hurricane", "high temp", "low temp"];
+
+interface EligibilityResult {
+  eligible: boolean;
+  reason: string | null;
+}
+
+/**
+ * Fail-closed contract validation, run before a market can produce a live
+ * signal or appear in the public feed. Confirms: ticker/series structure,
+ * known city, an active book, a local contract date that is actually
+ * "current" for that city, and that any available settlement-terms text is
+ * consistent with a daily-precipitation contract.
+ */
+export function checkRainEligibility(
+  market: Pick<RainMarket, "ticker" | "cityCode" | "status" | "eventTicker" | "rawTitle" | "rawSubtitle" | "rawRules">,
+  contractDateStr: string,
+  city: City | undefined,
+  now: Date
+): EligibilityResult {
+  if (!/^KXRAIN-\d{2}[A-Z]{3}\d{2}-[A-Z]+$/.test(market.ticker)) {
+    return { eligible: false, reason: "ticker_format_invalid" };
+  }
+  if (!market.eventTicker.startsWith("KXRAIN-")) {
+    return { eligible: false, reason: "series_mismatch" };
+  }
+  if (!city) {
+    return { eligible: false, reason: "unknown_city" };
+  }
+  if (market.status !== "active") {
+    return { eligible: false, reason: "market_inactive" };
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(contractDateStr)) {
+    return { eligible: false, reason: "contract_date_unparseable" };
+  }
+  const today = localIsoDate(now, city.timeZone);
+  const tomorrow = localIsoDate(new Date(now.getTime() + 86_400_000), city.timeZone);
+  const yesterday = localIsoDate(new Date(now.getTime() - 86_400_000), city.timeZone);
+  if (contractDateStr !== today && contractDateStr !== tomorrow) {
+    return { eligible: false, reason: contractDateStr <= yesterday ? "contract_date_stale" : "contract_date_out_of_range" };
+  }
+  // Fail closed on settlement-terms evidence: require positive confirmation
+  // that the contract actually settles on precipitation, from whatever title/
+  // subtitle/rules text Kalshi returns. Missing text is NOT treated as a pass
+  // — a KXRAIN-ticker market with no title, subtitle, or rules text at all is
+  // just as unverified as one with the wrong terms, so it's rejected too.
+  const text = [market.rawTitle, market.rawSubtitle, market.rawRules].filter(Boolean).join(" ").toLowerCase();
+  if (DISALLOWED_SETTLEMENT_KEYWORDS.some((kw) => text.includes(kw))) {
+    return { eligible: false, reason: "settlement_terms_mismatch" };
+  }
+  if (!/rain|precip/i.test(text)) {
+    return { eligible: false, reason: "settlement_terms_unverified" };
+  }
+  return { eligible: true, reason: null };
+}
 
 function toCents(value: unknown): number | null {
   if (value === null || value === undefined) return null;
@@ -110,23 +189,33 @@ function localIsoDate(date: Date, timeZone: string): string {
   return `${part("year")}-${part("month")}-${part("day")}`;
 }
 
-async function getAnyRainProbability(city: City, date: string): Promise<number | null> {
+interface RainProbabilityEvidence {
+  probability: number | null;
+  /** When we made the NWS request (quote timing evidence). */
+  fetchedAt: string;
+  /** NWS's own `updateTime` for the forecast product, when present. */
+  forecastUpdatedAt: string | null;
+}
+
+async function getAnyRainProbability(city: City, date: string): Promise<RainProbabilityEvidence> {
+  const fetchedAt = new Date().toISOString();
   const point = await fetch(`${NWS_BASE}/points/${city.lat},${city.lon}`, {
     headers: { "User-Agent": UA, Accept: "application/geo+json" },
     signal: AbortSignal.timeout(10_000),
   });
-  if (!point.ok) return null;
+  if (!point.ok) return { probability: null, fetchedAt, forecastUpdatedAt: null };
   const pointData = await point.json() as { properties?: { forecastHourly?: string } };
   const forecastUrl = pointData.properties?.forecastHourly;
-  if (!forecastUrl) return null;
+  if (!forecastUrl) return { probability: null, fetchedAt, forecastUpdatedAt: null };
 
   const forecast = await fetch(forecastUrl, {
     headers: { "User-Agent": UA, Accept: "application/geo+json" },
     signal: AbortSignal.timeout(10_000),
   });
-  if (!forecast.ok) return null;
+  if (!forecast.ok) return { probability: null, fetchedAt, forecastUpdatedAt: null };
   const forecastData = await forecast.json() as {
     properties?: {
+      updateTime?: string;
       periods?: Array<{
         startTime?: string;
         probabilityOfPrecipitation?: { value?: number | null };
@@ -134,17 +223,18 @@ async function getAnyRainProbability(city: City, date: string): Promise<number |
     };
   };
 
+  const forecastUpdatedAt = forecastData.properties?.updateTime ?? null;
   const values = (forecastData.properties?.periods ?? [])
     .filter((period) => period.startTime && localIsoDate(new Date(period.startTime), city.timeZone) === date)
     .map((period) => period.probabilityOfPrecipitation?.value)
     .filter((value): value is number => typeof value === "number" && Number.isFinite(value))
     .map((value) => Math.max(0, Math.min(100, value)));
 
-  if (values.length === 0) return null;
-  return Math.max(...values) / 100;
+  if (values.length === 0) return { probability: null, fetchedAt, forecastUpdatedAt };
+  return { probability: Math.max(...values) / 100, fetchedAt, forecastUpdatedAt };
 }
 
-async function fetchActiveRainMarkets(): Promise<{ date: string; markets: RainMarket[] }> {
+async function fetchActiveRainMarkets(maxAgeMin: number): Promise<CachedDiscovery> {
   for (let attempt = 0; attempt < 2; attempt++) {
     const response = await fetch(
       `${KALSHI_BASE}/events?series_ticker=KXRAIN&status=open&with_nested_markets=true&limit=5`,
@@ -159,10 +249,10 @@ async function fetchActiveRainMarkets(): Promise<{ date: string; markets: RainMa
 
     const data = await response.json() as { events?: Array<Record<string, unknown>> };
     for (const event of data.events ?? []) {
-      const date = contractDate(String(event["event_ticker"] ?? ""));
+      const eventTicker = String(event["event_ticker"] ?? "");
+      const date = contractDate(eventTicker);
       if (!date) continue;
       const markets = ((event["markets"] as Array<Record<string, unknown>> | undefined) ?? [])
-        .filter((market) => market["status"] === "active")
         .map((market) => {
           const ticker = String(market["ticker"] ?? "");
           const cityCode = ticker.split("-").at(-1) ?? "";
@@ -170,22 +260,34 @@ async function fetchActiveRainMarkets(): Promise<{ date: string; markets: RainMa
             ticker,
             cityCode,
             cityName: String(market["yes_sub_title"] ?? CITIES[cityCode]?.name ?? cityCode),
+            status: String(market["status"] ?? ""),
+            eventTicker,
+            rawTitle: (market["title"] as string | undefined) ?? null,
+            rawSubtitle: (market["yes_sub_title"] as string | undefined) ?? (market["subtitle"] as string | undefined) ?? null,
+            rawRules: (market["rules_primary"] as string | undefined) ?? null,
             yesBid: toCents(market["yes_bid_dollars"]),
             yesAsk: toCents(market["yes_ask_dollars"]),
             yesBidSize: toSize(market["yes_bid_size_fp"]),
             yesAskSize: toSize(market["yes_ask_size_fp"]),
           };
         })
-        .filter((market) => market.ticker && CITIES[market.cityCode] !== undefined);
+        .filter((market) => market.ticker);
       if (markets.length > 0) {
-        cachedDiscovery = { date, markets };
+        cachedDiscovery = { date, markets, fetchedAt: Date.now() };
         return cachedDiscovery;
       }
     }
-    return { date: "", markets: [] };
+    return { date: "", markets: [], fetchedAt: Date.now() };
   }
   if (cachedDiscovery) {
-    logger.warn({ markets: cachedDiscovery.markets.length }, "Rain engine: using cached discovery after Kalshi rate limit");
+    const ageMin = (Date.now() - cachedDiscovery.fetchedAt) / 60_000;
+    if (ageMin > maxAgeMin) {
+      throw new Error(`KXRAIN discovery failed and cached fallback is ${ageMin.toFixed(1)}min stale (limit ${maxAgeMin}min)`);
+    }
+    logger.warn(
+      { markets: cachedDiscovery.markets.length, ageMin: ageMin.toFixed(1) },
+      "Rain engine: using cached discovery after Kalshi rate limit"
+    );
     return cachedDiscovery;
   }
   throw new Error("KXRAIN discovery failed after retry");
@@ -195,25 +297,61 @@ export async function runRainSignalEngine(
   config: RiskConfig,
   now: Date
 ): Promise<Array<{ candidate: SignalCandidate; signalId: number }>> {
-  const discovery = await fetchActiveRainMarkets();
+  const discovery = await fetchActiveRainMarkets(config.max_age_min);
   if (discovery.markets.length === 0) {
     logger.info("Rain engine: no active KXRAIN markets");
     return [];
   }
+  const kalshiQuoteFetchedAt = new Date(discovery.fetchedAt).toISOString();
+  const kalshiQuoteStale = (Date.now() - discovery.fetchedAt) / 60_000 > 1; // used the rate-limit fallback cache, not this cycle's fetch
 
-  const probabilityByCity = new Map<string, number | null>();
-  await Promise.all(discovery.markets.map(async (market) => {
+  // Step 1: fail-closed eligibility gate. Ineligible markets never reach the
+  // risk officer and are excluded from probability lookups / book persistence.
+  const eligibleMarkets: RainMarket[] = [];
+  const nowIso = now.toISOString();
+  for (const market of discovery.markets) {
+    const city = CITIES[market.cityCode];
+    const { eligible, reason } = checkRainEligibility(market, discovery.date, city, now);
+    if (eligible) {
+      eligibleMarkets.push(market);
+      continue;
+    }
+    logger.warn({ ticker: market.ticker, reason }, "Rain engine: market failed eligibility check");
+    // Record both sides as suppressed so the ineligibility is auditable, not silent.
+    for (const side of ["YES", "NO"] as const) {
+      await insertSignal({
+        ts_utc: nowIso,
+        station_id: `RAIN_${market.cityCode}`,
+        ticker: market.ticker,
+        side,
+        limit_price: side === "YES" ? (market.yesAsk ?? 0) : (market.yesBid === null ? 0 : 100 - market.yesBid),
+        model_prob: 0,
+        implied_prob: 0,
+        edge_net: -1,
+        inputs_hash: inputsHash(market.ticker, side, 0, `ineligible:${reason}`),
+        suppressed_reason: `ineligible_${reason}`,
+      }).catch((err) => logger.warn({ err }, "Rain engine: failed to record ineligibility signal"));
+    }
+  }
+
+  if (eligibleMarkets.length === 0) {
+    logger.info("Rain engine: no eligible KXRAIN markets this cycle");
+    return [];
+  }
+
+  const probabilityByCity = new Map<string, RainProbabilityEvidence>();
+  await Promise.all(eligibleMarkets.map(async (market) => {
     const city = CITIES[market.cityCode]!;
     try {
       probabilityByCity.set(market.cityCode, await getAnyRainProbability(city, discovery.date));
     } catch (err) {
       logger.warn({ err, ticker: market.ticker }, "Rain engine: NWS forecast request failed");
-      probabilityByCity.set(market.cityCode, null);
+      probabilityByCity.set(market.cityCode, { probability: null, fetchedAt: nowIso, forecastUpdatedAt: null });
     }
   }));
 
   await db.insert(books).values(
-    discovery.markets.map((market) => ({
+    eligibleMarkets.map((market) => ({
       tsUtc: now,
       stationId: `RAIN_${market.cityCode}`,
       ticker: market.ticker,
@@ -230,23 +368,44 @@ export async function runRainSignalEngine(
   ).catch((err) => logger.warn({ err }, "Rain engine: failed to persist current books"));
 
   const live: Array<{ candidate: SignalCandidate; signalId: number }> = [];
-  const nowIso = now.toISOString();
 
-  for (const market of discovery.markets) {
-    const modelYes = probabilityByCity.get(market.cityCode);
-    if (typeof modelYes !== "number" || market.yesBid === null || market.yesAsk === null) continue;
-
+  for (const market of eligibleMarkets) {
     const stationId = `RAIN_${market.cityCode}`;
     const city = CITIES[market.cityCode]!;
+    const evidence = probabilityByCity.get(market.cityCode);
+    const modelYes = evidence?.probability ?? null;
+
+    if (typeof modelYes !== "number" || market.yesBid === null || market.yesAsk === null) {
+      const reason = typeof modelYes !== "number" ? "forecast_unavailable" : "no_price";
+      for (const side of ["YES", "NO"] as const) {
+        await insertSignal({
+          ts_utc: nowIso,
+          station_id: stationId,
+          ticker: market.ticker,
+          side,
+          limit_price: side === "YES" ? (market.yesAsk ?? 0) : (market.yesBid === null ? 0 : 100 - market.yesBid),
+          model_prob: 0,
+          implied_prob: 0,
+          edge_net: -1,
+          inputs_hash: inputsHash(market.ticker, side, 0, `${reason}:${evidence?.fetchedAt ?? nowIso}`),
+          suppressed_reason: reason,
+        }).catch((err) => logger.warn({ err }, "Rain engine: failed to record suppressed signal"));
+      }
+      continue;
+    }
+
     const modelPct = Math.round(modelYes * 100);
+    const evidenceKey = `${evidence!.forecastUpdatedAt ?? "na"}:${evidence!.fetchedAt}:${kalshiQuoteFetchedAt}`;
     const sides: Array<{
       side: "YES" | "NO";
       probability: number;
       limitPrice: number;
       implied: number;
+      // Contracts actually resting on the book at this price — bounds max-tilt sizing.
+      availableSize: number | null;
     }> = [
-      { side: "YES", probability: modelYes, limitPrice: market.yesAsk, implied: market.yesAsk / 100 },
-      { side: "NO", probability: 1 - modelYes, limitPrice: 100 - market.yesBid, implied: (100 - market.yesBid) / 100 },
+      { side: "YES", probability: modelYes, limitPrice: market.yesAsk, implied: market.yesAsk / 100, availableSize: market.yesAskSize },
+      { side: "NO", probability: 1 - modelYes, limitPrice: 100 - market.yesBid, implied: (100 - market.yesBid) / 100, availableSize: market.yesBidSize },
     ];
 
     for (const side of sides) {
@@ -254,7 +413,10 @@ export async function runRainSignalEngine(
         - side.implied
         - feeCeil(side.implied, config.fee_rate)
         - config.slippage_buffer;
-      const suppressedReason = edgeNet < config.min_edge ? "below_threshold" : null;
+      let suppressedReason: string | null = edgeNet < config.min_edge ? "below_threshold" : null;
+      if (!suppressedReason && kalshiQuoteStale) suppressedReason = "quote_stale";
+      if (!suppressedReason && (side.availableSize === null || side.availableSize < 1)) suppressedReason = "no_liquidity";
+
       const signal: SignalRow = {
         ts_utc: nowIso,
         station_id: stationId,
@@ -264,7 +426,7 @@ export async function runRainSignalEngine(
         model_prob: side.probability,
         implied_prob: side.implied,
         edge_net: edgeNet,
-        inputs_hash: inputsHash(market.ticker, side.side, side.probability, nowIso),
+        inputs_hash: inputsHash(market.ticker, side.side, side.probability, evidenceKey),
         suppressed_reason: suppressedReason,
       };
       const signalId = await insertSignal(signal);
@@ -282,11 +444,19 @@ export async function runRainSignalEngine(
           headline: `Buy ${side.side}: rain in ${market.cityName} on ${discovery.date} at ${side.limitPrice}¢ — NWS sees ${Math.round(side.probability * 100)}%`,
           model_pct: Math.round(side.probability * 100),
           market_type: "rain",
+          available_size: side.availableSize ?? undefined,
+          settlement_date: discovery.date,
           rain_context: {
             city: city.name,
             contract_date: discovery.date,
             forecast_rain_pct: modelPct,
             settlement_source: "The Weather Company",
+            probability_source: "NWS hourly probabilityOfPrecipitation (max over contract day)",
+            probability_fetched_at: evidence!.fetchedAt,
+            nws_forecast_updated_at: evidence!.forecastUpdatedAt,
+            kalshi_quote_fetched_at: kalshiQuoteFetchedAt,
+            kalshi_quote_stale: kalshiQuoteStale,
+            settlement_terms_verified: true,
           },
         },
       });
@@ -294,7 +464,7 @@ export async function runRainSignalEngine(
   }
 
   logger.info(
-    { date: discovery.date, markets: discovery.markets.length, live: live.length },
+    { date: discovery.date, markets: discovery.markets.length, eligible: eligibleMarkets.length, live: live.length },
     "Rain signal cycle complete"
   );
   return live;

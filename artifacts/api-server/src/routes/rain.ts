@@ -59,6 +59,59 @@ interface RainMarket {
   rainProbabilityPct: number | null;
 }
 
+/** Text that would indicate a market is NOT a daily-precipitation contract, even if it matched the KXRAIN ticker pattern. */
+const DISALLOWED_SETTLEMENT_KEYWORDS = ["snow", "temperature", "wind speed", "hurricane", "high temp", "low temp"];
+
+/**
+ * Fail-closed eligibility gate for the public feed — mirrors
+ * artifacts/trader/src/rainSignalEngine.ts's checkRainEligibility() so the
+ * public /api/rain/markets list never shows a contract the trader itself
+ * wouldn't be willing to trade. Kept as a duplicate (not a shared import)
+ * consistent with this file's existing pattern of duplicating the CITIES
+ * map and contract-date parsing rather than adding a cross-artifact
+ * dependency between the trader and the api-server.
+ */
+function checkRainEligibility(
+  market: { ticker: string; cityCode: string; status: string; eventTicker: string; rawTitle: string | null; rawSubtitle: string | null; rawRules: string | null },
+  contractDateStr: string,
+  city: City | undefined,
+  now: Date
+): { eligible: boolean; reason: string | null } {
+  if (!/^KXRAIN-\d{2}[A-Z]{3}\d{2}-[A-Z]+$/.test(market.ticker)) {
+    return { eligible: false, reason: "ticker_format_invalid" };
+  }
+  if (!market.eventTicker.startsWith("KXRAIN-")) {
+    return { eligible: false, reason: "series_mismatch" };
+  }
+  if (!city) {
+    return { eligible: false, reason: "unknown_city" };
+  }
+  if (market.status !== "active") {
+    return { eligible: false, reason: "market_inactive" };
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(contractDateStr)) {
+    return { eligible: false, reason: "contract_date_unparseable" };
+  }
+  const today = localIsoDate(now, city.timeZone);
+  const tomorrow = localIsoDate(new Date(now.getTime() + 86_400_000), city.timeZone);
+  const yesterday = localIsoDate(new Date(now.getTime() - 86_400_000), city.timeZone);
+  if (contractDateStr !== today && contractDateStr !== tomorrow) {
+    return { eligible: false, reason: contractDateStr <= yesterday ? "contract_date_stale" : "contract_date_out_of_range" };
+  }
+  // Fail closed on settlement-terms evidence: require positive confirmation
+  // that the contract actually settles on precipitation. Missing text is NOT
+  // treated as a pass — a KXRAIN-ticker market with no title, subtitle, or
+  // rules text at all is just as unverified as one with the wrong terms.
+  const text = [market.rawTitle, market.rawSubtitle, market.rawRules].filter(Boolean).join(" ").toLowerCase();
+  if (DISALLOWED_SETTLEMENT_KEYWORDS.some((kw) => text.includes(kw))) {
+    return { eligible: false, reason: "settlement_terms_mismatch" };
+  }
+  if (!/rain|precip/i.test(text)) {
+    return { eligible: false, reason: "settlement_terms_unverified" };
+  }
+  return { eligible: true, reason: null };
+}
+
 interface RainMarketsPayload {
   contractDate: string | null;
   markets: RainMarket[];
@@ -167,20 +220,36 @@ async function discoverRainMarkets(): Promise<{ date: string; markets: RainMarke
   }
 
   const data = await response.json() as { events?: Array<Record<string, unknown>> };
+  const now = new Date();
   for (const event of data.events ?? []) {
-    const date = contractDate(String(event["event_ticker"] ?? ""));
+    const eventTicker = String(event["event_ticker"] ?? "");
+    const date = contractDate(eventTicker);
     if (!date) continue;
     const rawMarkets = (event["markets"] as Array<Record<string, unknown>> | undefined) ?? [];
     const markets = rawMarkets
-      .filter((market) => market["status"] === "active")
       .map((market): RainMarket | null => {
         const ticker = String(market["ticker"] ?? "");
         const cityCode = ticker.split("-").at(-1) ?? "";
-        if (!ticker || !CITIES[cityCode]) return null;
+        const city = CITIES[cityCode];
+        if (!ticker || !city) return null;
+        const status = String(market["status"] ?? "");
+        const rawTitle = (market["title"] as string | undefined) ?? null;
+        const rawSubtitle = (market["yes_sub_title"] as string | undefined) ?? (market["subtitle"] as string | undefined) ?? null;
+        const rawRules = (market["rules_primary"] as string | undefined) ?? null;
+        const { eligible, reason } = checkRainEligibility(
+          { ticker, cityCode, status, eventTicker, rawTitle, rawSubtitle, rawRules },
+          date,
+          city,
+          now
+        );
+        if (!eligible) {
+          logger.warn({ ticker, reason }, "Rain page: market excluded from public feed — failed eligibility check");
+          return null;
+        }
         return {
           ticker,
           cityCode,
-          cityName: CITIES[cityCode]!.name,
+          cityName: city.name,
           contractDate: date,
           yesBidCents: toCents(market["yes_bid_dollars"]),
           yesAskCents: toCents(market["yes_ask_dollars"]),

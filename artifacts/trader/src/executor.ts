@@ -48,7 +48,25 @@ export async function placeOrder(
   todayDate: string
 ): Promise<number | null> {
   const riskState = await buildRiskState(todayDate, config.mode, config.cooldown_min);
-  const contracts = Math.max(1, Math.floor(config.max_cost_per_trade_cents / candidate.limit_price));
+  const maxTiltContracts = Math.max(1, Math.floor(config.max_cost_per_trade_cents / candidate.limit_price));
+  // Bound max-tilt sizing by resting book depth when the signal reports it
+  // (currently only rain). Never request more contracts than the market can
+  // actually fill at this price.
+  const contracts = candidate.available_size !== undefined
+    ? Math.min(maxTiltContracts, candidate.available_size)
+    : maxTiltContracts;
+
+  if (contracts < 1) {
+    await insertRiskDecision({
+      signal_id: signalId,
+      ts_utc:    new Date().toISOString(),
+      approved:  false,
+      reason:    `insufficient_liquidity: available=${candidate.available_size} needed>=1`,
+    });
+    logger.debug({ signalId, ticker: candidate.ticker }, "Rejected: insufficient book liquidity for any contract");
+    return null;
+  }
+
   const sizedCandidate = { ...candidate, contracts };
   const decision  = checkRisk(sizedCandidate, riskState, config);
 
