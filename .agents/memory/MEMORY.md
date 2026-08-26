@@ -2,6 +2,7 @@
 - [Kalshi signing key format](kalshi-signing.md) — PKCS1 key stored with spaces not newlines; normalisePem must strip all whitespace and re-wrap at 64 chars; auth MUST use RSA-PSS not PKCS1-v1.5.
 - [Kalshi Order API v2](kalshi-order-api-v2.md) — POST /portfolio/events/orders; side=bid/ask; price=decimal dollar string; count=string; tif=good_till_canceled; stp=taker_at_cross; flat response {order_id,fill_count,remaining_count}.
 - [Deployment env snapshot trap](deployment-env-snapshot.md) — deployments freeze env at publish; dev-only switches leak into prod and silently blank features; prod ignores POLLING_ENABLED=false.
+- [Artifact build environment](artifact-build-environment.md) — static artifact builds do not receive runtime service variables; Vite config must have safe build-time defaults.
 - [Postgres advisory lock keep-alive](pg-advisory-lock.md) — Replit managed PG kills idle conns (57P01 ~30s); held lock conn needs SELECT 1 every 25s or trader crash-loops.
 - [IEM data sources](iem-data-sources.md) — 3-letter station IDs (NYC not KNYC); NWS rawMessage always empty; IEM asos.py is primary METAR source; 1-min latency unknown (Phase 0 auditing).
 - [Snapshot collector](snapshot-collector.md) — PostgreSQL via @workspace/db; logSnapshots() called from warmup.ts after every warmCache(); setInterval only works on Reserved VM deployment.
@@ -13,3 +14,4 @@
 - [Running-high vs CLI](running-high-cli.md) — CLI high = max(T-groups, 6-hr 1-groups) over LST day via one bulk IEM asos.py call; NWS hourly obs run 1–6°F off, fallback only.
 - [Pipeline watchdog](pipeline-watchdog.md) — shared computePipelineHealth drives trader log alert + dashboard banner; new suppressed_reason values must be classified systemic vs benign.
 - [LLM Approver](llm-approver.md) — APPROVER env var (human/llm/llm_with_veto); executes through PATCH endpoint; llm_decisions audit table; decider col on approvals for P&L split.
+- [Generated API declarations](api-zod-generated.md) — rebuild the api-zod composite package when TypeScript falsely reports a missing generated export.

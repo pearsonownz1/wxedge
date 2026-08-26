@@ -176,8 +176,7 @@ function StationView({ stationId }: { stationId: string }) {
         {stale && (
           <div className="border border-muted-foreground/30 bg-muted/40 px-4 py-2.5 text-sm text-muted-foreground flex items-center justify-between">
             <span>
-              Observation feed stale — last reading {detail.obsTimestampLst ?? "unknown"}.
-              Track frozen at last-good high; eliminations and edge signals suspended.
+              Observation feed stale. Track frozen at last-good high; eliminations and edge signals suspended.
             </span>
             <span className="text-[10px] font-bold uppercase tracking-widest ml-4 shrink-0">
               Edge Signals Hidden
