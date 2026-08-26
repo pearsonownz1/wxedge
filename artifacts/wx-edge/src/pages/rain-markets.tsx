@@ -76,7 +76,16 @@ function MarketCard({ market }: { market: RainMarket }) {
 
       <div className="md:text-right">
         <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Settlement</div>
-        <div className="mt-1 text-xs text-muted-foreground">The Weather Company</div>
+        {market.stationConfidence === "verified" && market.settlementStationId ? (
+          <div className="mt-1 text-xs text-muted-foreground" title={market.settlementStationName ?? undefined}>
+            {market.settlementStationId} — {market.settlementStationName}
+          </div>
+        ) : (
+          <div className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-orange-700">
+            <TriangleAlert className="w-3 h-3" />
+            Station unresolved
+          </div>
+        )}
         <div className="mt-1 text-[10px] text-muted-foreground">YES if precipitation &gt; 0″</div>
       </div>
     </article>

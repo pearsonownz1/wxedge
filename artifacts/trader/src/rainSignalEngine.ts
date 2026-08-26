@@ -22,7 +22,7 @@
  */
 
 import { createHash } from "node:crypto";
-import { db, books } from "@workspace/db";
+import { db, books, getRainStationsMap, resolveRainStationsFromKalshi, type RainStationLookup } from "@workspace/db";
 import { insertSignal, type SignalRow } from "./db.js";
 import type { RiskConfig } from "./config.js";
 import type { SignalCandidate } from "./riskOfficer.js";
@@ -34,35 +34,15 @@ const KALSHI_BASE = "https://api.elections.kalshi.com/trade-api/v2";
 const NWS_BASE = "https://api.weather.gov";
 const UA = "SellingHighs/1.0 (rain-market-model)";
 
-interface City {
-  name: string;
-  lat: number;
-  lon: number;
-  timeZone: string;
-}
-
-const CITIES: Record<string, City> = {
-  NYC:  { name: "New York City", lat: 40.7831, lon: -73.9712, timeZone: "America/New_York" },
-  CHI:  { name: "Chicago", lat: 41.8781, lon: -87.6298, timeZone: "America/Chicago" },
-  AUS:  { name: "Austin", lat: 30.2672, lon: -97.7431, timeZone: "America/Chicago" },
-  MIA:  { name: "Miami", lat: 25.7617, lon: -80.1918, timeZone: "America/New_York" },
-  DEN:  { name: "Denver", lat: 39.7392, lon: -104.9903, timeZone: "America/Denver" },
-  PHIL: { name: "Philadelphia", lat: 39.9526, lon: -75.1652, timeZone: "America/New_York" },
-  LAX:  { name: "Los Angeles", lat: 34.0522, lon: -118.2437, timeZone: "America/Los_Angeles" },
-  LV:   { name: "Las Vegas", lat: 36.1699, lon: -115.1398, timeZone: "America/Los_Angeles" },
-  NOLA: { name: "New Orleans", lat: 29.9511, lon: -90.0715, timeZone: "America/Chicago" },
-  SFO:  { name: "San Francisco", lat: 37.7749, lon: -122.4194, timeZone: "America/Los_Angeles" },
-  DC:   { name: "Washington DC", lat: 38.9072, lon: -77.0369, timeZone: "America/New_York" },
-  SEA:  { name: "Seattle", lat: 47.6062, lon: -122.3321, timeZone: "America/Los_Angeles" },
-  BOS:  { name: "Boston", lat: 42.3601, lon: -71.0589, timeZone: "America/New_York" },
-  PHX:  { name: "Phoenix", lat: 33.4484, lon: -112.0740, timeZone: "America/Phoenix" },
-  ATL:  { name: "Atlanta", lat: 33.7490, lon: -84.3880, timeZone: "America/New_York" },
-  MIN:  { name: "Minneapolis", lat: 44.9778, lon: -93.2650, timeZone: "America/Chicago" },
-  DAL:  { name: "Dallas", lat: 32.7767, lon: -96.7970, timeZone: "America/Chicago" },
-  SATX: { name: "San Antonio", lat: 29.4241, lon: -98.4936, timeZone: "America/Chicago" },
-  HOU:  { name: "Houston", lat: 29.7604, lon: -95.3698, timeZone: "America/Chicago" },
-  OKC:  { name: "Oklahoma City", lat: 35.4676, lon: -97.5164, timeZone: "America/Chicago" },
-};
+/**
+ * City metadata comes from the rain settlement station registry
+ * (@workspace/db rainStations) — sourced from Kalshi's own rules_primary
+ * settlement text, not a hardcoded city-center guess. A city with
+ * confidence !== 'verified' has null lat/lon and is rejected by
+ * checkRainEligibility with reason "station_unresolved" rather than
+ * silently falling back to an approximate coordinate.
+ */
+type City = RainStationLookup;
 
 interface RainMarket {
   ticker: string;
@@ -86,6 +66,30 @@ interface CachedDiscovery {
 }
 
 let cachedDiscovery: CachedDiscovery | null = null;
+
+// Auto-discovery: once a day, re-resolve the station registry against
+// whatever KXRAIN markets are live right now, so a city Kalshi adds gets
+// flagged low_confidence (and thus excluded, never silently guessed)
+// without needing a human to notice and run the resolver script.
+let lastRegistryResolveMs = 0;
+const REGISTRY_RESOLVE_INTERVAL_MS = 24 * 60 * 60 * 1000;
+
+async function maybeRefreshStationRegistry(markets: RainMarket[], now: Date): Promise<void> {
+  if (now.getTime() - lastRegistryResolveMs < REGISTRY_RESOLVE_INTERVAL_MS) return;
+  lastRegistryResolveMs = now.getTime();
+  try {
+    const { lowConfidence } = await resolveRainStationsFromKalshi(
+      db,
+      markets.map((m) => ({ cityCode: m.cityCode, rulesPrimary: m.rawRules }))
+    );
+    if (lowConfidence.length > 0) {
+      logger.warn({ lowConfidence }, "Rain engine: station registry has unresolved cities — see rain_stations.rules_primary_sample");
+    }
+    await getRainStationsMap(db, true); // bust the in-memory cache so this cycle sees new rows
+  } catch (err) {
+    logger.warn({ err }, "Rain engine: daily station registry refresh failed — keeping existing registry");
+  }
+}
 
 /** Text that would indicate a market is NOT a daily-precipitation contract, even if it matched the KXRAIN ticker pattern. */
 const DISALLOWED_SETTLEMENT_KEYWORDS = ["snow", "temperature", "wind speed", "hurricane", "high temp", "low temp"];
@@ -116,6 +120,9 @@ export function checkRainEligibility(
   }
   if (!city) {
     return { eligible: false, reason: "unknown_city" };
+  }
+  if (city.confidence !== "verified" || city.lat === null || city.lon === null || city.timeZone === null) {
+    return { eligible: false, reason: "station_unresolved" };
   }
   if (market.status !== "active") {
     return { eligible: false, reason: "market_inactive" };
@@ -198,6 +205,13 @@ interface RainProbabilityEvidence {
 }
 
 async function getAnyRainProbability(city: City, date: string): Promise<RainProbabilityEvidence> {
+  // Only called for markets that already passed checkRainEligibility, which
+  // requires confidence === "verified" (lat/lon/timeZone all non-null) —
+  // this is defense-in-depth, not a real fallback path.
+  if (city.lat === null || city.lon === null || city.timeZone === null) {
+    return { probability: null, fetchedAt: new Date().toISOString(), forecastUpdatedAt: null };
+  }
+  const timeZone = city.timeZone;
   const fetchedAt = new Date().toISOString();
   const point = await fetch(`${NWS_BASE}/points/${city.lat},${city.lon}`, {
     headers: { "User-Agent": UA, Accept: "application/geo+json" },
@@ -225,7 +239,7 @@ async function getAnyRainProbability(city: City, date: string): Promise<RainProb
 
   const forecastUpdatedAt = forecastData.properties?.updateTime ?? null;
   const values = (forecastData.properties?.periods ?? [])
-    .filter((period) => period.startTime && localIsoDate(new Date(period.startTime), city.timeZone) === date)
+    .filter((period) => period.startTime && localIsoDate(new Date(period.startTime), timeZone) === date)
     .map((period) => period.probabilityOfPrecipitation?.value)
     .filter((value): value is number => typeof value === "number" && Number.isFinite(value))
     .map((value) => Math.max(0, Math.min(100, value)));
@@ -259,7 +273,7 @@ async function fetchActiveRainMarkets(maxAgeMin: number): Promise<CachedDiscover
           return {
             ticker,
             cityCode,
-            cityName: String(market["yes_sub_title"] ?? CITIES[cityCode]?.name ?? cityCode),
+            cityName: String(market["yes_sub_title"] ?? cityCode),
             status: String(market["status"] ?? ""),
             eventTicker,
             rawTitle: (market["title"] as string | undefined) ?? null,
@@ -304,13 +318,15 @@ export async function runRainSignalEngine(
   }
   const kalshiQuoteFetchedAt = new Date(discovery.fetchedAt).toISOString();
   const kalshiQuoteStale = (Date.now() - discovery.fetchedAt) / 60_000 > 1; // used the rate-limit fallback cache, not this cycle's fetch
+  await maybeRefreshStationRegistry(discovery.markets, now);
+  const stations = await getRainStationsMap(db);
 
   // Step 1: fail-closed eligibility gate. Ineligible markets never reach the
   // risk officer and are excluded from probability lookups / book persistence.
   const eligibleMarkets: RainMarket[] = [];
   const nowIso = now.toISOString();
   for (const market of discovery.markets) {
-    const city = CITIES[market.cityCode];
+    const city = stations.get(market.cityCode);
     const { eligible, reason } = checkRainEligibility(market, discovery.date, city, now);
     if (eligible) {
       eligibleMarkets.push(market);
@@ -341,7 +357,7 @@ export async function runRainSignalEngine(
 
   const probabilityByCity = new Map<string, RainProbabilityEvidence>();
   await Promise.all(eligibleMarkets.map(async (market) => {
-    const city = CITIES[market.cityCode]!;
+    const city = stations.get(market.cityCode)!;
     try {
       probabilityByCity.set(market.cityCode, await getAnyRainProbability(city, discovery.date));
     } catch (err) {
@@ -371,7 +387,7 @@ export async function runRainSignalEngine(
 
   for (const market of eligibleMarkets) {
     const stationId = `RAIN_${market.cityCode}`;
-    const city = CITIES[market.cityCode]!;
+    const city = stations.get(market.cityCode)!;
     const evidence = probabilityByCity.get(market.cityCode);
     const modelYes = evidence?.probability ?? null;
 
@@ -447,10 +463,13 @@ export async function runRainSignalEngine(
           available_size: side.availableSize ?? undefined,
           settlement_date: discovery.date,
           rain_context: {
-            city: city.name,
+            city: city.cityName,
             contract_date: discovery.date,
             forecast_rain_pct: modelPct,
-            settlement_source: "The Weather Company",
+            settlement_source: city.settlementSource,
+            settlement_station_id: city.stationId,
+            settlement_station_name: city.stationName,
+            station_confidence: city.confidence,
             probability_source: "NWS hourly probabilityOfPrecipitation (max over contract day)",
             probability_fetched_at: evidence!.fetchedAt,
             nws_forecast_updated_at: evidence!.forecastUpdatedAt,

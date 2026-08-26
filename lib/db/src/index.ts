@@ -15,3 +15,4 @@ export const db = drizzle(pool, { schema });
 
 export * from "./schema";
 export * from "./pipelineHealth";
+export * from "./rainStations";

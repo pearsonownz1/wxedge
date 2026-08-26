@@ -8,6 +8,7 @@
  * settlements    — daily reconciliation: CLI final high vs. Kalshi settlement.
  * daily_pnl      — rolled-up P&L per day per mode (written by auditor).
  * approvals      — human-in-the-loop approval queue (Phase B).
+ * rain_stations  — settlement station registry for KXRAIN cities.
  */
 
 import {
@@ -205,6 +206,45 @@ export const settlements = pgTable(
   },
   (table) => [
     uniqueIndex("settlements_station_date_idx").on(table.stationId, table.settlementDate),
+  ]
+);
+
+/**
+ * Settlement station registry for KXRAIN cities.
+ *
+ * Kalshi's rules_primary text for each KXRAIN market names the exact
+ * settlement source, e.g. "the total precipitation at CLIORD in Chicago"
+ * — CLIORD is the NWS CLI (climate report) station code. One row per
+ * Kalshi city code (the ticker suffix, e.g. "CHI", "NYC").
+ *
+ * confidence: 'verified' (climateStationCode resolved against a known,
+ * IEM NWSCLI-confirmed station) or 'low_confidence' (city seen live on
+ * Kalshi but its climate station is not yet in the verified map — station
+ * fields are left null rather than guessing).
+ */
+export const rainStations = pgTable(
+  "rain_stations",
+  {
+    id:                  serial("id").primaryKey(),
+    cityCode:            text("city_code").notNull(),
+    cityName:            text("city_name").notNull(),
+    /** CLI code parsed from Kalshi's rules_primary, e.g. "CLIORD". Null if not yet seen. */
+    climateStationCode:  text("climate_station_code"),
+    /** ICAO station id, e.g. "KORD". Null until verified. */
+    stationId:           text("station_id"),
+    stationName:         text("station_name"),
+    lat:                 real("lat"),
+    lon:                 real("lon"),
+    timeZone:            text("time_zone"),
+    settlementSource:    text("settlement_source").notNull().default("The Weather Company"),
+    confidence:          text("confidence").notNull().default("low_confidence"),
+    /** Raw rules_primary text captured at last resolution, for audit/debugging. */
+    rulesPrimarySample:  text("rules_primary_sample"),
+    resolvedAtUtc:       timestamp("resolved_at_utc", { withTimezone: true }),
+    updatedAtUtc:        timestamp("updated_at_utc", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("rain_stations_city_code_idx").on(table.cityCode),
   ]
 );
 

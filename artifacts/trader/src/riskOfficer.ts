@@ -58,6 +58,12 @@ export interface SignalCandidate {
     contract_date:             string;
     forecast_rain_pct:         number;
     settlement_source:         string;
+    /** ICAO id of the exact settlement station, e.g. "KORD". Null if unresolved. */
+    settlement_station_id?:    string | null;
+    /** Human-readable settlement station name, e.g. "Chicago O'Hare Intl". */
+    settlement_station_name?:  string | null;
+    /** 'verified' once the station registry has confirmed the exact station; otherwise the market is ineligible. */
+    station_confidence?:       "verified" | "low_confidence";
     /** Where the forecast probability came from, e.g. "NWS hourly probabilityOfPrecipitation". */
     probability_source?:       string;
     /** When we fetched the forecast used for this signal (reproducibility). */

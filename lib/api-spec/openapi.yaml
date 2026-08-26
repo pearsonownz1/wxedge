@@ -250,6 +250,16 @@ components:
           type: ["integer", "null"]
         rainProbabilityPct:
           type: ["number", "null"]
+        settlementStationId:
+          type: ["string", "null"]
+          description: ICAO id of the exact settlement station, e.g. "KORD". Null if unresolved.
+        settlementStationName:
+          type: ["string", "null"]
+          description: Human-readable settlement station name, e.g. "Chicago O'Hare Intl".
+        stationConfidence:
+          type: string
+          enum: [verified, low_confidence]
+          description: Set to verified once the station registry has confirmed the exact station.
       required:
         - ticker
         - cityCode
@@ -260,6 +270,9 @@ components:
         - yesBidSize
         - yesAskSize
         - rainProbabilityPct
+        - settlementStationId
+        - settlementStationName
+        - stationConfidence
 
     RainMarketsResponse:
       type: object

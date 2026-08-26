@@ -13,10 +13,33 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { checkRainEligibility } from "./rainSignalEngine.js";
 import { rainTickerSettlementDate } from "./auditor.js";
+import type { RainStationLookup } from "@workspace/db";
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
-const NYC = { name: "New York City", lat: 40.7831, lon: -73.9712, timeZone: "America/New_York" };
+const NYC: RainStationLookup = {
+  cityCode: "NYC",
+  cityName: "New York City",
+  stationId: "KNYC",
+  stationName: "New York Central Park",
+  lat: 40.7831,
+  lon: -73.9712,
+  timeZone: "America/New_York",
+  settlementSource: "The Weather Company",
+  confidence: "verified",
+};
+
+const UNRESOLVED_CITY: RainStationLookup = {
+  cityCode: "ZZZ",
+  cityName: "Unresolved City",
+  stationId: null,
+  stationName: null,
+  lat: null,
+  lon: null,
+  timeZone: null,
+  settlementSource: "The Weather Company",
+  confidence: "low_confidence",
+};
 
 const BASE_MARKET = {
   ticker: "KXRAIN-26AUG26-NYC",
@@ -71,6 +94,12 @@ describe("checkRainEligibility", () => {
     const result = checkRainEligibility(BASE_MARKET, "2026-08-26", undefined, NOW);
     assert.equal(result.eligible, false);
     assert.equal(result.reason, "unknown_city");
+  });
+
+  it("rejects a city seen live on Kalshi but not yet resolved to a verified station", () => {
+    const result = checkRainEligibility(BASE_MARKET, "2026-08-26", UNRESOLVED_CITY, NOW);
+    assert.equal(result.eligible, false);
+    assert.equal(result.reason, "station_unresolved");
   });
 
   it("rejects a market that isn't active", () => {

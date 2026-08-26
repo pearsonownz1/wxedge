@@ -16,3 +16,4 @@
 - [LLM Approver](llm-approver.md) — APPROVER env var (human/llm/llm_with_veto); executes through PATCH endpoint; llm_decisions audit table; decider col on approvals for P&L split.
 - [Generated API declarations](api-zod-generated.md) — rebuild the api-zod composite package when TypeScript falsely reports a missing generated export.
 - [Rain market safety patterns](rain-market-safety.md) — derive settlement date from ticker not placement ts; fail-closed eligibility gate duplicated trader/api-server; liquidity-bound sizing via books.ask_size/bid_size.
+- [Rain settlement station registry](rain-station-registry.md) — CLI code in rules_primary names the exact station; must cross-check IEM's NWSCLI network table, not the bare station endpoint (returns wrong network).

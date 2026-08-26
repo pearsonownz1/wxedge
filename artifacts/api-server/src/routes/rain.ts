@@ -8,6 +8,7 @@
 import { Router, type IRouter } from "express";
 import { cache } from "../lib/cache.js";
 import { logger } from "../lib/logger.js";
+import { db, getRainStationsMap, resolveRainStationsFromKalshi, type RainStationLookup } from "@workspace/db";
 
 const router: IRouter = Router();
 const KALSHI_BASE = "https://api.elections.kalshi.com/trade-api/v2";
@@ -17,35 +18,40 @@ const CACHE_KEY = "rain:markets";
 const CACHE_TTL_MS = 60_000;
 const NWS_TTL_MS = 30 * 60_000;
 
-interface City {
-  name: string;
-  lat: number;
-  lon: number;
-  timeZone: string;
-}
+/**
+ * City metadata comes from the rain settlement station registry
+ * (@workspace/db rainStations) — sourced from Kalshi's own rules_primary
+ * settlement text, not a hardcoded city-center guess. A city with
+ * confidence !== 'verified' has null lat/lon and is rejected by
+ * checkRainEligibility with reason "station_unresolved".
+ */
+type City = RainStationLookup;
 
-const CITIES: Record<string, City> = {
-  NYC: { name: "New York City", lat: 40.7831, lon: -73.9712, timeZone: "America/New_York" },
-  CHI: { name: "Chicago", lat: 41.8781, lon: -87.6298, timeZone: "America/Chicago" },
-  AUS: { name: "Austin", lat: 30.2672, lon: -97.7431, timeZone: "America/Chicago" },
-  MIA: { name: "Miami", lat: 25.7617, lon: -80.1918, timeZone: "America/New_York" },
-  DEN: { name: "Denver", lat: 39.7392, lon: -104.9903, timeZone: "America/Denver" },
-  PHIL: { name: "Philadelphia", lat: 39.9526, lon: -75.1652, timeZone: "America/New_York" },
-  LAX: { name: "Los Angeles", lat: 34.0522, lon: -118.2437, timeZone: "America/Los_Angeles" },
-  LV: { name: "Las Vegas", lat: 36.1699, lon: -115.1398, timeZone: "America/Los_Angeles" },
-  NOLA: { name: "New Orleans", lat: 29.9511, lon: -90.0715, timeZone: "America/Chicago" },
-  SFO: { name: "San Francisco", lat: 37.7749, lon: -122.4194, timeZone: "America/Los_Angeles" },
-  DC: { name: "Washington DC", lat: 38.9072, lon: -77.0369, timeZone: "America/New_York" },
-  SEA: { name: "Seattle", lat: 47.6062, lon: -122.3321, timeZone: "America/Los_Angeles" },
-  BOS: { name: "Boston", lat: 42.3601, lon: -71.0589, timeZone: "America/New_York" },
-  PHX: { name: "Phoenix", lat: 33.4484, lon: -112.074, timeZone: "America/Phoenix" },
-  ATL: { name: "Atlanta", lat: 33.749, lon: -84.388, timeZone: "America/New_York" },
-  MIN: { name: "Minneapolis", lat: 44.9778, lon: -93.265, timeZone: "America/Chicago" },
-  DAL: { name: "Dallas", lat: 32.7767, lon: -96.797, timeZone: "America/Chicago" },
-  SATX: { name: "San Antonio", lat: 29.4241, lon: -98.4936, timeZone: "America/Chicago" },
-  HOU: { name: "Houston", lat: 29.7604, lon: -95.3698, timeZone: "America/Chicago" },
-  OKC: { name: "Oklahoma City", lat: 35.4676, lon: -97.5164, timeZone: "America/Chicago" },
-};
+// Auto-discovery: once a day, re-resolve the registry against whatever
+// KXRAIN markets are live right now, mirroring the trader's own daily
+// refresh (see rainSignalEngine.ts) so a newly added Kalshi city is
+// flagged low_confidence here too, not just in the trader.
+let lastRegistryResolveMs = 0;
+const REGISTRY_RESOLVE_INTERVAL_MS = 24 * 60 * 60 * 1000;
+
+async function maybeRefreshStationRegistry(
+  markets: Array<{ cityCode: string; rawRules: string | null }>
+): Promise<void> {
+  if (Date.now() - lastRegistryResolveMs < REGISTRY_RESOLVE_INTERVAL_MS) return;
+  lastRegistryResolveMs = Date.now();
+  try {
+    const { lowConfidence } = await resolveRainStationsFromKalshi(
+      db,
+      markets.map((m) => ({ cityCode: m.cityCode, rulesPrimary: m.rawRules }))
+    );
+    if (lowConfidence.length > 0) {
+      logger.warn({ lowConfidence }, "Rain page: station registry has unresolved cities — see rain_stations.rules_primary_sample");
+    }
+    await getRainStationsMap(db, true);
+  } catch (err) {
+    logger.warn({ err }, "Rain page: daily station registry refresh failed — keeping existing registry");
+  }
+}
 
 interface RainMarket {
   ticker: string;
@@ -57,6 +63,9 @@ interface RainMarket {
   yesBidSize: number | null;
   yesAskSize: number | null;
   rainProbabilityPct: number | null;
+  settlementStationId: string | null;
+  settlementStationName: string | null;
+  stationConfidence: "verified" | "low_confidence";
 }
 
 /** Text that would indicate a market is NOT a daily-precipitation contract, even if it matched the KXRAIN ticker pattern. */
@@ -67,9 +76,11 @@ const DISALLOWED_SETTLEMENT_KEYWORDS = ["snow", "temperature", "wind speed", "hu
  * artifacts/trader/src/rainSignalEngine.ts's checkRainEligibility() so the
  * public /api/rain/markets list never shows a contract the trader itself
  * wouldn't be willing to trade. Kept as a duplicate (not a shared import)
- * consistent with this file's existing pattern of duplicating the CITIES
- * map and contract-date parsing rather than adding a cross-artifact
- * dependency between the trader and the api-server.
+ * consistent with this file's existing pattern of duplicating contract-date
+ * parsing rather than adding a cross-artifact dependency between the trader
+ * and the api-server. City/station data itself IS shared (via the
+ * @workspace/db rain_stations registry), since that's the DB-backed source
+ * of truth both artifacts must read live, not a static compile-time map.
  */
 function checkRainEligibility(
   market: { ticker: string; cityCode: string; status: string; eventTicker: string; rawTitle: string | null; rawSubtitle: string | null; rawRules: string | null },
@@ -85,6 +96,9 @@ function checkRainEligibility(
   }
   if (!city) {
     return { eligible: false, reason: "unknown_city" };
+  }
+  if (city.confidence !== "verified" || city.lat === null || city.lon === null || city.timeZone === null) {
+    return { eligible: false, reason: "station_unresolved" };
   }
   if (market.status !== "active") {
     return { eligible: false, reason: "market_inactive" };
@@ -165,7 +179,12 @@ function localIsoDate(date: Date, timeZone: string): string {
 }
 
 async function fetchRainProbability(city: City, date: string): Promise<number | null> {
-  const key = `rain:nws:${city.name}:${date}`;
+  // Only called for markets that already passed checkRainEligibility, which
+  // requires confidence === "verified" (lat/lon/timeZone all non-null) —
+  // this is defense-in-depth, not a real fallback path.
+  if (city.lat === null || city.lon === null || city.timeZone === null) return null;
+  const timeZone = city.timeZone;
+  const key = `rain:nws:${city.cityCode}:${date}`;
   const cached = cache.get<number | null>(key);
   if (cached) return cached.value;
 
@@ -192,7 +211,7 @@ async function fetchRainProbability(city: City, date: string): Promise<number | 
     };
   };
   const values = (forecastData.properties?.periods ?? [])
-    .filter((period) => period.startTime && localIsoDate(new Date(period.startTime), city.timeZone) === date)
+    .filter((period) => period.startTime && localIsoDate(new Date(period.startTime), timeZone) === date)
     .map((period) => period.probabilityOfPrecipitation?.value)
     .filter((value): value is number => typeof value === "number" && Number.isFinite(value))
     .map((value) => Math.max(0, Math.min(100, value)));
@@ -221,6 +240,27 @@ async function discoverRainMarkets(): Promise<{ date: string; markets: RainMarke
 
   const data = await response.json() as { events?: Array<Record<string, unknown>> };
   const now = new Date();
+
+  // Flatten all markets across events up front so we can run the daily
+  // registry auto-discovery against everything Kalshi is currently
+  // offering, not just the first event with a parseable date.
+  const allRawMarkets: Array<{ eventTicker: string; date: string; market: Record<string, unknown> }> = [];
+  for (const event of data.events ?? []) {
+    const eventTicker = String(event["event_ticker"] ?? "");
+    const date = contractDate(eventTicker);
+    if (!date) continue;
+    for (const market of (event["markets"] as Array<Record<string, unknown>> | undefined) ?? []) {
+      allRawMarkets.push({ eventTicker, date, market });
+    }
+  }
+  await maybeRefreshStationRegistry(
+    allRawMarkets.map(({ market }) => ({
+      cityCode: String(market["ticker"] ?? "").split("-").at(-1) ?? "",
+      rawRules: (market["rules_primary"] as string | undefined) ?? null,
+    }))
+  );
+  const stations = await getRainStationsMap(db);
+
   for (const event of data.events ?? []) {
     const eventTicker = String(event["event_ticker"] ?? "");
     const date = contractDate(eventTicker);
@@ -230,7 +270,7 @@ async function discoverRainMarkets(): Promise<{ date: string; markets: RainMarke
       .map((market): RainMarket | null => {
         const ticker = String(market["ticker"] ?? "");
         const cityCode = ticker.split("-").at(-1) ?? "";
-        const city = CITIES[cityCode];
+        const city = stations.get(cityCode);
         if (!ticker || !city) return null;
         const status = String(market["status"] ?? "");
         const rawTitle = (market["title"] as string | undefined) ?? null;
@@ -249,13 +289,16 @@ async function discoverRainMarkets(): Promise<{ date: string; markets: RainMarke
         return {
           ticker,
           cityCode,
-          cityName: city.name,
+          cityName: city.cityName,
           contractDate: date,
           yesBidCents: toCents(market["yes_bid_dollars"]),
           yesAskCents: toCents(market["yes_ask_dollars"]),
           yesBidSize: toSize(market["yes_bid_size_fp"]),
           yesAskSize: toSize(market["yes_ask_size_fp"]),
           rainProbabilityPct: null,
+          settlementStationId: city.stationId,
+          settlementStationName: city.stationName,
+          stationConfidence: city.confidence,
         };
       })
       .filter((market): market is RainMarket => market !== null);
@@ -291,12 +334,13 @@ async function refreshRainMarkets(): Promise<CachedRainMarkets> {
         return empty;
       }
 
+      const stations = await getRainStationsMap(db);
       const probabilityByCity = new Map<string, number | null>();
       await Promise.all(discovery.markets.map(async (market) => {
         try {
           probabilityByCity.set(
             market.cityCode,
-            await fetchRainProbability(CITIES[market.cityCode]!, discovery.date)
+            await fetchRainProbability(stations.get(market.cityCode)!, discovery.date)
           );
         } catch (err) {
           logger.warn({ err, ticker: market.ticker }, "Rain page: NWS probability request failed");

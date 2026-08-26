@@ -5,6 +5,7 @@
  * WX Edge — Kalshi weather market edge API
  * OpenAPI spec version: 0.1.0
  */
+import type { RainMarketStationConfidence } from './rainMarketStationConfidence';
 
 export interface RainMarket {
   ticker: string;
@@ -21,4 +22,16 @@ export interface RainMarket {
   yesAskSize: number | null;
   /** @nullable */
   rainProbabilityPct: number | null;
+  /**
+     * ICAO id of the exact settlement station, e.g. "KORD". Null if unresolved.
+     * @nullable
+     */
+  settlementStationId: string | null;
+  /**
+     * Human-readable settlement station name, e.g. "Chicago O'Hare Intl".
+     * @nullable
+     */
+  settlementStationName: string | null;
+  /** Set to verified once the station registry has confirmed the exact station. */
+  stationConfidence: RainMarketStationConfidence;
 }

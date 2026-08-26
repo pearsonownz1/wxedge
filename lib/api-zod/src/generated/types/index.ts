@@ -31,6 +31,7 @@ export * from './pipelineHealthStatus';
 export * from './rainMarket';
 export * from './rainMarketsResponse';
 export * from './rainMarketsResponseFeedStatus';
+export * from './rainMarketStationConfidence';
 export * from './settlementWindow';
 export * from './stationDetail';
 export * from './stationDistribution';

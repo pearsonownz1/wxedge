@@ -46,6 +46,17 @@ export interface ErrorResponse {
   error: string;
 }
 
+/**
+ * Set to verified once the station registry has confirmed the exact station.
+ */
+export type RainMarketStationConfidence = typeof RainMarketStationConfidence[keyof typeof RainMarketStationConfidence];
+
+
+export const RainMarketStationConfidence = {
+  verified: 'verified',
+  low_confidence: 'low_confidence',
+} as const;
+
 export interface RainMarket {
   ticker: string;
   cityCode: string;
@@ -61,6 +72,18 @@ export interface RainMarket {
   yesAskSize: number | null;
   /** @nullable */
   rainProbabilityPct: number | null;
+  /**
+     * ICAO id of the exact settlement station, e.g. "KORD". Null if unresolved.
+     * @nullable
+     */
+  settlementStationId: string | null;
+  /**
+     * Human-readable settlement station name, e.g. "Chicago O'Hare Intl".
+     * @nullable
+     */
+  settlementStationName: string | null;
+  /** Set to verified once the station registry has confirmed the exact station. */
+  stationConfidence: RainMarketStationConfidence;
 }
 
 export type RainMarketsResponseFeedStatus = typeof RainMarketsResponseFeedStatus[keyof typeof RainMarketsResponseFeedStatus];
