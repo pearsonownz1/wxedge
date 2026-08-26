@@ -249,3 +249,29 @@ export const GetMarketResponse = zod.object({
 })
 
 
+/**
+ * Returns active KXRAIN contracts with public Kalshi quotes and NWS hourly precipitation probabilities
+ * @summary List active daily rain markets
+ */
+export const GetRainMarketsResponse = zod.object({
+  "contractDate": zod.string().nullable(),
+  "markets": zod.array(zod.object({
+  "ticker": zod.string(),
+  "cityCode": zod.string(),
+  "cityName": zod.string(),
+  "contractDate": zod.string(),
+  "yesBidCents": zod.number().nullable(),
+  "yesAskCents": zod.number().nullable(),
+  "yesBidSize": zod.number().nullable(),
+  "yesAskSize": zod.number().nullable(),
+  "rainProbabilityPct": zod.number().nullable()
+})),
+  "fetchedAt": zod.string(),
+  "feedFresh": zod.boolean(),
+  "feedStatus": zod.enum(['live', 'stale', 'rate_limited', 'network_error', 'no_current_contracts', 'unavailable']),
+  "kalshiAgeSeconds": zod.number().nullable(),
+  "probabilitySource": zod.string(),
+  "settlementSource": zod.string()
+})
+
+

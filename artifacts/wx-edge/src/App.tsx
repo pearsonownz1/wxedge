@@ -9,6 +9,7 @@ import Live from '@/pages/live';
 import Markets from '@/pages/markets';
 import ContractDetail from '@/pages/contract-detail';
 import Approvals from '@/pages/approvals';
+import RainMarkets from '@/pages/rain-markets';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -27,6 +28,7 @@ function Router() {
       <Route path="/markets" component={Markets} />
       <Route path="/markets/:contractId" component={ContractDetail} />
       <Route path="/approvals" component={Approvals} />
+      <Route path="/rain" component={RainMarkets} />
       <Route component={NotFound} />
     </Switch>
   );

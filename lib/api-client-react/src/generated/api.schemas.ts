@@ -46,6 +46,48 @@ export interface ErrorResponse {
   error: string;
 }
 
+export interface RainMarket {
+  ticker: string;
+  cityCode: string;
+  cityName: string;
+  contractDate: string;
+  /** @nullable */
+  yesBidCents: number | null;
+  /** @nullable */
+  yesAskCents: number | null;
+  /** @nullable */
+  yesBidSize: number | null;
+  /** @nullable */
+  yesAskSize: number | null;
+  /** @nullable */
+  rainProbabilityPct: number | null;
+}
+
+export type RainMarketsResponseFeedStatus = typeof RainMarketsResponseFeedStatus[keyof typeof RainMarketsResponseFeedStatus];
+
+
+export const RainMarketsResponseFeedStatus = {
+  live: 'live',
+  stale: 'stale',
+  rate_limited: 'rate_limited',
+  network_error: 'network_error',
+  no_current_contracts: 'no_current_contracts',
+  unavailable: 'unavailable',
+} as const;
+
+export interface RainMarketsResponse {
+  /** @nullable */
+  contractDate: string | null;
+  markets: RainMarket[];
+  fetchedAt: string;
+  feedFresh: boolean;
+  feedStatus: RainMarketsResponseFeedStatus;
+  /** @nullable */
+  kalshiAgeSeconds: number | null;
+  probabilitySource: string;
+  settlementSource: string;
+}
+
 /**
  * Settlement window in both LST and local wall-clock time
  */

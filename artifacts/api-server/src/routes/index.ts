@@ -6,6 +6,7 @@ import snapshotsRouter from "./snapshots.js";
 import approvalsRouter from "./approvals.js";
 import pipelineHealthRouter from "./pipeline-health.js";
 import dashboardRouter from "./dashboard.js";
+import rainRouter from "./rain.js";
 
 const router: IRouter = Router();
 
@@ -16,5 +17,6 @@ router.use(snapshotsRouter);
 router.use(approvalsRouter);
 router.use(pipelineHealthRouter);
 router.use(dashboardRouter);
+  router.use(rainRouter);
 
 export default router;
