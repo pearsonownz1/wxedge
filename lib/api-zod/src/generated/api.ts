@@ -249,32 +249,3 @@ export const GetMarketResponse = zod.object({
 })
 
 
-/**
- * Returns active KXRAIN contracts with public Kalshi quotes and NWS hourly precipitation probabilities
- * @summary List active daily rain markets
- */
-export const GetRainMarketsResponse = zod.object({
-  "contractDate": zod.string().nullable(),
-  "markets": zod.array(zod.object({
-  "ticker": zod.string(),
-  "cityCode": zod.string(),
-  "cityName": zod.string(),
-  "contractDate": zod.string(),
-  "yesBidCents": zod.number().nullable(),
-  "yesAskCents": zod.number().nullable(),
-  "yesBidSize": zod.number().nullable(),
-  "yesAskSize": zod.number().nullable(),
-  "rainProbabilityPct": zod.number().nullable(),
-  "settlementStationId": zod.string().nullable().describe('ICAO id of the exact settlement station, e.g. \"KORD\". Null if unresolved.'),
-  "settlementStationName": zod.string().nullable().describe('Human-readable settlement station name, e.g. \"Chicago O\'Hare Intl\".'),
-  "stationConfidence": zod.enum(['verified', 'low_confidence']).describe('Set to verified once the station registry has confirmed the exact station.')
-})),
-  "fetchedAt": zod.string(),
-  "feedFresh": zod.boolean(),
-  "feedStatus": zod.enum(['live', 'stale', 'rate_limited', 'network_error', 'no_current_contracts', 'unavailable']),
-  "kalshiAgeSeconds": zod.number().nullable(),
-  "probabilitySource": zod.string(),
-  "settlementSource": zod.string()
-})
-
-

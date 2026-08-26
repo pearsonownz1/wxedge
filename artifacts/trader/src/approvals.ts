@@ -53,7 +53,7 @@ interface TradeCard {
   generated_at:     string;
   template_version: 1;
   // Market-specific metadata
-  market_type:      "weather" | "sports" | "rain";
+  market_type:      "weather" | "sports";
   sports_context:   {
     pitcher_name: string;
     threshold:    number;
@@ -61,20 +61,6 @@ interface TradeCard {
     k9:           number;
     avg_ip:       number;
   } | null;
-  rain_context: {
-    city:                      string;
-    contract_date:             string;
-    forecast_rain_pct:         number;
-    settlement_source:         string;
-    probability_source?:       string;
-    probability_fetched_at?:   string;
-    nws_forecast_updated_at?:  string | null;
-    kalshi_quote_fetched_at?:  string;
-    kalshi_quote_stale?:       boolean;
-    settlement_terms_verified?: boolean;
-  } | null;
-  /** Contracts resting on the book at this price when the signal reported it (rain only). */
-  available_size: number | null;
 }
 
 function renderCard(candidate: SignalCandidate, input: {
@@ -84,11 +70,9 @@ function renderCard(candidate: SignalCandidate, input: {
   hours_to_settle: number;
 } | null): TradeCard {
   const isSports = candidate.market_type === "sports";
-  const isRain   = candidate.market_type === "rain";
   const city     = STATION_NAMES[candidate.station_id] ?? candidate.station_id;
   const label    = input?.bracket_label ?? (
     isSports ? `${candidate.sports_context?.threshold}+ Ks`
-      : isRain ? `Rain in ${candidate.rain_context?.city ?? city}`
       : "?"
   );
   const price    = candidate.limit_price;
@@ -121,8 +105,6 @@ function renderCard(candidate: SignalCandidate, input: {
     // Sports context (null for weather proposals)
     market_type:      candidate.market_type ?? "weather",
     sports_context:   candidate.sports_context ?? null,
-    rain_context:     candidate.rain_context ?? null,
-    available_size:   candidate.available_size ?? null,
   };
 }
 

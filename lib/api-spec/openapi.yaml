@@ -14,8 +14,6 @@ tags:
     description: Settlement station operations
   - name: markets
     description: Kalshi market operations
-  - name: rain
-    description: Daily precipitation market operations
 paths:
   /healthz:
     get:
@@ -153,20 +151,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
-  /rain/markets:
-    get:
-      operationId: getRainMarkets
-      tags: [rain]
-      summary: List active daily rain markets
-      description: Returns active KXRAIN contracts with public Kalshi quotes and NWS hourly precipitation probabilities
-      responses:
-        "200":
-          description: Rain market list and feed status
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/RainMarketsResponse"
-
 components:
   schemas:
     HealthStatus:
@@ -228,83 +212,6 @@ components:
           type: string
       required:
         - error
-
-    RainMarket:
-      type: object
-      properties:
-        ticker:
-          type: string
-        cityCode:
-          type: string
-        cityName:
-          type: string
-        contractDate:
-          type: string
-        yesBidCents:
-          type: ["integer", "null"]
-        yesAskCents:
-          type: ["integer", "null"]
-        yesBidSize:
-          type: ["integer", "null"]
-        yesAskSize:
-          type: ["integer", "null"]
-        rainProbabilityPct:
-          type: ["number", "null"]
-        settlementStationId:
-          type: ["string", "null"]
-          description: ICAO id of the exact settlement station, e.g. "KORD". Null if unresolved.
-        settlementStationName:
-          type: ["string", "null"]
-          description: Human-readable settlement station name, e.g. "Chicago O'Hare Intl".
-        stationConfidence:
-          type: string
-          enum: [verified, low_confidence]
-          description: Set to verified once the station registry has confirmed the exact station.
-      required:
-        - ticker
-        - cityCode
-        - cityName
-        - contractDate
-        - yesBidCents
-        - yesAskCents
-        - yesBidSize
-        - yesAskSize
-        - rainProbabilityPct
-        - settlementStationId
-        - settlementStationName
-        - stationConfidence
-
-    RainMarketsResponse:
-      type: object
-      properties:
-        contractDate:
-          type: ["string", "null"]
-        markets:
-          type: array
-          items:
-            $ref: "#/components/schemas/RainMarket"
-        fetchedAt:
-          type: string
-        feedFresh:
-          type: boolean
-        feedStatus:
-          type: string
-          enum: [live, stale, rate_limited, network_error, no_current_contracts, unavailable]
-        kalshiAgeSeconds:
-          type: ["integer", "null"]
-        probabilitySource:
-          type: string
-        settlementSource:
-          type: string
-      required:
-        - contractDate
-        - markets
-        - fetchedAt
-        - feedFresh
-        - feedStatus
-        - kalshiAgeSeconds
-        - probabilitySource
-        - settlementSource
 
     SettlementWindow:
       type: object

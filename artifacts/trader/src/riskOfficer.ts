@@ -27,55 +27,16 @@ export interface SignalCandidate {
   contracts?: number;
   edge_net:   number;
   ts:         Date;
-  /**
-   * Contracts actually resting on the book at this signal's price. When set,
-   * the executor caps max-tilt sizing at this value so an order can never
-   * request more than the market can actually fill. Unset for signal types
-   * that don't carry book depth (temperature, sports) — their sizing is
-   * unchanged.
-   */
-  available_size?: number;
-  /**
-   * The contract's true local settlement date (from the ticker), used to
-   * reconcile P&L against the correct settlement row even when the order
-   * was placed near UTC midnight. Unset for signal types that key
-   * settlement off placement date instead (temperature, sports).
-   */
-  settlement_date?: string;
   // Optional: pre-computed metadata set by sports signals
   headline?:       string;
   model_pct?:      number;
-  market_type?:    "weather" | "sports" | "rain";
+  market_type?:    "weather" | "sports";
   sports_context?: {
     pitcher_name: string;
     threshold:    number;
     lambda:       number;  // expected strikeouts (Poisson λ)
     k9:           number;  // pitcher's K/9 this season
     avg_ip:       number;  // avg innings per start this season
-  };
-  rain_context?: {
-    city:                      string;
-    contract_date:             string;
-    forecast_rain_pct:         number;
-    settlement_source:         string;
-    /** ICAO id of the exact settlement station, e.g. "KORD". Null if unresolved. */
-    settlement_station_id?:    string | null;
-    /** Human-readable settlement station name, e.g. "Chicago O'Hare Intl". */
-    settlement_station_name?:  string | null;
-    /** 'verified' once the station registry has confirmed the exact station; otherwise the market is ineligible. */
-    station_confidence?:       "verified" | "low_confidence";
-    /** Where the forecast probability came from, e.g. "NWS hourly probabilityOfPrecipitation". */
-    probability_source?:       string;
-    /** When we fetched the forecast used for this signal (reproducibility). */
-    probability_fetched_at?:   string;
-    /** NWS's own `updateTime` for the forecast product, when available. */
-    nws_forecast_updated_at?:  string | null;
-    /** When we fetched the Kalshi quote used for this signal. */
-    kalshi_quote_fetched_at?:  string;
-    /** True if the quote came from the rate-limit fallback cache rather than this cycle's live fetch. */
-    kalshi_quote_stale?:       boolean;
-    /** True once checkRainEligibility() confirmed city/date/status/settlement terms for this contract. */
-    settlement_terms_verified?: boolean;
   };
 }
 

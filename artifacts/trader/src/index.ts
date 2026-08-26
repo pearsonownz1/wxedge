@@ -28,7 +28,6 @@ import http from "node:http";
 import { config } from "./config.js";
 import { runSignalEngine } from "./signalEngine.js";
 import { runSportsSignalEngine } from "./sportsSignalEngine.js";
-import { runRainSignalEngine } from "./rainSignalEngine.js";
 import { placeOrder, monitorOpenOrders } from "./executor.js";
 import { sweepExpiredProposals } from "./approvals.js";
 import { startLlmApprover } from "./llm-approver.js";
@@ -183,13 +182,7 @@ async function runTradingCycle(now: Date): Promise<void> {
     return [] as Awaited<ReturnType<typeof runSportsSignalEngine>>;
   });
 
-  // 1c. Rain markets (KXRAIN daily city contracts)
-  const liveRainSignals = await runRainSignalEngine(config, now).catch((err) => {
-    logger.warn({ err }, "Rain signal engine failed — skipping this cycle");
-    return [] as Awaited<ReturnType<typeof runRainSignalEngine>>;
-  });
-
-  const allSignals = [...liveSignals, ...liveSportsSignals, ...liveRainSignals];
+  const allSignals = [...liveSignals, ...liveSportsSignals];
 
   // 2. Risk officer → executor (in series to keep risk state consistent)
   for (const { candidate, signalId } of allSignals) {
@@ -216,6 +209,8 @@ async function runScheduledJobs(now: Date): Promise<void> {
 
   // Settlement audit runs every tick (idempotent; handles all stations internally)
   await runSettlementAudit(now);
+  // Closes out the handful of rain fills placed before rain trading was
+  // rolled back — read-only bookkeeping, does not place new rain orders.
   await runRainSettlementAudit(now);
 
   // Reconcile on every tick: settlement data normally arrives after the

@@ -166,6 +166,10 @@ async function getRainResult(ticker: string): Promise<"yes" | "no" | null> {
 
 /**
  * Records resolved KXRAIN contracts using Kalshi's final market result.
+ * Rain trading itself has been rolled back (no new rain signals/orders are
+ * generated), but a handful of already-placed rain fills predate the
+ * rollback and still need their real-money outcome recorded so daily P&L
+ * and audit history stay correct instead of sitting pending forever.
  * A NO outcome deliberately uses a non-ticker sentinel so the shared binary
  * YES/NO P&L calculation remains valid without a second settlement schema.
  */
@@ -200,7 +204,11 @@ export async function runRainSettlementAudit(now: Date): Promise<void> {
 /**
  * Given a KXRAIN ticker, returns its true local settlement date (YYYY-MM-DD)
  * as embedded in the ticker itself — e.g. "KXRAIN-26AUG26-NYC" -> "2026-08-26".
- * Returns null for non-rain tickers or an unparseable date segment.
+ * Returns null for non-rain tickers or an unparseable date segment. Rain
+ * trading is rolled back (no new rain orders are placed), but this keeps the
+ * handful of pre-rollback rain fills reconciling against their correct
+ * settlement date instead of the UTC placement date, which can differ near
+ * midnight.
  */
 export function rainTickerSettlementDate(ticker: string): string | null {
   const match = /^KXRAIN-(\d{2})([A-Z]{3})(\d{2})-/.exec(ticker);
@@ -227,10 +235,10 @@ export interface FilledOrderForPnl {
  * Pure P&L computation for a digest run. Each order is settled against the
  * key `${station_id}::${its own true settlement date}` (ticker-derived for
  * rain, otherwise `fallbackDate` — the placement-date bucket this digest run
- * covers). This per-order-date keying is required because a single rain
- * station can have both a today-contract and a tomorrow-contract filled on
- * the same placement date; collapsing them into one station-keyed slot would
- * let one contract's settlement silently overwrite the other's.
+ * covers). This per-order-date keying is required because a rain station can
+ * have a fill whose ticker-derived settlement date differs from the UTC
+ * placement date near midnight; collapsing them onto placement date would
+ * misattribute or permanently strand that fill as pending.
  *
  * An order whose key is absent from `settledByKey` has not settled yet —
  * it is excluded from this run's totals (not scored as a loss) and counted
@@ -286,7 +294,7 @@ export function computeDailyPnl(
  * Compute and write the daily P&L row for a given placement date and mode.
  * Idempotent and safe to re-run for a past date: it always recomputes the
  * full row from current settlement data, so calling it again after a
- * previously-pending rain contract settles corrects that date's numbers
+ * previously-pending contract settles corrects that date's numbers
  * in place (see runDailyReconciliation).
  *
  * The whole row is deferred (not written) until every filled order for this

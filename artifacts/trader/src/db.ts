@@ -444,7 +444,12 @@ export async function getBooksForDate(
   return rows as Array<{ ticker: string; bracket_lo: number | null; bracket_hi: number | null }>;
 }
 
-/** Filled rain orders whose contract result has not yet been recorded. */
+/**
+ * Filled rain orders whose contract result has not yet been recorded.
+ * Read-only bookkeeping for the handful of already-placed rain positions
+ * from before rain trading was rolled back — closes out their P&L
+ * correctly without re-enabling any rain signal generation.
+ */
 export async function getUnsettledRainOrders(): Promise<
   Array<{ station_id: string; ticker: string; settlement_date: string }>
 > {
@@ -494,6 +499,21 @@ export async function getFilledOrdersForDate(
  * The auditor can therefore backfill dates missed while the trader was asleep
  * or while the settlement feed was delayed.
  */
+/**
+ * Each order's own settlement date: ticker-derived for legacy KXRAIN- fills
+ * (their contract can settle on a different local date than the UTC
+ * placement date), placement date for everything else. Must match the
+ * per-order keying `computeDailyPnl`/`rainTickerSettlementDate` use, or a
+ * legacy rain fill's digest bucket would never see its own settlement land.
+ */
+const ORDER_SETTLEMENT_DATE_SQL = sql`
+  CASE
+    WHEN o.ticker LIKE 'KXRAIN-%'
+      THEN TO_CHAR(TO_DATE(split_part(o.ticker, '-', 2), 'YYMONDD'), 'YYYY-MM-DD')
+    ELSE o.ts_placed::date::text
+  END
+`;
+
 export async function getReadyDailyPnlKeys(): Promise<
   Array<{ date: string; mode: PnlMode }>
 > {
@@ -505,7 +525,7 @@ export async function getReadyDailyPnlKeys(): Promise<
         SELECT 1
         FROM settlements st
         WHERE st.station_id = o.station_id
-          AND st.settlement_date = o.ts_placed::date::text
+          AND st.settlement_date = ${ORDER_SETTLEMENT_DATE_SQL}
           AND st.kalshi_settled_bracket IS NOT NULL
       )) AS ready
     FROM orders o
@@ -515,7 +535,7 @@ export async function getReadyDailyPnlKeys(): Promise<
       SELECT 1
       FROM settlements st
       WHERE st.station_id = o.station_id
-        AND st.settlement_date = o.ts_placed::date::text
+        AND st.settlement_date = ${ORDER_SETTLEMENT_DATE_SQL}
         AND st.kalshi_settled_bracket IS NOT NULL
     ))
     ORDER BY date, mode
@@ -663,7 +683,7 @@ export async function getMissingDailyPnlKeys(): Promise<
         SELECT 1
         FROM settlements st
         WHERE st.station_id = o.station_id
-          AND st.settlement_date = o.ts_placed::date::text
+          AND st.settlement_date = ${ORDER_SETTLEMENT_DATE_SQL}
           AND st.kalshi_settled_bracket IS NOT NULL
       ))
     ) ready

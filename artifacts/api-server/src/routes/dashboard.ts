@@ -44,7 +44,9 @@ function loadRiskSettings(): { dailyCap: number; feeRate: number } {
 // ticker), which can differ from the UTC placement date near midnight.
 // Both fragments below derive the join date from the ticker for rain orders
 // instead of assuming placement date == settlement date, while leaving the
-// placement-date join unchanged for every other market type.
+// placement-date join unchanged for every other market type. Rain trading
+// itself is rolled back (no new rain signals), but the handful of
+// pre-rollback rain rows still need this to reconcile correctly.
 const ORDER_SETTLEMENT_DATE = sql`
   CASE
     WHEN o.ticker LIKE 'KXRAIN-%'
@@ -226,11 +228,6 @@ router.get("/dashboard", async (_req: Request, res: Response) => {
           s.limit_price AS limit_price_cents,
           ${MARKET_TYPE_CASE} AS market_type,
           CASE
-            WHEN a.ticker LIKE 'KXRAIN-%'
-              THEN TO_CHAR(TO_DATE(split_part(a.ticker, '-', 2), 'YYMONDD'), 'YYYY-MM-DD')
-            ELSE NULL
-          END AS contract_date,
-          CASE
             WHEN a.decision != 'approved' OR a.recheck_ok IS NOT TRUE THEN NULL
             WHEN st.kalshi_settled_bracket IS NULL              THEN 'pending'
             WHEN a.side = 'YES' AND st.kalshi_settled_bracket = a.ticker  THEN 'won'
@@ -273,7 +270,7 @@ router.get("/dashboard", async (_req: Request, res: Response) => {
             SELECT 1
             FROM settlements st
             WHERE st.station_id = o.station_id
-              AND st.settlement_date = o.ts_placed::date::text
+              AND st.settlement_date = ${ORDER_SETTLEMENT_DATE}
               AND st.kalshi_settled_bracket IS NOT NULL
           ))
         ) ready

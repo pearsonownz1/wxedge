@@ -54,7 +54,9 @@ export interface CurrentMarketState {
 // ticker), which can differ from the UTC placement/proposal date near
 // midnight. Both fragments derive the join date from the ticker for rain
 // orders/proposals instead of assuming placement date == settlement date,
-// leaving every other market type's join unchanged.
+// leaving every other market type's join unchanged. Rain trading itself is
+// rolled back (no new rain signals), but the handful of pre-rollback rain
+// rows still need this to reconcile correctly.
 const ORDER_SETTLEMENT_DATE = sql`
   CASE
     WHEN o.ticker LIKE 'KXRAIN-%'

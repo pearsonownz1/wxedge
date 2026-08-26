@@ -3,17 +3,19 @@
  *
  * Run with: node --import tsx/esm --test src/auditorDigest.test.ts
  *
- * computeDailyPnl is the pure core of runDailyDigest's settlement matching.
- * These tests target the specific rain failure modes fixed here: a rain
- * contract that hasn't settled by digest time must not be scored as a loss,
- * and two contracts for the same station on adjacent local dates (a
- * same-day "today" contract and a next-day "tomorrow" contract, both filled
- * on the same UTC placement date) must not clobber each other's settlement.
+ * computeDailyPnl is the pure core of runDailyDigest's settlement matching:
+ * every filled order for a placement-date digest run is settled against
+ * `${station_id}::${its own true settlement date}` in the settlements table
+ * — ticker-derived for legacy KXRAIN- rows (rain trading itself is rolled
+ * back, but a handful of pre-rollback fills remain and must keep reconciling
+ * correctly), otherwise the digest's placement-date bucket. An order whose
+ * key isn't present yet is excluded from totals (not scored as a loss) and
+ * counted as pending so a later re-run can pick it up once it settles.
  */
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { computeDailyPnl } from "./auditor.js";
+import { computeDailyPnl, rainTickerSettlementDate } from "./auditor.js";
 import type { FilledOrderForPnl } from "./auditor.js";
 
 const FEE_RATE = 0.07;
@@ -30,12 +32,10 @@ function order(overrides: Partial<FilledOrderForPnl>): FilledOrderForPnl {
   };
 }
 
-describe("computeDailyPnl — pending rain settlement is never scored as a loss", () => {
-  it("excludes an unsettled rain order from totals instead of paying out 0", () => {
-    const filled = [
-      order({ ticker: "KXRAIN-26AUG26-NYC", side: "NO", station_id: "RAIN_NYC", price_cents: 43, fill_price_cents: 43 }),
-    ];
-    // No settlement row for RAIN_NYC on any date — contract hasn't resolved yet.
+describe("computeDailyPnl — pending settlement is never scored as a loss", () => {
+  it("excludes an unsettled order from totals instead of paying out 0", () => {
+    const filled = [order({})];
+    // No settlement row for KNYC on this date — contract hasn't resolved yet.
     const settledByKey = new Map<string, string | null>();
 
     const result = computeDailyPnl(filled, settledByKey, "2026-08-26", FEE_RATE);
@@ -47,89 +47,7 @@ describe("computeDailyPnl — pending rain settlement is never scored as a loss"
   });
 
   it("scores the order once its settlement is present", () => {
-    const filled = [
-      order({ ticker: "KXRAIN-26AUG26-NYC", side: "NO", station_id: "RAIN_NYC", price_cents: 43, fill_price_cents: 43 }),
-    ];
-    // Settles NO (kalshi_settled_bracket is the sentinel form for a NO market result).
-    const settledByKey = new Map<string, string | null>([
-      ["RAIN_NYC::2026-08-26", "KXRAIN-26AUG26-NYC:NO"],
-    ]);
-
-    const result = computeDailyPnl(filled, settledByKey, "2026-08-26", FEE_RATE);
-
-    assert.equal(result.tradeCount, 1);
-    assert.equal(result.pendingCount, 0);
-    // NO buy wins when settled bracket !== own ticker -> payout 100c, fillCents 43c -> gross 57c.
-    assert.equal(result.grossCents, 57);
-  });
-});
-
-describe("computeDailyPnl — adjacent-date rain contracts for the same station", () => {
-  it("does not let a tomorrow-contract settlement clobber a today-contract's result", () => {
-    const filled: FilledOrderForPnl[] = [
-      order({ ticker: "KXRAIN-26AUG26-NYC", side: "YES", station_id: "RAIN_NYC", price_cents: 30, fill_price_cents: 30 }),
-      order({ ticker: "KXRAIN-26AUG27-NYC", side: "YES", station_id: "RAIN_NYC", price_cents: 35, fill_price_cents: 35 }),
-    ];
-    // Today's (Aug 26) contract settled YES; tomorrow's (Aug 27) contract is
-    // still unsettled — both were filled on the same UTC placement date.
-    const settledByKey = new Map<string, string | null>([
-      ["RAIN_NYC::2026-08-26", "KXRAIN-26AUG26-NYC"],
-    ]);
-
-    const result = computeDailyPnl(filled, settledByKey, "2026-08-26", FEE_RATE);
-
-    // Only the Aug-26 contract should be counted; the Aug-27 one stays pending.
-    assert.equal(result.tradeCount, 1);
-    assert.equal(result.pendingCount, 1);
-    // YES buy wins (settled bracket === own ticker) -> payout 100c, fillCents 30c -> gross 70c.
-    assert.equal(result.grossCents, 70);
-  });
-
-  it("scores both adjacent-date contracts correctly once both have settled", () => {
-    const filled: FilledOrderForPnl[] = [
-      order({ ticker: "KXRAIN-26AUG26-NYC", side: "YES", station_id: "RAIN_NYC", price_cents: 30, fill_price_cents: 30 }),
-      order({ ticker: "KXRAIN-26AUG27-NYC", side: "YES", station_id: "RAIN_NYC", price_cents: 35, fill_price_cents: 35 }),
-    ];
-    // Today's contract settled YES; tomorrow's settled NO (no rain) — a
-    // buggy station-only key would let this second write stomp the first.
-    const settledByKey = new Map<string, string | null>([
-      ["RAIN_NYC::2026-08-26", "KXRAIN-26AUG26-NYC"],
-      ["RAIN_NYC::2026-08-27", "KXRAIN-26AUG27-NYC:NO"],
-    ]);
-
-    const result = computeDailyPnl(filled, settledByKey, "2026-08-26", FEE_RATE);
-
-    assert.equal(result.tradeCount, 2);
-    assert.equal(result.pendingCount, 0);
-    // Aug-26 YES win: payout 100 - 30 = 70. Aug-27 YES loses (settled !== own ticker): payout 0 - 35 = -35.
-    assert.equal(result.grossCents, 70 + -35);
-  });
-});
-
-describe("computeDailyPnl — a rain fill whose true settlement date precedes its placement date", () => {
-  it("matches the order against its ticker-derived date, not the placement-date bucket", () => {
-    // A contract for "yesterday" (relative to the digest's placement-date
-    // bucket) that was filled late — its own settlement date is in the past
-    // relative to `fallbackDate`, and must still be looked up correctly.
-    const filled: FilledOrderForPnl[] = [
-      order({ ticker: "KXRAIN-26AUG25-NYC", side: "YES", station_id: "RAIN_NYC", price_cents: 50, fill_price_cents: 50 }),
-    ];
-    const settledByKey = new Map<string, string | null>([
-      ["RAIN_NYC::2026-08-25", "KXRAIN-26AUG25-NYC"],
-    ]);
-
-    // Placement-date bucket is Aug 26, but the ticker's own date (Aug 25) is used for the lookup.
-    const result = computeDailyPnl(filled, settledByKey, "2026-08-26", FEE_RATE);
-
-    assert.equal(result.tradeCount, 1);
-    assert.equal(result.pendingCount, 0);
-    assert.equal(result.grossCents, 50); // YES win: 100 - 50
-  });
-});
-
-describe("computeDailyPnl — non-rain orders are unaffected (keyed by the digest's own date)", () => {
-  it("settles a temperature bracket order against the fallback (placement) date", () => {
-    const filled = [order({ ticker: "KXHIGHNY-26AUG26-B82.5", side: "YES", station_id: "KNYC", price_cents: 40, fill_price_cents: 40 })];
+    const filled = [order({})];
     const settledByKey = new Map<string, string | null>([
       ["KNYC::2026-08-26", "KXHIGHNY-26AUG26-B82.5"],
     ]);
@@ -137,6 +55,118 @@ describe("computeDailyPnl — non-rain orders are unaffected (keyed by the diges
     const result = computeDailyPnl(filled, settledByKey, "2026-08-26", FEE_RATE);
 
     assert.equal(result.tradeCount, 1);
+    assert.equal(result.pendingCount, 0);
+    // YES buy wins (settled bracket === own ticker) -> payout 100c, fillCents 40c -> gross 60c.
+    assert.equal(result.grossCents, 60);
+  });
+});
+
+describe("computeDailyPnl — multiple stations on the same digest date", () => {
+  it("settles each station independently against its own key", () => {
+    const filled: FilledOrderForPnl[] = [
+      order({ ticker: "KXHIGHNY-26AUG26-B82.5", side: "YES", station_id: "KNYC", price_cents: 30, fill_price_cents: 30 }),
+      order({ ticker: "KXHIGHCHI-26AUG26-B75.5", side: "NO", station_id: "KMDW", price_cents: 35, fill_price_cents: 35 }),
+    ];
+    const settledByKey = new Map<string, string | null>([
+      ["KNYC::2026-08-26", "KXHIGHNY-26AUG26-B82.5"],
+      // KMDW still unsettled.
+    ]);
+
+    const result = computeDailyPnl(filled, settledByKey, "2026-08-26", FEE_RATE);
+
+    // Only the NYC order should be counted; the CHI one stays pending.
+    assert.equal(result.tradeCount, 1);
+    assert.equal(result.pendingCount, 1);
+    // YES buy wins (settled bracket === own ticker) -> payout 100c, fillCents 30c -> gross 70c.
+    assert.equal(result.grossCents, 70);
+  });
+
+  it("scores both stations correctly once both have settled", () => {
+    const filled: FilledOrderForPnl[] = [
+      order({ ticker: "KXHIGHNY-26AUG26-B82.5", side: "YES", station_id: "KNYC", price_cents: 30, fill_price_cents: 30 }),
+      order({ ticker: "KXHIGHCHI-26AUG26-B75.5", side: "NO", station_id: "KMDW", price_cents: 35, fill_price_cents: 35 }),
+    ];
+    const settledByKey = new Map<string, string | null>([
+      ["KNYC::2026-08-26", "KXHIGHNY-26AUG26-B82.5"],
+      ["KMDW::2026-08-26", "KXHIGHCHI-26AUG26-B75.5"],
+    ]);
+
+    const result = computeDailyPnl(filled, settledByKey, "2026-08-26", FEE_RATE);
+
+    assert.equal(result.tradeCount, 2);
+    assert.equal(result.pendingCount, 0);
+    // NYC YES win: payout 100 - 30 = 70. CHI NO loses (settled === own ticker -> NO loses): payout 0 - 35 = -35.
+    assert.equal(result.grossCents, 70 + -35);
+  });
+});
+
+describe("computeDailyPnl — non-temperature orders are unaffected (sports keyed the same way)", () => {
+  it("settles a sports order against the fallback (placement) date", () => {
+    const filled = [order({ ticker: "KXMLBKS-26AUG26-DEGROM5", side: "YES", station_id: "SPORTS_DEGROM", price_cents: 40, fill_price_cents: 40 })];
+    const settledByKey = new Map<string, string | null>([
+      ["SPORTS_DEGROM::2026-08-26", "KXMLBKS-26AUG26-DEGROM5"],
+    ]);
+
+    const result = computeDailyPnl(filled, settledByKey, "2026-08-26", FEE_RATE);
+
+    assert.equal(result.tradeCount, 1);
     assert.equal(result.grossCents, 60); // YES win: 100 - 40
+  });
+});
+
+describe("rainTickerSettlementDate — legacy rain fills", () => {
+  it("extracts the contract's true local date from the ticker", () => {
+    assert.equal(rainTickerSettlementDate("KXRAIN-26AUG25-MIA"), "2026-08-25");
+    assert.equal(rainTickerSettlementDate("KXRAIN-26AUG26-NOLA"), "2026-08-26");
+  });
+
+  it("returns null for non-rain tickers", () => {
+    assert.equal(rainTickerSettlementDate("KXHIGHNY-26AUG26-B82.5"), null);
+    assert.equal(rainTickerSettlementDate("KXMLBKS-26AUG26-DEGROM5"), null);
+  });
+});
+
+describe("computeDailyPnl — legacy rain fill placed on a different UTC date than its contract settles", () => {
+  it("is excluded from this digest's totals when only the placement-date bucket has settled", () => {
+    // Rain trading is rolled back, but a fill like this — placed 08/26 UTC
+    // for a contract whose ticker date is 08/25 — is real pre-rollback
+    // history. Only a same-day (fallback-keyed) settlement exists here, so
+    // the order must stay pending rather than being silently dropped or
+    // scored against the wrong day.
+    const filled = [order({
+      ticker: "KXRAIN-26AUG25-MIA",
+      side: "NO",
+      station_id: "RAIN_MIA",
+      price_cents: 20,
+      fill_price_cents: 20,
+    })];
+    const settledByKey = new Map<string, string | null>([
+      ["RAIN_MIA::2026-08-26", "some-other-bracket"], // wrong-date bucket only
+    ]);
+
+    const result = computeDailyPnl(filled, settledByKey, "2026-08-26", FEE_RATE);
+
+    assert.equal(result.tradeCount, 0);
+    assert.equal(result.pendingCount, 1, "must key off the ticker's true date, not the placement date");
+  });
+
+  it("settles correctly once its true ticker-derived date has a settlement row", () => {
+    const filled = [order({
+      ticker: "KXRAIN-26AUG25-MIA",
+      side: "NO",
+      station_id: "RAIN_MIA",
+      price_cents: 20,
+      fill_price_cents: 20,
+    })];
+    const settledByKey = new Map<string, string | null>([
+      ["RAIN_MIA::2026-08-25", "KXRAIN-26AUG25-MIA:NO"], // correct ticker-derived date, NO won
+    ]);
+
+    const result = computeDailyPnl(filled, settledByKey, "2026-08-26", FEE_RATE);
+
+    assert.equal(result.tradeCount, 1);
+    assert.equal(result.pendingCount, 0);
+    // NO buy wins (settled bracket !== own ticker) -> payout 100c, fillCents 20c -> gross 80c.
+    assert.equal(result.grossCents, 80);
   });
 });

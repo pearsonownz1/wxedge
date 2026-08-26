@@ -21,7 +21,6 @@ import type {
   MarketDetail,
   MarketList,
   PipelineHealth,
-  RainMarketsResponse,
   StationDetail,
   StationDistribution,
   StationSummary
@@ -588,84 +587,6 @@ export function useGetMarket<TData = Awaited<ReturnType<typeof getMarket>>, TErr
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetMarketQueryOptions(contractId,options)
-
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-
-
-
-
-
-
-export const getGetRainMarketsUrl = () => {
-
-
-
-
-  return `/api/rain/markets`
-}
-
-/**
- * Returns active KXRAIN contracts with public Kalshi quotes and NWS hourly precipitation probabilities
- * @summary List active daily rain markets
- */
-export const getRainMarkets = async ( options?: RequestInit): Promise<RainMarketsResponse> => {
-
-  return customFetch<RainMarketsResponse>(getGetRainMarketsUrl(),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getGetRainMarketsQueryKey = () => {
-    return [
-    `/api/rain/markets`
-    ] as const;
-    }
-
-
-export const getGetRainMarketsQueryOptions = <TData = Awaited<ReturnType<typeof getRainMarkets>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRainMarkets>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getGetRainMarketsQueryKey();
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getRainMarkets>>> = ({ signal }) => getRainMarkets({ signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getRainMarkets>>, TError, TData> & { queryKey: QueryKey }
-}
-
-export type GetRainMarketsQueryResult = NonNullable<Awaited<ReturnType<typeof getRainMarkets>>>
-export type GetRainMarketsQueryError = ErrorType<unknown>
-
-
-/**
- * @summary List active daily rain markets
- */
-
-export function useGetRainMarkets<TData = Awaited<ReturnType<typeof getRainMarkets>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRainMarkets>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-
-  const queryOptions = getGetRainMarketsQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
