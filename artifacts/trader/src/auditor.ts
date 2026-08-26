@@ -22,6 +22,7 @@ import {
   getOutcome,
   getAppHigh,
   getBooksForDate,
+  getUnsettledRainOrders,
   insertSettlement,
   getFilledOrdersForDate,
   upsertDailyPnl,
@@ -32,6 +33,7 @@ import type { RiskConfig } from "./config.js";
 import pino from "pino";
 
 const logger = pino({ name: "auditor" });
+const KALSHI_BASE = "https://api.elections.kalshi.com/trade-api/v2";
 
 // ─── Settlement job (07:30 station-local) ────────────────────────────────────
 
@@ -140,6 +142,49 @@ export async function runSettlementAudit(now: Date): Promise<void> {
   }
 }
 
+/** Fetch Kalshi's final binary outcome for a resolved rain contract. */
+async function getRainResult(ticker: string): Promise<"yes" | "no" | null> {
+  const response = await fetch(`${KALSHI_BASE}/markets/${encodeURIComponent(ticker)}`, {
+    headers: { Accept: "application/json", "User-Agent": "SellingHighs/1.0 (settlement-audit)" },
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!response.ok) throw new Error(`Rain settlement lookup failed: ${response.status}`);
+  const payload = await response.json() as { market?: { result?: unknown } };
+  const result = String(payload.market?.result ?? "").toLowerCase();
+  return result === "yes" || result === "no" ? result : null;
+}
+
+/**
+ * Records resolved KXRAIN contracts using Kalshi's final market result.
+ * A NO outcome deliberately uses a non-ticker sentinel so the shared binary
+ * YES/NO P&L calculation remains valid without a second settlement schema.
+ */
+export async function runRainSettlementAudit(now: Date): Promise<void> {
+  const unsettled = await getUnsettledRainOrders();
+  for (const order of unsettled) {
+    try {
+      const result = await getRainResult(order.ticker);
+      if (!result) continue;
+
+      await insertSettlement({
+        settlement_date: order.settlement_date,
+        station_id: order.station_id,
+        cli_high_f: null,
+        app_high_f: null,
+        kalshi_settled_bracket: result === "yes" ? order.ticker : `${order.ticker}:NO`,
+        match_flag: null,
+        ts_utc: now.toISOString(),
+      });
+      logger.info(
+        { ticker: order.ticker, station_id: order.station_id, settlement_date: order.settlement_date, result },
+        "Rain settlement written"
+      );
+    } catch (err) {
+      logger.warn({ err, ticker: order.ticker }, "Rain settlement audit failed — will retry next cycle");
+    }
+  }
+}
+
 // ─── Daily P&L digest (21:00 UTC) ────────────────────────────────────────────
 
 /** Compute and write the daily P&L row for a given date and mode. */
@@ -190,8 +235,8 @@ export async function runDailyDigest(
 
     const gross       = payout - fillCents;  // cents
     const fee         = Math.ceil(config.fee_rate * (fillCents / 100) * (1 - fillCents / 100) * 100);
-    grossCents       += gross;
-    feesCents        += fee;
+    grossCents       += gross * order.count;
+    feesCents        += fee * order.count;
   }
 
   const netCents = grossCents - feesCents;

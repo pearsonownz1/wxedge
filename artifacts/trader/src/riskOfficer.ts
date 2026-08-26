@@ -23,18 +23,26 @@ export interface SignalCandidate {
   station_id: string;
   side:       "YES" | "NO";
   limit_price: number;  // cents
+  /** Contract count after maximum-tilt sizing; defaults to one for direct callers. */
+  contracts?: number;
   edge_net:   number;
   ts:         Date;
   // Optional: pre-computed metadata set by sports signals
   headline?:       string;
   model_pct?:      number;
-  market_type?:    "weather" | "sports";
+  market_type?:    "weather" | "sports" | "rain";
   sports_context?: {
     pitcher_name: string;
     threshold:    number;
     lambda:       number;  // expected strikeouts (Poisson λ)
     k9:           number;  // pitcher's K/9 this season
     avg_ip:       number;  // avg innings per start this season
+  };
+  rain_context?: {
+    city:              string;
+    contract_date:     string;
+    forecast_rain_pct: number;
+    settlement_source: string;
   };
 }
 
@@ -52,24 +60,31 @@ export function checkRisk(
   state: RiskState,
   config: RiskConfig
 ): RiskDecision {
+  const contracts = signal.contracts ?? 1;
+  const orderCost = signal.limit_price * contracts;
+
+  if (!Number.isInteger(contracts) || contracts < 1) {
+    return { approved: false, reason: `invalid_contract_count: ${contracts}` };
+  }
+
   // 1. Kill switch — always checked first.
   if (state.killSwitchActive) {
     return { approved: false, reason: "kill_switch" };
   }
 
   // 2. Daily loss cap — stops all trading when realised losses hit the limit.
-  if (state.dailyCostToday >= config.max_daily_loss_cents) {
+  if (state.dailyCostToday + orderCost > config.max_daily_loss_cents) {
     return {
       approved: false,
-      reason: `max_daily_loss: today_cost=${state.dailyCostToday} >= limit=${config.max_daily_loss_cents}`,
+      reason: `max_daily_loss: today_cost=${state.dailyCostToday} + this=${orderCost} > limit=${config.max_daily_loss_cents}`,
     };
   }
 
   // 3. Per-trade cost limit.
-  if (signal.limit_price > config.max_cost_per_trade_cents) {
+  if (orderCost > config.max_cost_per_trade_cents) {
     return {
       approved: false,
-      reason: `max_cost_per_trade: price=${signal.limit_price} > limit=${config.max_cost_per_trade_cents}`,
+      reason: `max_cost_per_trade: cost=${orderCost} > limit=${config.max_cost_per_trade_cents}`,
     };
   }
 
@@ -84,23 +99,23 @@ export function checkRisk(
 
   // 5. Max daily exposure per station.
   const stationDaily = state.dailyExposurePerStation[signal.station_id] ?? 0;
-  if (stationDaily + signal.limit_price > config.max_daily_exposure_per_station_cents) {
+  if (stationDaily + orderCost > config.max_daily_exposure_per_station_cents) {
     return {
       approved: false,
       reason:
         `max_daily_exposure_per_station: station_today=${stationDaily}` +
-        ` + this=${signal.limit_price}` +
+        ` + this=${orderCost}` +
         ` > limit=${config.max_daily_exposure_per_station_cents}`,
     };
   }
 
   // 6. Max total open exposure.
-  if (state.totalOpenExposure + signal.limit_price > config.max_total_open_exposure_cents) {
+  if (state.totalOpenExposure + orderCost > config.max_total_open_exposure_cents) {
     return {
       approved: false,
       reason:
         `max_total_open_exposure: open=${state.totalOpenExposure}` +
-        ` + this=${signal.limit_price}` +
+        ` + this=${orderCost}` +
         ` > limit=${config.max_total_open_exposure_cents}`,
     };
   }

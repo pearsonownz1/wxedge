@@ -180,7 +180,7 @@ export async function getLatestSignalInputs(): Promise<SnapshotSignalInput[]> {
     ORDER BY snap.station_id, snap.bracket_lower_f NULLS FIRST
   `);
 
-  return (result.rows ?? []) as SnapshotSignalInput[];
+  return (result.rows ?? []) as unknown as SnapshotSignalInput[];
 }
 
 /** Latest snapshot input for a specific ticker (for proposal card rendering). */
@@ -231,18 +231,18 @@ export async function buildRiskState(
       GROUP BY station_id
     `),
     db.execute(sql`
-      SELECT station_id, COALESCE(SUM(price_cents),0)::int AS total
+      SELECT station_id, COALESCE(SUM(price_cents * count),0)::int AS total
       FROM   orders
       WHERE  ts_placed::date = ${date}::date
         AND  status != 'cancelled'
       GROUP BY station_id
     `),
     db.execute(sql`
-      SELECT COALESCE(SUM(price_cents),0)::int AS total
+      SELECT COALESCE(SUM(price_cents * count),0)::int AS total
       FROM   orders WHERE status = 'open'
     `),
     db.execute(sql`
-      SELECT COALESCE(SUM(price_cents),0)::int AS total
+      SELECT COALESCE(SUM(price_cents * count),0)::int AS total
       FROM   orders
       WHERE  ts_placed::date = ${date}::date
         AND  status != 'cancelled'
@@ -443,6 +443,26 @@ export async function getBooksForDate(
   return rows as Array<{ ticker: string; bracket_lo: number | null; bracket_hi: number | null }>;
 }
 
+/** Filled rain orders whose contract result has not yet been recorded. */
+export async function getUnsettledRainOrders(): Promise<
+  Array<{ station_id: string; ticker: string; settlement_date: string }>
+> {
+  const { rows } = await db.execute(sql`
+    SELECT DISTINCT
+      o.station_id,
+      o.ticker,
+      TO_CHAR(TO_DATE(split_part(o.ticker, '-', 2), 'YYMONDD'), 'YYYY-MM-DD') AS settlement_date
+    FROM orders o
+    LEFT JOIN settlements st
+      ON st.station_id = o.station_id
+     AND st.settlement_date = TO_CHAR(TO_DATE(split_part(o.ticker, '-', 2), 'YYMONDD'), 'YYYY-MM-DD')
+    WHERE o.status = 'filled'
+      AND o.station_id LIKE 'RAIN_%'
+      AND st.id IS NULL
+  `);
+  return rows as Array<{ station_id: string; ticker: string; settlement_date: string }>;
+}
+
 /** Shadow fills data for daily P&L computation (auditor 21:00 job). */
 export async function getFilledOrdersForDate(
   date: string,
@@ -453,10 +473,11 @@ export async function getFilledOrdersForDate(
   side: "YES" | "NO";
   price_cents: number;
   fill_price_cents: number | null;
+  count: number;
   station_id: string;
 }>> {
   const { rows } = await db.execute(sql`
-    SELECT id, ticker, side, price_cents, fill_price_cents, station_id
+    SELECT id, ticker, side, price_cents, fill_price_cents, count, station_id
     FROM   orders
     WHERE  ts_placed::date = ${date}::date
       AND  status = 'filled'

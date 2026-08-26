@@ -42,7 +42,7 @@ const SYSTEM_PROMPT = `You are the approval layer of an automated prediction-mar
 A statistical model proposed this trade and a risk engine already verified it
 is within hard limits. Your job: approve or deny based on decision quality.
 
-This system trades two market types — handle them differently:
+This system trades weather, sports, and rain markets — handle them differently:
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 WEATHER MARKETS (market_type = "weather")
@@ -86,6 +86,21 @@ APPROVE when ALL hold:
 CALIBRATION for sports: calibration data will be null (new market type).
   This is EXPECTED and NORMAL. Do NOT deny for null calibration.
   Approve based on edge + book + story coherence alone.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+RAIN MARKETS (market_type = "rain")
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+These are daily city contracts resolving YES when precipitation is greater than
+0 inches. The model probability is the highest NWS hourly precipitation
+probability for the contract date.
+
+APPROVE when ALL hold:
+1. Edge ≥ 2 pts.
+2. Book: both sides quoted and spread ≤ 25¢.
+3. The rain forecast probability and proposed side agree with the model.
+
+Do not require temperature fields or historical calibration for rain. The
+contract settlement-source label is informational and is not a deny reason.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 UNIVERSAL RULES
@@ -253,7 +268,7 @@ async function buildLlmPayload(row: PendingApprovalRow): Promise<object> {
       bracket:           card["bracket_label"] ?? null,
       side:              row.side,
       limit_price_cents: row.limit_price_cents,
-      contracts:         1,
+      contracts:         Number(card["contracts"] ?? 1),
       max_loss_cents:    card["max_loss_cents"] ?? row.limit_price_cents,
       expires_in_s:      Math.round((new Date(row.expires_ts).getTime() - Date.now()) / 1000),
     },
@@ -275,6 +290,13 @@ async function buildLlmPayload(row: PendingApprovalRow): Promise<object> {
             pitcher_k9:      (card["sports_context"] as Record<string, unknown> | null)?.["k9"] ?? null,
             avg_ip_per_start: (card["sports_context"] as Record<string, unknown> | null)?.["avg_ip"] ?? null,
           }
+        : card["market_type"] === "rain"
+          ? {
+              city:              (card["rain_context"] as Record<string, unknown> | null)?.["city"] ?? null,
+              contract_date:     (card["rain_context"] as Record<string, unknown> | null)?.["contract_date"] ?? null,
+              forecast_rain_pct: (card["rain_context"] as Record<string, unknown> | null)?.["forecast_rain_pct"] ?? null,
+              settlement_source: (card["rain_context"] as Record<string, unknown> | null)?.["settlement_source"] ?? null,
+            }
         // Weather: show temperature forecast inputs
         : {
             forecast_median_f:       card["nbm_median_f"] ?? null,

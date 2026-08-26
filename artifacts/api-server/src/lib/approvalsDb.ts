@@ -81,12 +81,12 @@ const SETTLEMENT_SELECT = sql`
          AND st.kalshi_settled_bracket IS NOT NULL
     THEN CASE
       WHEN a.side = 'YES' AND st.kalshi_settled_bracket = a.ticker
-        THEN 100 - COALESCE(o.fill_price_cents, o.price_cents)
+        THEN o.count * (100 - COALESCE(o.fill_price_cents, o.price_cents))
       WHEN a.side = 'YES'
-        THEN -COALESCE(o.fill_price_cents, o.price_cents)
+        THEN -o.count * COALESCE(o.fill_price_cents, o.price_cents)
       WHEN a.side = 'NO' AND st.kalshi_settled_bracket != a.ticker
-        THEN 100 - COALESCE(o.fill_price_cents, o.price_cents)
-      ELSE -COALESCE(o.fill_price_cents, o.price_cents)
+        THEN o.count * (100 - COALESCE(o.fill_price_cents, o.price_cents))
+      ELSE -o.count * COALESCE(o.fill_price_cents, o.price_cents)
     END
     ELSE NULL
   END AS pnl_cents
@@ -102,7 +102,7 @@ export async function getPendingApprovals(): Promise<ApprovalRecord[]> {
       AND a.expires_ts > NOW()
     ORDER BY a.proposed_ts DESC
   `);
-  return rows as ApprovalRecord[];
+  return rows as unknown as ApprovalRecord[];
 }
 
 /** Last N decided proposals (approved, denied, expired), newest first. Includes settlement outcome. */
@@ -119,7 +119,7 @@ export async function getApprovalHistory(limit = 50): Promise<ApprovalRecord[]> 
     ORDER BY a.proposed_ts DESC
     LIMIT ${limit}
   `);
-  return rows as ApprovalRecord[];
+  return rows as unknown as ApprovalRecord[];
 }
 
 /** Single approval row by id, including derived fields. */
@@ -130,7 +130,7 @@ export async function getApprovalById(id: number): Promise<ApprovalRecord | null
     JOIN signals s ON s.id = a.signal_id
     WHERE a.id = ${id}
   `);
-  return (rows[0] as ApprovalRecord | undefined) ?? null;
+  return (rows[0] as unknown as ApprovalRecord | undefined) ?? null;
 }
 
 /**
@@ -159,17 +159,25 @@ export async function getCurrentMarketState(ticker: string): Promise<CurrentMark
       WHERE sn.gap_flag IS NOT TRUE
       ORDER BY sn.ts_utc DESC
       LIMIT 1
+    ),
+    latest_signal AS (
+      SELECT model_prob * 100.0 AS model_pct
+      FROM signals
+      WHERE ticker = ${ticker}
+      ORDER BY ts_utc DESC
+      LIMIT 1
     )
     SELECT
       lb.ticker,
       lb.yes_ask     AS ask_cents,
       lb.yes_bid     AS bid_cents,
-      ls.model_pct,
+      COALESCE(ls.model_pct, sig.model_pct, 0) AS model_pct,
       ls.obs_age_s,
       ls.lock_status,
       lb.book_age_min
     FROM latest_book lb
     LEFT JOIN latest_snap ls ON true
+    LEFT JOIN latest_signal sig ON true
   `);
 
   if (rows.length === 0) return null;
@@ -198,17 +206,17 @@ export async function buildApprovalRiskState(
         GROUP BY station_id
       `),
       db.execute(sql`
-        SELECT station_id, COALESCE(SUM(price_cents), 0)::int AS total
+        SELECT station_id, COALESCE(SUM(price_cents * count), 0)::int AS total
         FROM orders
         WHERE ts_placed::date = ${date}::date AND status != 'cancelled'
         GROUP BY station_id
       `),
       db.execute(sql`
-        SELECT COALESCE(SUM(price_cents), 0)::int AS total
+        SELECT COALESCE(SUM(price_cents * count), 0)::int AS total
         FROM orders WHERE status = 'open'
       `),
       db.execute(sql`
-        SELECT COALESCE(SUM(price_cents), 0)::int AS total
+        SELECT COALESCE(SUM(price_cents * count), 0)::int AS total
         FROM orders
         WHERE ts_placed::date = ${date}::date AND status != 'cancelled'
       `),

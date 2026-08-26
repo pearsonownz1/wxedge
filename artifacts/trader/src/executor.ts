@@ -48,7 +48,9 @@ export async function placeOrder(
   todayDate: string
 ): Promise<number | null> {
   const riskState = await buildRiskState(todayDate, config.mode, config.cooldown_min);
-  const decision  = checkRisk(candidate, riskState, config);
+  const contracts = Math.max(1, Math.floor(config.max_cost_per_trade_cents / candidate.limit_price));
+  const sizedCandidate = { ...candidate, contracts };
+  const decision  = checkRisk(sizedCandidate, riskState, config);
 
   // Always log the risk decision.
   await insertRiskDecision({
@@ -69,12 +71,12 @@ export async function placeOrder(
   if (config.execution_mode === "approval") {
     // Mark signal as pending_approval, then create the proposal card.
     await markSignalPendingApproval(signalId);
-    const approvalId = await createProposal(signalId, candidate, config);
+    const approvalId = await createProposal(signalId, sizedCandidate, config);
     return approvalId;
   }
 
   if (config.mode === "shadow" || config.execution_mode === "auto") {
-    return placeShadowOrder(signalId, candidate, config);
+    return placeShadowOrder(signalId, sizedCandidate, config);
   }
 
   // Phase C: implement live Kalshi order placement here.
@@ -94,7 +96,7 @@ async function placeShadowOrder(
     station_id:  candidate.station_id,
     side:        candidate.side,
     price_cents: candidate.limit_price,
-    count:       1,
+    count:       candidate.contracts ?? 1,
     status:      "open",
   });
 
@@ -104,6 +106,7 @@ async function placeShadowOrder(
       ticker:     candidate.ticker,
       side:       candidate.side,
       priceCents: candidate.limit_price,
+      contracts:  candidate.contracts ?? 1,
       edgeNet:    candidate.edge_net.toFixed(3),
     },
     "Shadow order placed"
@@ -147,7 +150,7 @@ export async function monitorOpenOrders(
       await updateOrderStatus(order.id!, {
         status:          "expired",
         ts_cancelled:    now.toISOString(),
-        book_state_json: book ? JSON.stringify(bookSnapshot(book)) : null,
+        book_state_json: book ? JSON.stringify(bookSnapshot(book)) : undefined,
       });
       logger.info({ orderId: order.id, ticker: order.ticker }, "Order expired (TTL)");
       continue;

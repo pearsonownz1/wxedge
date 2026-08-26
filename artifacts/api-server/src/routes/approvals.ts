@@ -103,7 +103,7 @@ router.get("/approvals", async (_req: Request, res: Response) => {
 // ─── PATCH /approvals/:id ─────────────────────────────────────────────────────
 
 router.patch("/approvals/:id", async (req: Request, res: Response) => {
-  const id = parseInt(req.params["id"]!, 10);
+  const id = parseInt(String(req.params["id"] ?? ""), 10);
   if (isNaN(id)) return void res.status(400).json({ error: "invalid_id" });
 
   const { action, decider: rawDecider } = req.body as { action?: string; decider?: string };
@@ -216,16 +216,20 @@ router.patch("/approvals/:id", async (req: Request, res: Response) => {
     return void await withStationLock(approval.station_id, async () => {
     const today = now.toISOString().slice(0, 10);
     const riskState = await buildApprovalRiskState(today, riskConfig);
-    if (riskState.dailyCostToday >= riskConfig.max_daily_loss_cents) {
+    const contracts = Math.max(1, Math.floor(
+      riskConfig.max_cost_per_trade_cents / approval.limit_price_cents
+    ));
+    const orderCost = approval.limit_price_cents * contracts;
+    if (riskState.dailyCostToday + orderCost > riskConfig.max_daily_loss_cents) {
       diff["daily_loss_cap"] = {
         at_proposal: "ok",
-        now: `cost_today=${riskState.dailyCostToday} >= limit=${riskConfig.max_daily_loss_cents}`,
+        now: `cost_today=${riskState.dailyCostToday} + this=${orderCost} > limit=${riskConfig.max_daily_loss_cents}`,
       };
     }
-    if (approval.limit_price_cents > riskConfig.max_cost_per_trade_cents) {
+    if (orderCost > riskConfig.max_cost_per_trade_cents) {
       diff["max_cost_per_trade"] = {
         at_proposal: "ok",
-        now: `price=${approval.limit_price_cents} > limit=${riskConfig.max_cost_per_trade_cents}`,
+        now: `cost=${orderCost} > limit=${riskConfig.max_cost_per_trade_cents}`,
       };
     }
     const stationOpen = riskState.openOrdersPerStation[approval.station_id] ?? 0;
@@ -236,16 +240,16 @@ router.patch("/approvals/:id", async (req: Request, res: Response) => {
       };
     }
     const stationDaily = riskState.dailyExposurePerStation[approval.station_id] ?? 0;
-    if (stationDaily + approval.limit_price_cents > riskConfig.max_daily_exposure_per_station_cents) {
+    if (stationDaily + orderCost > riskConfig.max_daily_exposure_per_station_cents) {
       diff["daily_exposure_per_station"] = {
         at_proposal: "ok",
-        now: `station_today=${stationDaily} + this=${approval.limit_price_cents} > limit=${riskConfig.max_daily_exposure_per_station_cents}`,
+        now: `station_today=${stationDaily} + this=${orderCost} > limit=${riskConfig.max_daily_exposure_per_station_cents}`,
       };
     }
-    if (riskState.totalOpenExposure + approval.limit_price_cents > riskConfig.max_total_open_exposure_cents) {
+    if (riskState.totalOpenExposure + orderCost > riskConfig.max_total_open_exposure_cents) {
       diff["total_open_exposure"] = {
         at_proposal: "ok",
-        now: `open=${riskState.totalOpenExposure} + this=${approval.limit_price_cents} > limit=${riskConfig.max_total_open_exposure_cents}`,
+        now: `open=${riskState.totalOpenExposure} + this=${orderCost} > limit=${riskConfig.max_total_open_exposure_cents}`,
       };
     }
 
@@ -295,12 +299,12 @@ router.patch("/approvals/:id", async (req: Request, res: Response) => {
           approval.ticker,
           approval.side as "YES" | "NO",
           currentPrice,
-          1,
+          contracts,
         );
         kalshiOrderId = kalshiResult.order_id;
-        kalshiStatus  = kalshiResult.status;
+        kalshiStatus  = kalshiResult.status ?? "open";
         logger.info(
-          { approvalId: id, kalshiOrderId, ticker: approval.ticker, side: approval.side, status: kalshiStatus },
+          { approvalId: id, kalshiOrderId, ticker: approval.ticker, side: approval.side, contracts, status: kalshiStatus },
           "Real Kalshi order placed"
         );
       } catch (kalshiErr) {
@@ -326,13 +330,13 @@ router.patch("/approvals/:id", async (req: Request, res: Response) => {
       station_id:     approval.station_id,
       side:           approval.side as "YES" | "NO",
       price_cents:    currentPrice,
-      count:          1,
+      count:          contracts,
       kalshi_order_id: kalshiOrderId,
       status:         kalshiOrderId ? kalshiStatus : "open",
     });
 
     logger.info(
-      { approvalId: id, orderId, kalshiOrderId, ticker: approval.ticker, side: approval.side, priceCents: currentPrice, decider },
+      { approvalId: id, orderId, kalshiOrderId, ticker: approval.ticker, side: approval.side, priceCents: currentPrice, contracts, decider },
       "Proposal approved — order recorded"
     );
 
@@ -343,7 +347,7 @@ router.patch("/approvals/:id", async (req: Request, res: Response) => {
         ticker:            approval.ticker,
         side:              approval.side,
         limit_price_cents: currentPrice,
-        contracts:         1,
+        contracts,
         status:            kalshiOrderId ? kalshiStatus : "open",
         kalshi_order_id:   kalshiOrderId,
       },

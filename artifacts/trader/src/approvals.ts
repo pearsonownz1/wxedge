@@ -49,16 +49,23 @@ interface TradeCard {
   ticker:           string;
   side:             "YES" | "NO";
   limit_price_cents: number;
+  contracts:         number;
   generated_at:     string;
   template_version: 1;
-  // Sports-specific (null for weather)
-  market_type:      "weather" | "sports";
+  // Market-specific metadata
+  market_type:      "weather" | "sports" | "rain";
   sports_context:   {
     pitcher_name: string;
     threshold:    number;
     lambda:       number;
     k9:           number;
     avg_ip:       number;
+  } | null;
+  rain_context: {
+    city: string;
+    contract_date: string;
+    forecast_rain_pct: number;
+    settlement_source: string;
   } | null;
 }
 
@@ -69,8 +76,13 @@ function renderCard(candidate: SignalCandidate, input: {
   hours_to_settle: number;
 } | null): TradeCard {
   const isSports = candidate.market_type === "sports";
+  const isRain   = candidate.market_type === "rain";
   const city     = STATION_NAMES[candidate.station_id] ?? candidate.station_id;
-  const label    = input?.bracket_label ?? (isSports ? `${candidate.sports_context?.threshold}+ Ks` : "?");
+  const label    = input?.bracket_label ?? (
+    isSports ? `${candidate.sports_context?.threshold}+ Ks`
+      : isRain ? `Rain in ${candidate.rain_context?.city ?? city}`
+      : "?"
+  );
   const price    = candidate.limit_price;
   const modelPct = candidate.model_pct ?? (input ? Math.round(input.model_pct) : null);
 
@@ -86,7 +98,7 @@ function renderCard(candidate: SignalCandidate, input: {
     model_pct:        candidate.model_pct ?? input?.model_pct ?? 0,
     implied_pct:      candidate.limit_price,
     edge_pts:         Math.round(candidate.edge_net * 100 * 10) / 10,
-    max_loss_cents:   candidate.limit_price,
+    max_loss_cents:   candidate.limit_price * (candidate.contracts ?? 1),
     running_high_f:   input?.running_high_f ?? null,
     hours_to_settle:  input?.hours_to_settle ?? null,
     nbm_median_f:     (input as Record<string, unknown> | null)?.["nbm_median_f"] as number | null ?? null,
@@ -95,11 +107,13 @@ function renderCard(candidate: SignalCandidate, input: {
     ticker:           candidate.ticker,
     side:             candidate.side,
     limit_price_cents: candidate.limit_price,
+    contracts:         candidate.contracts ?? 1,
     generated_at:     new Date().toISOString(),
     template_version: 1,
     // Sports context (null for weather proposals)
     market_type:      candidate.market_type ?? "weather",
     sports_context:   candidate.sports_context ?? null,
+    rain_context:     candidate.rain_context ?? null,
   };
 }
 

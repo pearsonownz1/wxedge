@@ -24,6 +24,14 @@ token was being sent. Removing the header immediately unblocked Kalshi data flow
 - `strike_date` field on event object (not `close_time`) is the settlement timestamp
 - Two events open at once: today and tomorrow
 
+## KXRAIN daily markets
+- Rain events use the same `YYMMMDD` token: `KXRAIN-26AUG25` is Aug. 25, 2026. An active event can still represent a city’s local calendar day after UTC has advanced, so do not discard it solely because its date is before the UTC day.
+- Kalshi can return a temporary 429 on rain discovery; make one bounded retry and retain the latest valid discovery for the next cycle rather than blanking the rain pipeline.
+
+**Why:** The first rain cycle misread the date token and then encountered a rate limit, which suppressed all rain discovery despite active contracts.
+
+**How to apply:** Parse the first two digits as the year and the last two as the day; trust `status=active` for eligibility, and fail over to a recent valid discovery only after the retry fails.
+
 ## Price fields on nested markets
 - `yes_bid_dollars` and `yes_ask_dollars` — dollar strings e.g. "0.3100"
 - Multiply × 100 and round to get cents

@@ -28,10 +28,11 @@ import http from "node:http";
 import { config } from "./config.js";
 import { runSignalEngine } from "./signalEngine.js";
 import { runSportsSignalEngine } from "./sportsSignalEngine.js";
+import { runRainSignalEngine } from "./rainSignalEngine.js";
 import { placeOrder, monitorOpenOrders } from "./executor.js";
 import { sweepExpiredProposals } from "./approvals.js";
 import { startLlmApprover } from "./llm-approver.js";
-import { runSettlementAudit, runDailyDigest, runWeeklyGateReport } from "./auditor.js";
+import { runSettlementAudit, runRainSettlementAudit, runDailyDigest, runWeeklyGateReport } from "./auditor.js";
 import { pool, computePipelineHealth } from "@workspace/db";
 import pino from "pino";
 
@@ -55,7 +56,7 @@ const logger = pino({ name: "trader", level: process.env["LOG_LEVEL"] ?? "info" 
 
 const ADVISORY_LOCK_KEY = 7827369; // arbitrary constant — "WX-TRADER"
 
-let _leaderConn: Awaited<ReturnType<typeof pool.connect>> | null = null;
+let _leaderConn: { release: () => void } | null = null;
 
 async function tryAcquireLeaderLock(): Promise<boolean> {
   const client = await pool.connect();
@@ -176,7 +177,13 @@ async function runTradingCycle(now: Date): Promise<void> {
     return [] as Awaited<ReturnType<typeof runSportsSignalEngine>>;
   });
 
-  const allSignals = [...liveSignals, ...liveSportsSignals];
+  // 1c. Rain markets (KXRAIN daily city contracts)
+  const liveRainSignals = await runRainSignalEngine(config, now).catch((err) => {
+    logger.warn({ err }, "Rain signal engine failed — skipping this cycle");
+    return [] as Awaited<ReturnType<typeof runRainSignalEngine>>;
+  });
+
+  const allSignals = [...liveSignals, ...liveSportsSignals, ...liveRainSignals];
 
   // 2. Risk officer → executor (in series to keep risk state consistent)
   for (const { candidate, signalId } of allSignals) {
@@ -203,6 +210,7 @@ async function runScheduledJobs(now: Date): Promise<void> {
 
   // Settlement audit runs every tick (idempotent; handles all stations internally)
   await runSettlementAudit(now);
+  await runRainSettlementAudit(now);
 
   // Daily digest at 21:00–21:05 UTC
   if (utcHour === 21 && utcMin < 5 && lastDigestDate !== date) {

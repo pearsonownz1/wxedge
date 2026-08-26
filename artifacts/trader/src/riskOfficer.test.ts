@@ -18,6 +18,7 @@ import type { SignalCandidate } from "./riskOfficer.js";
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
 const DEFAULT_CONFIG: RiskConfig = {
+  execution_mode:                          "shadow",
   mode:                                    "shadow",
   max_cost_per_trade_cents:                60,
   cooldown_min:                            30,
@@ -28,9 +29,11 @@ const DEFAULT_CONFIG: RiskConfig = {
   min_edge:                                0.05,
   slippage_buffer:                         0.01,
   max_age_min:                             10,
+  max_obs_age_min:                         75,
   fee_rate:                                0.07,
   ttl_min:                                 15,
   cancel_edge:                             0.01,
+  proposal_ttl_min:                        30,
 };
 
 const CLEAN_STATE: RiskState = {
@@ -78,8 +81,11 @@ describe("checkRisk — max_daily_loss", () => {
     assert.match(d.reason, /max_daily_loss/);
   });
 
-  it("approves when daily cost is one cent below limit", () => {
-    const state: RiskState = { ...CLEAN_STATE, dailyCostToday: 299 };
+  it("approves when the incoming order brings daily cost exactly to the limit", () => {
+    const state: RiskState = {
+      ...CLEAN_STATE,
+      dailyCostToday: DEFAULT_CONFIG.max_daily_loss_cents - SIGNAL.limit_price,
+    };
     const d = checkRisk(SIGNAL, state, DEFAULT_CONFIG);
     assert.equal(d.approved, true);
   });
