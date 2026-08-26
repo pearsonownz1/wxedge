@@ -100,6 +100,7 @@ export interface OrderRow {
   kalshi_order_id?: string | null;
 }
 
+export type PnlMode = "shadow" | "approval" | "live";
 export interface SettlementRow {
   settlement_date:        string;
   station_id:             string;
@@ -387,7 +388,7 @@ export async function getUnsettledDates(): Promise<
     LEFT JOIN settlements st
       ON  st.station_id = s.station_id
       AND st.settlement_date = s.settlement_date
-    WHERE st.id IS NULL
+    WHERE st.id IS NULL OR st.cli_high_f IS NULL
     ORDER BY s.settlement_date
   `);
   return rows as Array<{ station_id: string; settlement_date: string }>;
@@ -466,7 +467,7 @@ export async function getUnsettledRainOrders(): Promise<
 /** Shadow fills data for daily P&L computation (auditor 21:00 job). */
 export async function getFilledOrdersForDate(
   date: string,
-  mode: "shadow" | "live" | "approval"
+  mode: PnlMode
 ): Promise<Array<{
   id: number;
   ticker: string;
@@ -486,8 +487,44 @@ export async function getFilledOrdersForDate(
   return rows as ReturnType<typeof getFilledOrdersForDate> extends Promise<infer T> ? T : never;
 }
 
-// ─── Writes ───────────────────────────────────────────────────────────────────
-
+/**
+ * Filled order date/mode pairs whose every order has a resolved settlement.
+ *
+ * This intentionally scans all historical dates rather than only "today".
+ * The auditor can therefore backfill dates missed while the trader was asleep
+ * or while the settlement feed was delayed.
+ */
+export async function getReadyDailyPnlKeys(): Promise<
+  Array<{ date: string; mode: PnlMode }>
+> {
+  const { rows } = await db.execute(sql`
+    SELECT
+      o.ts_placed::date::text AS date,
+      o.mode,
+      BOOL_AND(EXISTS (
+        SELECT 1
+        FROM settlements st
+        WHERE st.station_id = o.station_id
+          AND st.settlement_date = o.ts_placed::date::text
+          AND st.kalshi_settled_bracket IS NOT NULL
+      )) AS ready
+    FROM orders o
+    WHERE o.status = 'filled'
+    GROUP BY o.ts_placed::date, o.mode
+    HAVING BOOL_AND(EXISTS (
+      SELECT 1
+      FROM settlements st
+      WHERE st.station_id = o.station_id
+        AND st.settlement_date = o.ts_placed::date::text
+        AND st.kalshi_settled_bracket IS NOT NULL
+    ))
+    ORDER BY date, mode
+  `);
+  return rows.map((row) => ({
+    date: String(row.date),
+    mode: row.mode as PnlMode,
+  }));
+}
 export async function insertSignal(row: SignalRow): Promise<number> {
   const [inserted] = await db
     .insert(signals)
@@ -571,7 +608,16 @@ export async function insertSettlement(row: SettlementRow): Promise<void> {
       matchFlag:            row.match_flag ?? null,
       tsUtc:                new Date(row.ts_utc),
     })
-    .onConflictDoNothing();
+    .onConflictDoUpdate({
+      target: [settlements.stationId, settlements.settlementDate],
+      set: {
+        cliHighF:             row.cli_high_f ?? null,
+        appHighF:             row.app_high_f ?? null,
+        kalshiSettledBracket: row.kalshi_settled_bracket ?? null,
+        matchFlag:            row.match_flag ?? null,
+        tsUtc:                new Date(row.ts_utc),
+      },
+    });
 }
 
 export async function upsertDailyPnl(
@@ -593,4 +639,42 @@ export async function upsertDailyPnl(
       trade_count = EXCLUDED.trade_count,
       ts_utc      = EXCLUDED.ts_utc
   `);
+}
+
+/**
+ * Ready date/mode pairs without a daily P&L row.
+ *
+ * This is deliberately separate from getReadyDailyPnlKeys so the auditor can
+ * run the upserts first and then emit an alert only for gaps that remain.
+ */
+export async function getMissingDailyPnlKeys(): Promise<
+  Array<{ date: string; mode: PnlMode }>
+> {
+  const { rows } = await db.execute(sql`
+    SELECT ready.date, ready.mode
+    FROM (
+      SELECT
+        o.ts_placed::date::text AS date,
+        o.mode
+      FROM orders o
+      WHERE o.status = 'filled'
+      GROUP BY o.ts_placed::date, o.mode
+      HAVING BOOL_AND(EXISTS (
+        SELECT 1
+        FROM settlements st
+        WHERE st.station_id = o.station_id
+          AND st.settlement_date = o.ts_placed::date::text
+          AND st.kalshi_settled_bracket IS NOT NULL
+      ))
+    ) ready
+    LEFT JOIN daily_pnl dp
+      ON dp.date = ready.date
+     AND dp.mode = ready.mode
+    WHERE dp.id IS NULL
+    ORDER BY ready.date, ready.mode
+  `);
+  return rows.map((row) => ({
+    date: String(row.date),
+    mode: row.mode as PnlMode,
+  }));
 }

@@ -70,6 +70,7 @@ interface FeedItem {
 interface DashboardData {
   summary:     DashboardSummary;
   pnl_by_day:  DayRow[];
+  pnl_alerts:  Array<{ date: string; mode: string; message: string }>;
   by_station:  StationRow[];
   recent_feed: FeedItem[];
 }
@@ -401,12 +402,23 @@ export default function Dashboard() {
             <div className="border border-destructive/40 rounded-md p-3 text-sm text-destructive">{error}</div>
           )}
 
+           {data && data.pnl_alerts.length > 0 && (
+             <div
+               role="alert"
+               className="border border-amber-500/50 bg-amber-500/10 rounded-md px-3 py-2.5 text-sm text-amber-700 dark:text-amber-300"
+             >
+               <span className="font-semibold">P&amp;L reconciliation needs attention.</span>
+               {" "}Settled {data.pnl_alerts.length === 1 ? "trading day is" : "trading days are"} missing a daily P&amp;L record:
+               {" "}{data.pnl_alerts.map((alert) => `${fmtDate(alert.date)} (${alert.mode})`).join(", ")}.
+             </div>
+           )}
+
           {/* ── Stat cards ─────────────────────────────────────────────────── */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <StatCard
               label="Net P&L"
               value={s ? fmt$(s.pnl_cents) : "—"}
-              sub={s ? `${s.settled_count} settled trade${s.settled_count !== 1 ? "s" : ""}` : undefined}
+              sub={s ? `${s.settled_count} settled trade${s.settled_count !== 1 ? "s" : ""} · Kalshi fees included` : undefined}
               valueClass={s
                 ? s.pnl_cents > 0 ? "text-green-500" : s.pnl_cents < 0 ? "text-destructive" : ""
                 : ""}
@@ -443,7 +455,7 @@ export default function Dashboard() {
             {/* P&L chart — takes 2/3 width */}
             <div className="md:col-span-2 border bg-card p-4">
               <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">
-                Daily P&L (¢)
+                  Daily P&L (¢, net of fees)
               </div>
               <div className="h-48">
                 {data ? <PnlChart data={data.pnl_by_day} /> : (

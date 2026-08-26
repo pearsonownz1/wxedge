@@ -6,6 +6,7 @@
  *   pnl_by_day     — daily P&L + cost for charting
  *   by_station     — per-station win/loss/P&L leaderboard
  *   recent_feed    — last 30 decisions with settlement outcomes
+ *   pnl_alerts     — settled date/mode pairs missing a daily_pnl record
  */
 
 import { Router, type Request, type Response } from "express";
@@ -18,18 +19,25 @@ import { logger } from "../lib/logger.js";
 
 const router = Router();
 
-function loadDailyCap(): number {
+function loadRiskSettings(): { dailyCap: number; feeRate: number } {
   const paths = [
     resolve(process.cwd(), "artifacts/trader/config/risk.json"),
     resolve(process.cwd(), "../trader/config/risk.json"),
   ];
   for (const p of paths) {
     if (existsSync(p)) {
-      const cfg = JSON.parse(readFileSync(p, "utf-8")) as { max_daily_loss_cents?: number; llm_daily_cap_cents?: number };
-      return cfg.llm_daily_cap_cents ?? cfg.max_daily_loss_cents ?? 300;
+      const cfg = JSON.parse(readFileSync(p, "utf-8")) as {
+        max_daily_loss_cents?: number;
+        llm_daily_cap_cents?: number;
+        fee_rate?: number;
+      };
+      return {
+        dailyCap: cfg.llm_daily_cap_cents ?? cfg.max_daily_loss_cents ?? 300,
+        feeRate: cfg.fee_rate ?? 0.07,
+      };
     }
   }
-  return 300;
+  return { dailyCap: 300, feeRate: 0.07 };
 }
 
 // Rain contracts settle on their own local contract date (embedded in the
@@ -61,40 +69,61 @@ const MARKET_TYPE_CASE = sql`
   END
 `;
 
-// Reusable P&L CASE fragment — YES wins when settled bracket = ticker; NO wins when it doesn't.
-// Uses COALESCE(fill_price_cents, price_cents) because fill_price_cents isn't always populated.
-const PNL_CASE = sql`
-  CASE
-    WHEN st.kalshi_settled_bracket IS NULL THEN 0
-    WHEN o.side = 'YES' AND st.kalshi_settled_bracket = o.ticker
-      THEN 100 - COALESCE(o.fill_price_cents, o.price_cents)
-    WHEN o.side = 'YES'
-      THEN -COALESCE(o.fill_price_cents, o.price_cents)
-    WHEN o.side = 'NO' AND st.kalshi_settled_bracket != o.ticker
-      THEN 100 - COALESCE(o.fill_price_cents, o.price_cents)
-    ELSE -COALESCE(o.fill_price_cents, o.price_cents)
-  END
-`;
+/**
+ * Net P&L for an order, in cents. Mirrors the trader auditor: settlement
+ * payout less the conservative, whole-cent Kalshi taker fee for every contract.
+ */
+function netPnlCase(feeRate: number) {
+  const fillPrice = sql`COALESCE(o.fill_price_cents, o.price_cents)`;
+  const feeCents = sql`
+    CEIL(
+      ${feeRate}
+      * (${fillPrice} / 100.0)
+      * (1 - ${fillPrice} / 100.0)
+      * o.count
+      * 100
+    )::int
+  `;
+  return sql`
+    CASE
+      WHEN st.kalshi_settled_bracket IS NULL THEN 0
+      WHEN o.side = 'YES' AND st.kalshi_settled_bracket = o.ticker
+        THEN (100 - ${fillPrice}) * o.count - ${feeCents}
+      WHEN o.side = 'YES'
+        THEN -${fillPrice} * o.count - ${feeCents}
+      WHEN o.side = 'NO' AND st.kalshi_settled_bracket != o.ticker
+        THEN (100 - ${fillPrice}) * o.count - ${feeCents}
+      ELSE -${fillPrice} * o.count - ${feeCents}
+    END
+  `;
+}
 
 router.get("/dashboard", async (_req: Request, res: Response) => {
   try {
-    const dailyCap = loadDailyCap();
+    const { dailyCap, feeRate } = loadRiskSettings();
+    const pnlCase = netPnlCase(feeRate);
 
-    const [summaryRes, byDayRes, byStationRes, todayCostRes, feedRes] = await Promise.all([
+    const [summaryRes, byDayRes, byStationRes, todayCostRes, feedRes, pnlAlertRes] = await Promise.all([
 
       // ── Overall summary ────────────────────────────────────────────────────
+      // pnl_cents is sourced from daily_pnl (the reconciled source of truth);
+      // settled/pending/win/loss are gated on the same (date, mode) daily_pnl
+      // row existing so a partially-settled day can't count as settled here
+      // while its total is still excluded from the daily_pnl sum above.
       db.execute(sql`
         SELECT
-          COALESCE(SUM(${PNL_CASE}), 0)::int AS pnl_cents,
+          COALESCE((SELECT SUM(net_cents) FROM daily_pnl), 0)::int AS pnl_cents,
           COUNT(o.id)::int AS total_placed,
-          COUNT(*) FILTER (WHERE st.settlement_date IS NOT NULL)::int AS settled_count,
-          COUNT(*) FILTER (WHERE st.settlement_date IS NULL)::int AS pending_count,
+          COUNT(*) FILTER (WHERE dp.id IS NOT NULL)::int AS settled_count,
+          COUNT(*) FILTER (WHERE dp.id IS NULL)::int AS pending_count,
           COUNT(*) FILTER (WHERE
-            (o.side = 'YES' AND st.kalshi_settled_bracket = o.ticker) OR
-            (o.side = 'NO' AND st.kalshi_settled_bracket != o.ticker)
+            dp.id IS NOT NULL AND (
+              (o.side = 'YES' AND st.kalshi_settled_bracket = o.ticker) OR
+              (o.side = 'NO' AND st.kalshi_settled_bracket != o.ticker)
+            )
           )::int AS win_count,
           COUNT(*) FILTER (WHERE
-            st.settlement_date IS NOT NULL AND NOT (
+            dp.id IS NOT NULL AND NOT (
               (o.side = 'YES' AND st.kalshi_settled_bracket = o.ticker) OR
               (o.side = 'NO' AND st.kalshi_settled_bracket != o.ticker)
             )
@@ -104,24 +133,43 @@ router.get("/dashboard", async (_req: Request, res: Response) => {
         LEFT JOIN settlements st
           ON st.station_id = o.station_id
          AND st.settlement_date = ${ORDER_SETTLEMENT_DATE}
+        LEFT JOIN daily_pnl dp
+          ON dp.date = o.ts_placed::date::text
+         AND dp.mode = o.mode
         WHERE o.status = 'filled'
       `),
 
       // ── P&L by calendar day ────────────────────────────────────────────────
+      // Net P&L per day comes straight from daily_pnl; cost is recomputed from
+      // orders (fee-exclusive) for the same (date, mode) rows so bars only
+      // ever show fully-reconciled days.
       db.execute(sql`
         SELECT
-          o.ts_placed::date AS trade_date,
-          COUNT(o.id)::int AS trade_count,
-          COALESCE(SUM(${PNL_CASE}), 0)::int AS pnl_cents,
-          COALESCE(SUM(COALESCE(o.fill_price_cents, o.price_cents)), 0)::int AS cost_cents
-        FROM orders o
-        JOIN approvals a ON a.id = o.approval_id AND a.recheck_ok = true
-        LEFT JOIN settlements st
-          ON st.station_id = o.station_id
-         AND st.settlement_date = ${ORDER_SETTLEMENT_DATE}
-        WHERE o.status = 'filled'
-        GROUP BY o.ts_placed::date
-        ORDER BY trade_date ASC
+          pnl.date AS trade_date,
+          pnl.trade_count,
+          pnl.pnl_cents,
+          COALESCE(cost.cost_cents, 0)::int AS cost_cents
+        FROM (
+          SELECT
+            date,
+            SUM(trade_count)::int AS trade_count,
+            SUM(net_cents)::int AS pnl_cents
+          FROM daily_pnl
+          GROUP BY date
+        ) pnl
+        LEFT JOIN (
+          SELECT
+            o.ts_placed::date::text AS date,
+            SUM(COALESCE(o.fill_price_cents, o.price_cents) * o.count)::int AS cost_cents
+          FROM orders o
+          JOIN approvals a ON a.id = o.approval_id AND a.recheck_ok = true
+          JOIN daily_pnl dp
+            ON dp.date = o.ts_placed::date::text
+           AND dp.mode = o.mode
+          WHERE o.status = 'filled'
+          GROUP BY o.ts_placed::date
+        ) cost ON cost.date = pnl.date
+        ORDER BY pnl.date ASC
       `),
 
       // ── Per-station leaderboard ────────────────────────────────────────────
@@ -140,9 +188,12 @@ router.get("/dashboard", async (_req: Request, res: Response) => {
               (o.side = 'NO' AND st.kalshi_settled_bracket != o.ticker)
             )
           )::int AS loss_count,
-          COALESCE(SUM(${PNL_CASE}), 0)::int AS pnl_cents
+          COALESCE(SUM(${pnlCase}), 0)::int AS pnl_cents
         FROM orders o
         JOIN approvals a ON a.id = o.approval_id AND a.recheck_ok = true
+        JOIN daily_pnl dp
+          ON dp.date = o.ts_placed::date::text
+         AND dp.mode = o.mode
         LEFT JOIN settlements st
           ON st.station_id = o.station_id
          AND st.settlement_date = ${ORDER_SETTLEMENT_DATE}
@@ -153,7 +204,7 @@ router.get("/dashboard", async (_req: Request, res: Response) => {
 
       // ── Today's total spend ────────────────────────────────────────────────
       db.execute(sql`
-        SELECT COALESCE(SUM(price_cents), 0)::int AS cost_today_cents
+        SELECT COALESCE(SUM(price_cents * count), 0)::int AS cost_today_cents
         FROM orders
         WHERE ts_placed::date = CURRENT_DATE
           AND status != 'cancelled'
@@ -189,16 +240,9 @@ router.get("/dashboard", async (_req: Request, res: Response) => {
           END AS settlement_outcome,
           CASE
             WHEN a.decision = 'approved' AND a.recheck_ok IS NOT DISTINCT FROM true
+                 AND o.id IS NOT NULL
                  AND st.kalshi_settled_bracket IS NOT NULL
-            THEN CASE
-              WHEN a.side = 'YES' AND st.kalshi_settled_bracket = a.ticker
-                THEN 100 - COALESCE(o.fill_price_cents, o.price_cents)
-              WHEN a.side = 'YES'
-                THEN -COALESCE(o.fill_price_cents, o.price_cents)
-              WHEN a.side = 'NO' AND st.kalshi_settled_bracket != a.ticker
-                THEN 100 - COALESCE(o.fill_price_cents, o.price_cents)
-              ELSE -COALESCE(o.fill_price_cents, o.price_cents)
-            END
+            THEN ${pnlCase}
             ELSE NULL
           END AS pnl_cents
         FROM approvals a
@@ -210,6 +254,34 @@ router.get("/dashboard", async (_req: Request, res: Response) => {
         WHERE a.decision IS NOT NULL
         ORDER BY a.proposed_ts DESC
         LIMIT 30
+      `),
+
+      // ── Reconciliation coverage alert ──────────────────────────────────────
+      // A date/mode is "ready" once every filled order in it has a resolved
+      // settlement; if it still has no daily_pnl row the trader's backfill
+      // hasn't caught up (or is failing), so surface it explicitly.
+      db.execute(sql`
+        SELECT ready.date, ready.mode
+        FROM (
+          SELECT
+            o.ts_placed::date::text AS date,
+            o.mode
+          FROM orders o
+          WHERE o.status = 'filled'
+          GROUP BY o.ts_placed::date, o.mode
+          HAVING BOOL_AND(EXISTS (
+            SELECT 1
+            FROM settlements st
+            WHERE st.station_id = o.station_id
+              AND st.settlement_date = o.ts_placed::date::text
+              AND st.kalshi_settled_bracket IS NOT NULL
+          ))
+        ) ready
+        LEFT JOIN daily_pnl dp
+          ON dp.date = ready.date
+         AND dp.mode = ready.mode
+        WHERE dp.id IS NULL
+        ORDER BY ready.date, ready.mode
       `),
     ]);
 
@@ -241,6 +313,14 @@ router.get("/dashboard", async (_req: Request, res: Response) => {
           pnl_cents:   Number(row["pnl_cents"]   ?? 0),
           cost_cents:  Number(row["cost_cents"]   ?? 0),
           trade_count: Number(row["trade_count"]  ?? 0),
+        };
+      }),
+      pnl_alerts: pnlAlertRes.rows.map(r => {
+        const row = r as Record<string, unknown>;
+        return {
+          date: String(row["date"] ?? "").slice(0, 10),
+          mode: String(row["mode"] ?? ""),
+          message: "Settled trading day is missing its daily P&L record",
         };
       }),
       by_station: byStationRes.rows.map(r => {

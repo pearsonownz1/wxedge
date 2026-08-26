@@ -13,7 +13,7 @@
  *     5. runSettlementAudit() — write settlements rows for closed days
  *
  *   Scheduled:
- *     21:00 UTC daily  — runDailyDigest()
+ *     Every tick        — reconcile daily P&L after settlement is available
  *     21:00 UTC Sunday — runWeeklyGateReport()
  *
  * Health endpoint:
@@ -32,7 +32,7 @@ import { runRainSignalEngine } from "./rainSignalEngine.js";
 import { placeOrder, monitorOpenOrders } from "./executor.js";
 import { sweepExpiredProposals } from "./approvals.js";
 import { startLlmApprover } from "./llm-approver.js";
-import { runSettlementAudit, runRainSettlementAudit, runDailyDigest, runWeeklyGateReport } from "./auditor.js";
+import { runSettlementAudit, runRainSettlementAudit, runDailyReconciliation, runDailyDigest, runWeeklyGateReport } from "./auditor.js";
 import { pool, computePipelineHealth } from "@workspace/db";
 import pino from "pino";
 
@@ -121,7 +121,6 @@ const INITIAL_DELAY_MS = 60 * 1000;       // 60s startup grace for collector
 
 let cycleCount      = 0;
 let lastCycleTs     = "";
-let lastDigestDate  = "";
 let lastGateDate    = "";
 let lastDigestRecheckMs = 0;
 
@@ -219,11 +218,9 @@ async function runScheduledJobs(now: Date): Promise<void> {
   await runSettlementAudit(now);
   await runRainSettlementAudit(now);
 
-  // Daily digest at 21:00–21:05 UTC
-  if (utcHour === 21 && utcMin < 5 && lastDigestDate !== date) {
-    lastDigestDate = date;
-    await runDailyDigest(date, config.mode, config);
-  }
+  // Reconcile on every tick: settlement data normally arrives after the
+  // previous day's 21:00 digest, and the scan is idempotent/backfill-safe.
+  await runDailyReconciliation(config);
 
   // Weekly gate report at 21:00–21:05 UTC on Sundays (day 0)
   if (utcHour === 21 && utcMin < 5 && now.getUTCDay() === 0 && lastGateDate !== date) {

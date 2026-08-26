@@ -25,7 +25,10 @@ import {
   getUnsettledRainOrders,
   insertSettlement,
   getFilledOrdersForDate,
+  getReadyDailyPnlKeys,
+  getMissingDailyPnlKeys,
   upsertDailyPnl,
+  type PnlMode,
 } from "./db.js";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
@@ -94,6 +97,13 @@ export async function runSettlementAudit(now: Date): Promise<void> {
 
       const cliHighF = outcome?.final_high_f ?? null;
       const settled  = cliHighF !== null ? resolvedBracket(cliHighF, brackets) : null;
+
+      // Do not create a placeholder settlement row before the official outcome
+      // exists.  If an older run already created one, insertSettlement's
+      // conflict update will replace it once the outcome appears.
+      if (cliHighF === null) {
+        continue;
+      }
 
       // Match: does cli_high_f fall within the resolved bracket's bounds?
       let matchFlag: boolean | null = null;
@@ -277,11 +287,16 @@ export function computeDailyPnl(
  * Idempotent and safe to re-run for a past date: it always recomputes the
  * full row from current settlement data, so calling it again after a
  * previously-pending rain contract settles corrects that date's numbers
- * in place (see index.ts's periodic digest recheck).
+ * in place (see runDailyReconciliation).
+ *
+ * The whole row is deferred (not written) until every filled order for this
+ * (date, mode) has a resolved settlement. A partial write would let the
+ * dashboard's daily_pnl-gated aggregates disagree with its per-order
+ * breakdowns for the trades still pending on this date.
  */
 export async function runDailyDigest(
   date: string,
-  mode: "shadow" | "live",
+  mode: PnlMode,
   config: RiskConfig
 ): Promise<void> {
   const filled = await getFilledOrdersForDate(date, mode);
@@ -317,10 +332,10 @@ export async function runDailyDigest(
   const { grossCents, feesCents, netCents, tradeCount, pendingCount } =
     computeDailyPnl(filled, settledByKey, date, config.fee_rate);
 
-  if (tradeCount === 0) {
+  if (pendingCount > 0) {
     logger.info(
-      { date, mode, pendingCount },
-      "Daily digest: all filled orders still awaiting settlement — will recheck later"
+      { date, mode, pendingCount, settledCount: tradeCount },
+      "Daily digest deferred — some filled orders are still awaiting settlement"
     );
     return;
   }
@@ -328,10 +343,8 @@ export async function runDailyDigest(
   await upsertDailyPnl(date, mode, grossCents, feesCents, netCents, tradeCount);
 
   logger.info(
-    { date, mode, grossCents, feesCents, netCents, trades: tradeCount, pendingCount },
-    pendingCount > 0
-      ? "Daily P&L digest written (some orders still pending — will recheck)"
-      : "Daily P&L digest written"
+    { date, mode, grossCents, feesCents, netCents, trades: tradeCount },
+    "Daily P&L digest written"
   );
 
   if (netCents < 0) {
@@ -342,8 +355,27 @@ export async function runDailyDigest(
   }
 }
 
-// ─── Weekly gate stats ────────────────────────────────────────────────────────
+/**
+ * Reconcile every ready date/mode on every trader tick.
+ *
+ * Settlement usually arrives the morning after the 21:00 digest, so a
+ * once-per-day job is inherently too early.  Re-running these small upserts
+ * on every tick also makes historical backfill automatic and idempotent.
+ */
+export async function runDailyReconciliation(config: RiskConfig): Promise<void> {
+  const readyKeys = await getReadyDailyPnlKeys();
+  for (const { date, mode } of readyKeys) {
+    await runDailyDigest(date, mode, config);
+  }
 
+  const missingKeys = await getMissingDailyPnlKeys();
+  if (missingKeys.length > 0) {
+    logger.error(
+      { missingPnl: missingKeys },
+      "P&L ALERT — settled trading day has no daily P&L record"
+    );
+  }
+}
 /** Brief weekly summary of shadow-trade accumulation and calibration metrics. */
 export async function runWeeklyGateReport(now: Date): Promise<void> {
   const { rows: statsRows } = await db.execute(sql`
