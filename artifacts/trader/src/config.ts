@@ -19,6 +19,11 @@ export interface RiskConfig {
   execution_mode: "approval" | "auto" | "shadow";
   mode: "shadow" | "live";
 
+  /** Only these station IDs may generate or execute new trades. */
+  active_station_ids: string[];
+  /** Fixed number of contracts requested for each approved trade. */
+  contracts_per_trade: number;
+
   // Per-trade limits
   max_cost_per_trade_cents:             number;
   cooldown_min:                         number;
@@ -73,6 +78,8 @@ function loadConfig(): RiskConfig {
   const required: Array<keyof RiskConfig> = [
     "execution_mode",
     "mode",
+    "active_station_ids",
+    "contracts_per_trade",
     "max_cost_per_trade_cents",
     "cooldown_min",
     "max_open_orders_per_station",
@@ -95,6 +102,13 @@ function loadConfig(): RiskConfig {
   }
 
   const config = raw as unknown as RiskConfig;
+
+  if (!Array.isArray(config.active_station_ids) || config.active_station_ids.length === 0) {
+    throw new Error("risk.json active_station_ids must be a non-empty array");
+  }
+  if (!Number.isInteger(config.contracts_per_trade) || config.contracts_per_trade < 1) {
+    throw new Error("risk.json contracts_per_trade must be a positive integer");
+  }
 
   // Default proposal_ttl_min if absent in older configs
   if (config.proposal_ttl_min === undefined) {

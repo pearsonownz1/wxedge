@@ -217,7 +217,8 @@ export interface RiskState {
 export async function buildRiskState(
   date: string,
   mode: "shadow" | "live" | "approval",
-  cooldownMin: number
+  cooldownMin: number,
+  feeRate: number
 ): Promise<RiskState> {
   const [
     { rows: openRows },
@@ -228,22 +229,28 @@ export async function buildRiskState(
   ] = await Promise.all([
     db.execute(sql`
       SELECT station_id, COUNT(*) AS cnt
-      FROM   orders WHERE status = 'open'
+      FROM   orders WHERE status IN ('open', 'resting', 'submitting')
       GROUP BY station_id
     `),
     db.execute(sql`
-      SELECT station_id, COALESCE(SUM(price_cents * count),0)::int AS total
+      SELECT station_id, COALESCE(SUM(
+        (price_cents + CEIL(${feeRate} * (price_cents / 100.0) * (1 - price_cents / 100.0) * 100)) * count
+      ),0)::int AS total
       FROM   orders
       WHERE  ts_placed::date = ${date}::date
         AND  status != 'cancelled'
       GROUP BY station_id
     `),
     db.execute(sql`
-      SELECT COALESCE(SUM(price_cents * count),0)::int AS total
-      FROM   orders WHERE status = 'open'
+      SELECT COALESCE(SUM(
+        (price_cents + CEIL(${feeRate} * (price_cents / 100.0) * (1 - price_cents / 100.0) * 100)) * count
+      ),0)::int AS total
+      FROM   orders WHERE status IN ('open', 'resting', 'submitting')
     `),
     db.execute(sql`
-      SELECT COALESCE(SUM(price_cents * count),0)::int AS total
+      SELECT COALESCE(SUM(
+        (price_cents + CEIL(${feeRate} * (price_cents / 100.0) * (1 - price_cents / 100.0) * 100)) * count
+      ),0)::int AS total
       FROM   orders
       WHERE  ts_placed::date = ${date}::date
         AND  status != 'cancelled'

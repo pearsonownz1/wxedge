@@ -10,7 +10,7 @@
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { checkRisk } from "./riskOfficer.js";
+import { checkRisk, estimatedOrderDebitCents } from "./riskOfficer.js";
 import type { RiskConfig } from "./config.js";
 import type { RiskState } from "./db.js";
 import type { SignalCandidate } from "./riskOfficer.js";
@@ -20,6 +20,8 @@ import type { SignalCandidate } from "./riskOfficer.js";
 const DEFAULT_CONFIG: RiskConfig = {
   execution_mode:                          "shadow",
   mode:                                    "shadow",
+  active_station_ids:                      ["KNYC", "KLAX"],
+  contracts_per_trade:                     1,
   max_cost_per_trade_cents:                60,
   cooldown_min:                            30,
   max_open_orders_per_station:             1,
@@ -84,7 +86,8 @@ describe("checkRisk — max_daily_loss", () => {
   it("approves when the incoming order brings daily cost exactly to the limit", () => {
     const state: RiskState = {
       ...CLEAN_STATE,
-      dailyCostToday: DEFAULT_CONFIG.max_daily_loss_cents - SIGNAL.limit_price,
+      dailyCostToday: DEFAULT_CONFIG.max_daily_loss_cents -
+        estimatedOrderDebitCents(SIGNAL.limit_price, 1, DEFAULT_CONFIG.fee_rate),
     };
     const d = checkRisk(SIGNAL, state, DEFAULT_CONFIG);
     assert.equal(d.approved, true);
@@ -101,7 +104,8 @@ describe("checkRisk — max_cost_per_trade", () => {
 
   it("approves at exactly the limit", () => {
     const sig: SignalCandidate = { ...SIGNAL, limit_price: 60 };
-    const d = checkRisk(sig, CLEAN_STATE, DEFAULT_CONFIG);
+    const config = { ...DEFAULT_CONFIG, max_cost_per_trade_cents: 62 };
+    const d = checkRisk(sig, CLEAN_STATE, config);
     assert.equal(d.approved, true);
   });
 });
@@ -120,7 +124,7 @@ describe("checkRisk — max_open_orders_per_station", () => {
   it("approves when a different station is at max", () => {
     const state: RiskState = {
       ...CLEAN_STATE,
-      openOrdersPerStation: { KMDW: 1 },
+      openOrdersPerStation: { KLAX: 1 },
     };
     const d = checkRisk(SIGNAL, state, DEFAULT_CONFIG);
     assert.equal(d.approved, true);
@@ -139,9 +143,16 @@ describe("checkRisk — max_daily_exposure_per_station", () => {
   });
 
   it("approves when station sum is exactly at limit after this order", () => {
+    const orderDebit = estimatedOrderDebitCents(
+      SIGNAL.limit_price,
+      1,
+      DEFAULT_CONFIG.fee_rate
+    );
     const state: RiskState = {
       ...CLEAN_STATE,
-      dailyExposurePerStation: { KNYC: 160 }, // 160 + 40 = 200 = limit
+      dailyExposurePerStation: {
+        KNYC: DEFAULT_CONFIG.max_daily_exposure_per_station_cents - orderDebit,
+      },
     };
     const d = checkRisk(SIGNAL, state, DEFAULT_CONFIG);
     assert.equal(d.approved, true);
@@ -218,13 +229,69 @@ describe("checkRisk — duplicate guard", () => {
 });
 
 describe("checkRisk — incoherent book does not suppress other stations", () => {
-  it("a signal from KMDW is approved even when KNYC is at max open orders", () => {
+  it("a signal from KLAX is approved even when KNYC is at max open orders", () => {
     const state: RiskState = {
       ...CLEAN_STATE,
       openOrdersPerStation: { KNYC: 1 },
     };
-    const sig: SignalCandidate = { ...SIGNAL, station_id: "KMDW", ticker: "KXHIGHCHI-26JUL25-B78" };
+    const sig: SignalCandidate = { ...SIGNAL, station_id: "KLAX", ticker: "KXHIGHLAX-26JUL25-B78" };
     const d = checkRisk(sig, state, DEFAULT_CONFIG);
     assert.equal(d.approved, true);
+  });
+});
+
+describe("checkRisk — active trading universe", () => {
+  it("rejects a non-target heat station even if every other risk check passes", () => {
+    const sig: SignalCandidate = {
+      ...SIGNAL,
+      station_id: "KPHL",
+      ticker: "KXHIGHPHIL-26JUL25-B90",
+    };
+    const d = checkRisk(sig, CLEAN_STATE, DEFAULT_CONFIG);
+    assert.equal(d.approved, false);
+    assert.equal(d.reason, "station_not_active: KPHL");
+  });
+
+  it("rejects a non-weather market outside the active station allowlist", () => {
+    const sig: SignalCandidate = {
+      ...SIGNAL,
+      station_id: "MLB_NYY",
+      ticker: "KXMLBKS-26AUG26-DEGROM5",
+      market_type: "sports",
+    };
+    const d = checkRisk(sig, CLEAN_STATE, DEFAULT_CONFIG);
+    assert.equal(d.approved, false);
+    assert.equal(d.reason, "station_not_active: MLB_NYY");
+  });
+
+  it("accepts a 10-contract NYC order when its full cost is within the cap", () => {
+    const config: RiskConfig = {
+      ...DEFAULT_CONFIG,
+      contracts_per_trade: 10,
+      max_cost_per_trade_cents: 1000,
+      max_daily_exposure_per_station_cents: 5000,
+      max_total_open_exposure_cents: 10000,
+      max_daily_loss_cents: 10000,
+    };
+    const d = checkRisk({ ...SIGNAL, contracts: 10 }, CLEAN_STATE, config);
+    assert.equal(d.approved, true);
+  });
+
+  it("rejects a 10-contract order when principal fits but principal plus fees exceeds the cap", () => {
+    const config: RiskConfig = {
+      ...DEFAULT_CONFIG,
+      contracts_per_trade: 10,
+      max_cost_per_trade_cents: 500,
+      max_daily_exposure_per_station_cents: 5000,
+      max_total_open_exposure_cents: 10000,
+      max_daily_loss_cents: 10000,
+    };
+    const d = checkRisk(
+      { ...SIGNAL, limit_price: 49, contracts: 10 },
+      CLEAN_STATE,
+      config
+    );
+    assert.equal(d.approved, false);
+    assert.match(d.reason, /max_cost_per_trade/);
   });
 });

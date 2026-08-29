@@ -45,6 +45,17 @@ export interface RiskDecision {
   reason:   string;
 }
 
+/** Conservative debit reserve: principal plus whole-cent rounded fee per contract. */
+export function estimatedOrderDebitCents(
+  priceCents: number,
+  contracts: number,
+  feeRate: number
+): number {
+  const price = priceCents / 100;
+  const feePerContract = Math.ceil(feeRate * price * (1 - price) * 100);
+  return (priceCents + feePerContract) * contracts;
+}
+
 /**
  * Evaluate a signal candidate against all risk limits.
  * Returns on the FIRST failing check.
@@ -55,7 +66,11 @@ export function checkRisk(
   config: RiskConfig
 ): RiskDecision {
   const contracts = signal.contracts ?? 1;
-  const orderCost = signal.limit_price * contracts;
+  const orderCost = estimatedOrderDebitCents(
+    signal.limit_price,
+    contracts,
+    config.fee_rate
+  );
 
   if (!Number.isInteger(contracts) || contracts < 1) {
     return { approved: false, reason: `invalid_contract_count: ${contracts}` };
@@ -66,7 +81,16 @@ export function checkRisk(
     return { approved: false, reason: "kill_switch" };
   }
 
-  // 2. Daily loss cap — stops all trading when realised losses hit the limit.
+  // 2. Active trading universe — defense in depth in case a candidate bypasses
+  // the signal-engine filter (including stale proposals and non-weather markets).
+  if (!config.active_station_ids.includes(signal.station_id)) {
+    return {
+      approved: false,
+      reason: `station_not_active: ${signal.station_id}`,
+    };
+  }
+
+  // 3. Daily loss cap — stops all trading when realised losses hit the limit.
   if (state.dailyCostToday + orderCost > config.max_daily_loss_cents) {
     return {
       approved: false,
@@ -74,7 +98,7 @@ export function checkRisk(
     };
   }
 
-  // 3. Per-trade cost limit.
+  // 4. Per-trade cost limit.
   if (orderCost > config.max_cost_per_trade_cents) {
     return {
       approved: false,
@@ -82,7 +106,7 @@ export function checkRisk(
     };
   }
 
-  // 4. Max open orders per station.
+  // 5. Max open orders per station.
   const stationOpen = state.openOrdersPerStation[signal.station_id] ?? 0;
   if (stationOpen >= config.max_open_orders_per_station) {
     return {
@@ -91,7 +115,7 @@ export function checkRisk(
     };
   }
 
-  // 5. Max daily exposure per station.
+  // 6. Max daily exposure per station.
   const stationDaily = state.dailyExposurePerStation[signal.station_id] ?? 0;
   if (stationDaily + orderCost > config.max_daily_exposure_per_station_cents) {
     return {
@@ -103,7 +127,7 @@ export function checkRisk(
     };
   }
 
-  // 6. Max total open exposure.
+  // 7. Max total open exposure.
   if (state.totalOpenExposure + orderCost > config.max_total_open_exposure_cents) {
     return {
       approved: false,
@@ -114,7 +138,7 @@ export function checkRisk(
     };
   }
 
-  // 7. Duplicate guard: same ticker+side proposed/ordered within the cooldown
+  // 8. Duplicate guard: same ticker+side proposed/ordered within the cooldown
   //    window (state.recentSignals is sourced from approvals + orders).
   //    Only STRICTLY EARLIER rows count, as defense in depth: anything sharing
   //    this signal's exact timestamp originated in the same trading cycle and

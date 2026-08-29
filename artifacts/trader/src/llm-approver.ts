@@ -164,20 +164,23 @@ async function getPendingForLlm(): Promise<PendingApprovalRow[]> {
   return rows as unknown as PendingApprovalRow[];
 }
 
-async function getLlmDailySpent(today: string): Promise<number> {
+async function getLlmDailySpent(today: string, feeRate: number): Promise<number> {
   const { rows } = await db.execute(sql`
-    SELECT COALESCE(SUM(s.limit_price), 0)::int AS total
+    SELECT COALESCE(SUM(
+      (o.price_cents + CEIL(${feeRate} * (o.price_cents / 100.0) * (1 - o.price_cents / 100.0) * 100)) * o.count
+    ), 0)::int AS total
     FROM approvals a
-    JOIN signals s ON s.id = a.signal_id
+    JOIN orders o ON o.approval_id = a.id
     WHERE a.decision = 'approved'
       AND a.decider = 'llm'
       AND a.recheck_ok = true
-      AND a.decision_ts::date = ${today}::date
+      AND o.ts_placed::date = ${today}::date
+      AND o.status != 'cancelled'
   `);
   return Number((rows[0] as { total: number } | undefined)?.total ?? 0);
 }
 
-async function buildLlmPayload(row: PendingApprovalRow): Promise<object> {
+async function buildLlmPayload(row: PendingApprovalRow, feeRate: number): Promise<object> {
   const card = row.card_json ? JSON.parse(row.card_json) as Record<string, unknown> : {};
   const today = new Date().toISOString().slice(0, 10);
 
@@ -195,9 +198,18 @@ async function buildLlmPayload(row: PendingApprovalRow): Promise<object> {
     // open_proposals must come from a scalar subquery, not a FILTER over orders.
     db.execute(sql`
       SELECT
-        COALESCE(SUM(price_cents) FILTER (WHERE ts_placed::date = ${today}::date AND status != 'cancelled'), 0)::int AS daily_spent,
-        COALESCE(SUM(price_cents) FILTER (WHERE status = 'open'), 0)::int AS open_exposure,
-        COALESCE(SUM(price_cents) FILTER (WHERE station_id = ${row.station_id} AND status = 'open'), 0)::int AS station_exposure,
+        COALESCE(SUM(
+          (price_cents + CEIL(${feeRate} * (price_cents / 100.0) * (1 - price_cents / 100.0) * 100)) * count
+        ) FILTER (WHERE ts_placed::date = ${today}::date AND status != 'cancelled'), 0)::int AS daily_spent,
+        COALESCE(SUM(
+          (price_cents + CEIL(${feeRate} * (price_cents / 100.0) * (1 - price_cents / 100.0) * 100)) * count
+        ) FILTER (WHERE status IN ('open', 'resting', 'submitting')), 0)::int AS open_exposure,
+        COALESCE(SUM(
+          (price_cents + CEIL(${feeRate} * (price_cents / 100.0) * (1 - price_cents / 100.0) * 100)) * count
+        ) FILTER (
+          WHERE station_id = ${row.station_id}
+            AND status IN ('open', 'resting', 'submitting')
+        ), 0)::int AS station_exposure,
         (SELECT COUNT(*) FROM approvals WHERE decision IS NULL AND expires_ts > NOW())::int AS open_proposals
       FROM orders
     `),
@@ -459,7 +471,7 @@ export async function runLlmApproverTick(config: RiskConfig): Promise<void> {
   logger.debug({ count: pending.length, approver }, "LLM approver tick");
 
   // Check LLM daily spend cap once per tick
-  const llmSpentToday = await getLlmDailySpent(today).catch(() => Infinity);
+  const llmSpentToday = await getLlmDailySpent(today, config.fee_rate).catch(() => Infinity);
   if (llmSpentToday >= dailyCap) {
     logger.warn({ llmSpentToday, dailyCap }, "LLM daily cap reached — no LLM approvals this tick");
   }
@@ -495,7 +507,7 @@ export async function runLlmApproverTick(config: RiskConfig): Promise<void> {
     // Build payload and call the LLM
     let payload: object;
     try {
-      payload = await buildLlmPayload(row);
+      payload = await buildLlmPayload(row, config.fee_rate);
       // Inject runtime config values the payload builder couldn't access
       (payload as Record<string, Record<string, unknown>>)["risk"]!["daily_cap_cents"]     = dailyCap;
       (payload as Record<string, Record<string, unknown>>)["risk"]!["station_cap_cents"]   =

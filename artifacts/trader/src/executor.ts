@@ -35,6 +35,11 @@ const logger = pino({ name: "executor" });
 
 // ─── Place ────────────────────────────────────────────────────────────────────
 
+/** Fixed configured size; risk checks validate the resulting dollar cost. */
+export function configuredContractCount(config: RiskConfig): number {
+  return config.contracts_per_trade;
+}
+
 /**
  * Evaluate signal through risk officer.
  * In approval mode: create a pending proposal awaiting human decision.
@@ -47,8 +52,13 @@ export async function placeOrder(
   config: RiskConfig,
   todayDate: string
 ): Promise<number | null> {
-  const riskState = await buildRiskState(todayDate, config.mode, config.cooldown_min);
-  const contracts = Math.max(1, Math.floor(config.max_cost_per_trade_cents / candidate.limit_price));
+  const riskState = await buildRiskState(
+    todayDate,
+    config.mode,
+    config.cooldown_min,
+    config.fee_rate
+  );
+  const contracts = configuredContractCount(config);
 
   const sizedCandidate = { ...candidate, contracts };
   const decision  = checkRisk(sizedCandidate, riskState, config);

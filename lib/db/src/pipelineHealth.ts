@@ -37,7 +37,7 @@ const SYSTEMIC_REASONS = new Set([
 ]);
 
 /** Benign reasons: the engine evaluated and correctly found nothing. */
-const BENIGN_REASONS = new Set(["below_threshold", "lock_dead"]);
+const BENIGN_REASONS = new Set(["below_threshold", "lock_dead", "station_not_active"]);
 
 /** Fraction of suppressed rows that must be systemic to call it "blocked". */
 const SYSTEMIC_DOMINANCE = 0.5;

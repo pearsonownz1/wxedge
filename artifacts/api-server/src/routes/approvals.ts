@@ -19,6 +19,8 @@ import {
   getApprovalById,
   decideApproval,
   insertApprovalOrder,
+  hasUnresolvedOrderSubmission,
+  completeApprovalOrderSubmission,
   getCurrentMarketState,
   buildApprovalRiskState,
   getApprovalReport,
@@ -32,6 +34,8 @@ const router = Router();
 interface RiskConfig {
   execution_mode:                       string;
   mode:                                 string;
+  active_station_ids:                   string[];
+  contracts_per_trade:                  number;
   max_cost_per_trade_cents:             number;
   cooldown_min:                         number;
   max_open_orders_per_station:          number;
@@ -61,27 +65,37 @@ function loadRiskConfig(): RiskConfig {
   // Fallback defaults so the API doesn't crash if trader config is unavailable
   return {
     execution_mode: "approval", mode: "shadow",
-    max_cost_per_trade_cents: 60, cooldown_min: 30,
-    max_open_orders_per_station: 1, max_daily_exposure_per_station_cents: 200,
-    max_total_open_exposure_cents: 500, max_daily_loss_cents: 300,
-    min_edge: 0.05, slippage_buffer: 0.01, max_age_min: 10, max_obs_age_min: 75,
+    active_station_ids: ["KNYC", "KLAX"], contracts_per_trade: 10,
+    max_cost_per_trade_cents: 1000, cooldown_min: 10,
+    max_open_orders_per_station: 5, max_daily_exposure_per_station_cents: 5000,
+    max_total_open_exposure_cents: 10000, max_daily_loss_cents: 10000,
+    min_edge: 0.02, slippage_buffer: 0.01, max_age_min: 10, max_obs_age_min: 75,
     fee_rate: 0.07, ttl_min: 15, cancel_edge: 0.01, proposal_ttl_min: 30,
   };
 }
 
 const riskConfig = loadRiskConfig();
 
-// ─── Per-station approve mutex ────────────────────────────────────────────────
-// Serializes risk re-check + order insert per station so two concurrent
-// approvals cannot both pass the caps (read-then-write race). In-process only,
-// which is sufficient while a single api-server instance handles approvals
-// (dev and Reserved VM prod both run one instance). If approvals ever run
-// multi-instance, replace with pg_advisory_xact_lock inside a transaction.
-const stationLocks = new Map<string, Promise<unknown>>();
-function withStationLock<T>(stationId: string, fn: () => Promise<T>): Promise<T> {
-  const prev = stationLocks.get(stationId) ?? Promise.resolve();
+function estimatedOrderDebitCents(
+  priceCents: number,
+  contracts: number,
+  feeRate: number
+): number {
+  const price = priceCents / 100;
+  const feePerContract = Math.ceil(feeRate * price * (1 - price) * 100);
+  return (priceCents + feePerContract) * contracts;
+}
+
+// ─── Portfolio approve mutex ──────────────────────────────────────────────────
+// Serializes the global risk re-check + durable order intent. A per-station
+// lock is insufficient because NYC and LAX share portfolio-wide exposure caps.
+// In-process is sufficient while Reserved VM runs one API instance. If this
+// becomes multi-instance, replace it with a PostgreSQL advisory transaction lock.
+let portfolioLock: Promise<unknown> = Promise.resolve();
+function withPortfolioLock<T>(fn: () => Promise<T>): Promise<T> {
+  const prev = portfolioLock;
   const run = prev.then(fn, fn);
-  stationLocks.set(stationId, run.then(() => undefined, () => undefined));
+  portfolioLock = run.then(() => undefined, () => undefined);
   return run;
 }
 
@@ -127,6 +141,23 @@ router.patch("/approvals/:id", async (req: Request, res: Response) => {
       const latencyMs = now.getTime() - new Date(approval.proposed_ts).getTime();
       await decideApproval(id, "denied", latencyMs, true, "rain_trading_disabled", decider);
       logger.info({ approvalId: id, ticker: approval.ticker, decider }, "Proposal denied — rain trading rolled back");
+      return void res.json({ result: "denied" });
+    }
+
+    // Fail closed for stale/orphaned proposals outside the active NYC/LAX
+    // trading universe. The trader filters these before proposal creation, but
+    // the final execution endpoint must independently enforce the same policy.
+    if (
+      approval.decision === null &&
+      !riskConfig.active_station_ids.includes(approval.station_id)
+    ) {
+      const now = new Date();
+      const latencyMs = now.getTime() - new Date(approval.proposed_ts).getTime();
+      await decideApproval(id, "denied", latencyMs, true, "station_not_active", decider);
+      logger.warn(
+        { approvalId: id, stationId: approval.station_id, ticker: approval.ticker, requestedAction: action },
+        "Proposal force-denied: station is outside active trading universe"
+      );
       return void res.json({ result: "denied" });
     }
 
@@ -225,16 +256,25 @@ router.patch("/approvals/:id", async (req: Request, res: Response) => {
       diff["kill_switch"] = { at_proposal: false, now: true };
     }
 
-    // 5. Risk state re-check, decision, and order insert run under the
-    //    per-station mutex — see withStationLock above.
-    return void await withStationLock(approval.station_id, async () => {
+    // 5. Risk state re-check, decision, and durable order submission run under
+    //    the portfolio mutex so NYC and LAX cannot race shared caps.
+    return void await withPortfolioLock(async () => {
     const today = now.toISOString().slice(0, 10);
     const riskState = await buildApprovalRiskState(today, riskConfig);
-    const contracts = Math.max(1, Math.floor(
-      riskConfig.max_cost_per_trade_cents / approval.limit_price_cents
-    ));
+    const contracts = riskConfig.contracts_per_trade;
 
-    const orderCost = approval.limit_price_cents * contracts;
+    if (await hasUnresolvedOrderSubmission()) {
+      diff["unresolved_order_submission"] = {
+        at_proposal: "none",
+        now: "A prior Kalshi submission has no durably recorded response",
+      };
+    }
+
+    const orderCost = estimatedOrderDebitCents(
+      approval.limit_price_cents,
+      contracts,
+      riskConfig.fee_rate
+    );
     if (riskState.dailyCostToday + orderCost > riskConfig.max_daily_loss_cents) {
       diff["daily_loss_cap"] = {
         at_proposal: "ok",
@@ -305,10 +345,24 @@ router.patch("/approvals/:id", async (req: Request, res: Response) => {
           : (current.bid_cents !== null ? 100 - current.bid_cents : approval.limit_price_cents))
       : approval.limit_price_cents;
 
-    let kalshiOrderId: string | null = null;
-    let kalshiStatus = "open";
+    const liveSubmission = kalshiLiveOrdersEnabled();
+    const orderId = await insertApprovalOrder({
+      signal_id:       approval.signal_id,
+      approval_id:     id,
+      mode:            execMode as "shadow" | "approval" | "live",
+      ticker:          approval.ticker,
+      station_id:      approval.station_id,
+      side:            approval.side as "YES" | "NO",
+      price_cents:     currentPrice,
+      count:           contracts,
+      kalshi_order_id: null,
+      status:          liveSubmission ? "submitting" : "open",
+    });
 
-    if (kalshiLiveOrdersEnabled()) {
+    let kalshiOrderId: string | null = null;
+    let kalshiStatus = liveSubmission ? "submitting" : "open";
+
+    if (liveSubmission) {
       try {
         const kalshiResult = await placeKalshiOrder(
           approval.ticker,
@@ -318,17 +372,23 @@ router.patch("/approvals/:id", async (req: Request, res: Response) => {
         );
         kalshiOrderId = kalshiResult.order_id;
         kalshiStatus  = kalshiResult.status ?? "open";
+        await completeApprovalOrderSubmission(orderId, kalshiOrderId, kalshiStatus);
         logger.info(
           { approvalId: id, kalshiOrderId, ticker: approval.ticker, side: approval.side, contracts, status: kalshiStatus },
           "Real Kalshi order placed"
         );
       } catch (kalshiErr) {
-        // Log prominently but don't block — still record the approval in our DB
-        // so the decision is auditable. The order will show kalshi_order_id = null.
+        // Leave the durable intent in "submitting": the request may have reached
+        // Kalshi even if its response or our follow-up DB update failed. Further
+        // approvals fail closed until this intent is reconciled.
         logger.error(
-          { approvalId: id, ticker: approval.ticker, err: kalshiErr },
-          "Kalshi order placement FAILED — recording approval without live fill"
+          { approvalId: id, orderId, ticker: approval.ticker, err: kalshiErr },
+          "Kalshi submission unresolved — blocking subsequent live approvals"
         );
+        return void res.status(502).json({
+          result: "submission_unresolved",
+          order_id: orderId,
+        });
       }
     } else {
       logger.info(
@@ -336,19 +396,6 @@ router.patch("/approvals/:id", async (req: Request, res: Response) => {
         "Development mode — skipping real Kalshi order (simulation only)"
       );
     }
-
-    const orderId = await insertApprovalOrder({
-      signal_id:      approval.signal_id,
-      approval_id:    id,
-      mode:           execMode as "shadow" | "approval" | "live",
-      ticker:         approval.ticker,
-      station_id:     approval.station_id,
-      side:           approval.side as "YES" | "NO",
-      price_cents:    currentPrice,
-      count:          contracts,
-      kalshi_order_id: kalshiOrderId,
-      status:         kalshiOrderId ? kalshiStatus : "open",
-    });
 
     logger.info(
       { approvalId: id, orderId, kalshiOrderId, ticker: approval.ticker, side: approval.side, priceCents: currentPrice, contracts, decider },
@@ -363,11 +410,11 @@ router.patch("/approvals/:id", async (req: Request, res: Response) => {
         side:              approval.side,
         limit_price_cents: currentPrice,
         contracts,
-        status:            kalshiOrderId ? kalshiStatus : "open",
+        status:            kalshiStatus,
         kalshi_order_id:   kalshiOrderId,
       },
     });
-    }); // end withStationLock
+    }); // end withPortfolioLock
   } catch (err) {
     logger.error({ err, approvalId: id }, "PATCH /approvals/:id failed");
     res.status(500).json({ error: "internal_error" });

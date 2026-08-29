@@ -227,27 +227,33 @@ export async function getCurrentMarketState(ticker: string): Promise<CurrentMark
 /** Lightweight risk state for approve-time re-check (approval mode only). */
 export async function buildApprovalRiskState(
   date: string,
-  config: { cooldown_min: number }
+  config: { cooldown_min: number; fee_rate: number }
 ): Promise<ApprovalRiskState> {
   const [{ rows: openRows }, { rows: dailyRows }, { rows: totalRows }, { rows: costRows }] =
     await Promise.all([
       db.execute(sql`
         SELECT station_id, COUNT(*) AS cnt
-        FROM orders WHERE status = 'open'
+        FROM orders WHERE status IN ('open', 'resting', 'submitting')
         GROUP BY station_id
       `),
       db.execute(sql`
-        SELECT station_id, COALESCE(SUM(price_cents * count), 0)::int AS total
+        SELECT station_id, COALESCE(SUM(
+          (price_cents + CEIL(${config.fee_rate} * (price_cents / 100.0) * (1 - price_cents / 100.0) * 100)) * count
+        ), 0)::int AS total
         FROM orders
         WHERE ts_placed::date = ${date}::date AND status != 'cancelled'
         GROUP BY station_id
       `),
       db.execute(sql`
-        SELECT COALESCE(SUM(price_cents * count), 0)::int AS total
-        FROM orders WHERE status = 'open'
+        SELECT COALESCE(SUM(
+          (price_cents + CEIL(${config.fee_rate} * (price_cents / 100.0) * (1 - price_cents / 100.0) * 100)) * count
+        ), 0)::int AS total
+        FROM orders WHERE status IN ('open', 'resting', 'submitting')
       `),
       db.execute(sql`
-        SELECT COALESCE(SUM(price_cents * count), 0)::int AS total
+        SELECT COALESCE(SUM(
+          (price_cents + CEIL(${config.fee_rate} * (price_cents / 100.0) * (1 - price_cents / 100.0) * 100)) * count
+        ), 0)::int AS total
         FROM orders
         WHERE ts_placed::date = ${date}::date AND status != 'cancelled'
       `),
@@ -326,6 +332,35 @@ export async function insertApprovalOrder(row: {
     RETURNING id
   `);
   return Number((rows[0] as { id: number }).id);
+}
+
+/** True while a real Kalshi submission has no durably recorded response yet. */
+export async function hasUnresolvedOrderSubmission(): Promise<boolean> {
+  const { rows } = await db.execute(sql`
+    SELECT EXISTS (
+      SELECT 1 FROM orders WHERE status = 'submitting'
+    ) AS unresolved
+  `);
+  return Boolean((rows[0] as { unresolved?: boolean } | undefined)?.unresolved);
+}
+
+/** Attach Kalshi's response to a previously persisted submission intent. */
+export async function completeApprovalOrderSubmission(
+  orderId: number,
+  kalshiOrderId: string,
+  status: string
+): Promise<void> {
+  const { rows } = await db.execute(sql`
+    UPDATE orders
+    SET kalshi_order_id = ${kalshiOrderId},
+        status = ${status}
+    WHERE id = ${orderId}
+      AND status = 'submitting'
+    RETURNING id
+  `);
+  if (rows.length !== 1) {
+    throw new Error(`Order submission intent ${orderId} was not pending`);
+  }
 }
 
 // ─── Report ───────────────────────────────────────────────────────────────────

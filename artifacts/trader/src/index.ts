@@ -141,6 +141,8 @@ const healthServer = http.createServer((req, res) => {
         status:         "ok",
         mode:           config.mode,
         execution_mode: config.execution_mode,
+        active_station_ids: config.active_station_ids,
+        contracts_per_trade: config.contracts_per_trade,
         cycle_count:    cycleCount,
         last_cycle_ts:  lastCycleTs || null,
       })
@@ -288,7 +290,12 @@ async function runPipelineWatchdog(now: Date): Promise<void> {
 
 async function main(): Promise<void> {
   logger.info(
-    { mode: config.mode, execution_mode: config.execution_mode },
+    {
+      mode: config.mode,
+      execution_mode: config.execution_mode,
+      active_station_ids: config.active_station_ids,
+      contracts_per_trade: config.contracts_per_trade,
+    },
     "Trader starting — acquiring leader lock"
   );
 

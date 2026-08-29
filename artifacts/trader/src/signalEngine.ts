@@ -23,6 +23,7 @@
  *   - 'gap_data'        — snapshot follows a collector gap
  *   - 'no_price'        — no YES bid/ask in book (KDFW or stub)
  *   - 'below_threshold' — edge_net < min_edge (computed but not actionable)
+ *   - 'station_not_active' — station is monitored but outside the trading universe
  */
 
 import { createHash } from "node:crypto";
@@ -85,6 +86,7 @@ export async function runSignalEngine(
   config: RiskConfig,
   now: Date
 ): Promise<Array<{ candidate: SignalCandidate; signalId: number }>> {
+  const activeStations = new Set(config.active_station_ids);
   const inputs = await getLatestSignalInputs();
 
   if (inputs.length === 0) {
@@ -120,6 +122,7 @@ export async function runSignalEngine(
     for (const row of rows) {
       // Per-bracket suppression checks
       const suppressed = (() => {
+        if (!activeStations.has(row.station_id)) return "station_not_active";
         if (row.gap_flag)       return "gap_data";
         if (!row.coherent_flag) return "book_incoherent";
         if (row.lock_status === "dead") return "lock_dead";
