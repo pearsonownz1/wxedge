@@ -65,7 +65,7 @@ function loadRiskConfig(): RiskConfig {
   // Fallback defaults so the API doesn't crash if trader config is unavailable
   return {
     execution_mode: "approval", mode: "shadow",
-    active_station_ids: ["KNYC", "KLAX"], contracts_per_trade: 10,
+    active_station_ids: ["KLAX", "KNYC", "KAUS", "KMDW"], contracts_per_trade: 10,
     max_cost_per_trade_cents: 1000, cooldown_min: 10,
     max_open_orders_per_station: 5, max_daily_exposure_per_station_cents: 5000,
     max_total_open_exposure_cents: 10000, max_daily_loss_cents: 10000,
