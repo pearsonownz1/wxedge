@@ -1,4 +1,4 @@
-{
+{approvals.ts
   "_comment": [
     "Risk Officer and Signal Engine configuration.",
     "All dollar amounts in CENTS unless the key ends in _prob, _min, or _rate.",
