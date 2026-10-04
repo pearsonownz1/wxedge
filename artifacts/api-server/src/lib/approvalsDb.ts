@@ -7,6 +7,12 @@
 
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
+import { logger } from "./logger.js";
+import {
+  KalshiOrderPlacementError,
+  readConfirmedRejectedSubmissions,
+  type ConfirmedRejectedSubmission,
+} from "./kalshiOrderErrors.js";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -336,12 +342,74 @@ export async function insertApprovalOrder(row: {
 
 /** True while a real Kalshi submission has no durably recorded response yet. */
 export async function hasUnresolvedOrderSubmission(): Promise<boolean> {
+  // Recover only operator-attested explicit rejections whose full DB identity
+  // matches. Never infer rejection from age or retry an ambiguous intent.
+  for (const evidence of readConfirmedRejectedSubmissions(process.env["KALSHI_CONFIRMED_REJECTED_SUBMISSIONS"])) {
+    const rejection = new KalshiOrderPlacementError(evidence.httpStatus, evidence.responseBody);
+    if (await rejectApprovalOrderSubmission(evidence.orderId, rejection, evidence)) {
+      logger.warn(
+        { orderId: evidence.orderId, approvalId: evidence.approvalId, ticker: evidence.ticker, httpStatus: rejection.httpStatus, code: rejection.code },
+        "Reconciled confirmed Kalshi rejection — cancelled local intent; no order retried"
+      );
+    }
+  }
   const { rows } = await db.execute(sql`
     SELECT EXISTS (
       SELECT 1 FROM orders WHERE status = 'submitting'
     ) AS unresolved
   `);
   return Boolean((rows[0] as { unresolved?: boolean } | undefined)?.unresolved);
+}
+
+/** Release a rejected local intent without deleting it.
+ * Historical operator-confirmed recovery changes ONLY the order status.
+ * A newly received rejection also records its response and approval audit note.
+ * Uses the existing cancelled state so rejected principal/fees do not consume
+ * daily spend or exposure. This does NOT send a cancel request to Kalshi.
+ */
+export async function rejectApprovalOrderSubmission(
+  orderId: number,
+  rejection: KalshiOrderPlacementError,
+  expected?: ConfirmedRejectedSubmission,
+  executor: Pick<typeof db, "execute"> = db
+): Promise<boolean> {
+  if (!rejection.isConfirmedRejection) throw new Error("Cannot clear an ambiguous Kalshi submission");
+  const identity = expected ? sql`
+    AND id = ${expected.orderId}
+    AND approval_id = ${expected.approvalId}
+    AND ticker = ${expected.ticker} AND side = ${expected.side}
+    AND price_cents = ${expected.priceCents} AND count = ${expected.contracts}
+    AND ts_placed = ${expected.tsPlaced}::timestamptz
+  ` : sql``;
+  if (expected) {
+    const { rows } = await executor.execute(sql`
+      UPDATE orders SET status = 'cancelled'
+      WHERE id = ${orderId} AND status = 'submitting' AND kalshi_order_id IS NULL
+      ${identity}
+      RETURNING id
+    `);
+    return rows.length > 0;
+  }
+  const evidence = JSON.stringify({
+    submission_rejection: {
+      http_status: rejection.httpStatus, code: rejection.code,
+      response_body: rejection.responseBody, source: "kalshi_response",
+    },
+  });
+  const { rows } = await executor.execute(sql`
+    WITH rejected AS (
+      UPDATE orders
+      SET status = 'cancelled', ts_cancelled = NOW(), book_state_json = ${evidence}
+      WHERE id = ${orderId} AND status = 'submitting' AND kalshi_order_id IS NULL
+      ${identity}
+      RETURNING id, approval_id
+    )
+    UPDATE approvals AS a
+    SET recheck_ok = false, recheck_note = ${`kalshi_rejected:${rejection.code}`}
+    FROM rejected AS r WHERE a.id = r.approval_id
+    RETURNING r.id
+  `);
+  return rows.length > 0;
 }
 
 /** Attach Kalshi's response to a previously persisted submission intent. */

@@ -14,6 +14,7 @@
 
 import { createPrivateKey, sign as cryptoSign, constants } from "node:crypto";
 import { logger } from "./logger.js";
+import { KalshiOrderPlacementError } from "./kalshiOrderErrors.js";
 
 // Kalshi consolidated trading + market-data at a single domain.
 // Per Kalshi's own error message: "API has been moved to https://api.elections.kalshi.com/"
@@ -161,13 +162,14 @@ export async function placeKalshiOrder(
   const text = await resp.text();
 
   if (!resp.ok) {
-    throw new Error(
-      `Kalshi order placement failed: HTTP ${resp.status} — ${text.slice(0, 400)}`
-    );
+    throw new KalshiOrderPlacementError(resp.status, text);
   }
 
   // v2 response is a flat object — NOT wrapped in { order: ... }
   const raw = JSON.parse(text) as KalshiOrderResult;
+  if (typeof raw.order_id !== "string" || !raw.order_id) {
+    throw new Error("Kalshi submission response has no order_id — outcome unresolved");
+  }
   const fillCents    = parseFloat(raw.fill_count);
   const remainCents  = parseFloat(raw.remaining_count);
   const derivedStatus = fillCents > 0 && remainCents === 0 ? "filled" : "resting";

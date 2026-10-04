@@ -16,3 +16,4 @@
 - [LLM Approver](llm-approver.md) — APPROVER env var (human/llm/llm_with_veto); executes through PATCH endpoint; llm_decisions audit table; decider col on approvals for P&L split.
 - [Generated API declarations](api-zod-generated.md) — rebuild the api-zod composite package when TypeScript falsely reports a missing generated export.
 - [Trading scope](trading-scope.md) — four-station highs allowlist, fixed 10-contract sizing, $500 daily cap; verify rain is disabled in production, not just development.
+- [Kalshi submission outcomes](kalshi-submission-outcomes.md) — explicit insufficient-balance rejection must release its local intent; ambiguous outcomes stay blocked, never blindly retried.

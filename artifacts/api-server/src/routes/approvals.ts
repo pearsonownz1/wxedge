@@ -21,11 +21,13 @@ import {
   insertApprovalOrder,
   hasUnresolvedOrderSubmission,
   completeApprovalOrderSubmission,
+  rejectApprovalOrderSubmission,
   getCurrentMarketState,
   buildApprovalRiskState,
   getApprovalReport,
 } from "../lib/approvalsDb.js";
 import { placeKalshiOrder, kalshiLiveOrdersEnabled } from "../lib/kalshiOrderApi.js";
+import { KalshiOrderPlacementError } from "../lib/kalshiOrderErrors.js";
 
 const router = Router();
 
@@ -260,10 +262,11 @@ router.patch("/approvals/:id", async (req: Request, res: Response) => {
     //    the portfolio mutex so NYC and LAX cannot race shared caps.
     return void await withPortfolioLock(async () => {
     const today = now.toISOString().slice(0, 10);
+    const unresolvedSubmission = await hasUnresolvedOrderSubmission();
     const riskState = await buildApprovalRiskState(today, riskConfig);
     const contracts = riskConfig.contracts_per_trade;
 
-    if (await hasUnresolvedOrderSubmission()) {
+    if (unresolvedSubmission) {
       diff["unresolved_order_submission"] = {
         at_proposal: "none",
         now: "A prior Kalshi submission has no durably recorded response",
@@ -378,6 +381,22 @@ router.patch("/approvals/:id", async (req: Request, res: Response) => {
           "Real Kalshi order placed"
         );
       } catch (kalshiErr) {
+        if (kalshiErr instanceof KalshiOrderPlacementError && kalshiErr.isConfirmedRejection) {
+          try {
+            const recorded = await rejectApprovalOrderSubmission(orderId, kalshiErr);
+            if (!recorded) throw new Error("Rejected Kalshi submission was not durably recorded");
+            logger.warn(
+              { approvalId: id, orderId, ticker: approval.ticker, httpStatus: kalshiErr.httpStatus, code: kalshiErr.code, err: kalshiErr },
+              "Kalshi explicitly rejected order — local intent cancelled; no unresolved submission"
+            );
+            return void res.status(422).json({
+              result: "order_rejected", order_id: orderId,
+              error: kalshiErr.code, message: kalshiErr.message,
+            });
+          } catch (recordErr) {
+            logger.error({ approvalId: id, orderId, err: recordErr }, "Failed to persist Kalshi rejection — retaining safety block");
+          }
+        }
         // Leave the durable intent in "submitting": the request may have reached
         // Kalshi even if its response or our follow-up DB update failed. Further
         // approvals fail closed until this intent is reconciled.
