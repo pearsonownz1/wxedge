@@ -19,7 +19,7 @@
   "mode": "live",
   "approver": "llm",
   "llm_min_age_s": 30,
-  "active_station_ids": ["KLAX", "KNYC", "KAUS", "KMDW"],
+  "active_station_ids": ["KLAX", "KNYC"],
   "contracts_per_trade": 10,
   "max_cost_per_trade_cents": 1000,
   "max_open_orders_per_station": 5,
