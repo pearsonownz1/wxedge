@@ -26,7 +26,7 @@ import {
   buildApprovalRiskState,
   getApprovalReport,
 } from "../lib/approvalsDb.js";
-import { placeKalshiOrder, kalshiLiveOrdersEnabled } from "../lib/kalshiOrderApi.js";
+import { placeKalshiOrder, kalshiLiveOrdersEnabled, assertKalshiSigningReady } from "../lib/kalshiOrderApi.js";
 import { KalshiOrderPlacementError } from "../lib/kalshiOrderErrors.js";
 
 const router = Router();
@@ -311,6 +311,20 @@ router.patch("/approvals/:id", async (req: Request, res: Response) => {
       };
     }
 
+    // Local signing failures are NOT ambiguous exchange submissions. Check
+    // before the decision/intent is recorded, so no new submitting row is left.
+    const liveSubmission = kalshiLiveOrdersEnabled();
+    if (liveSubmission && Object.keys(diff).length === 0) {
+      try {
+        assertKalshiSigningReady(process.env["KALSHI_KEY_ID"], process.env["KALSHI_PRIVATE_KEY"]);
+      } catch {
+        diff["kalshi_signing_unavailable"] = {
+          at_proposal: "unchecked",
+          now: "Cannot produce the required RSA-PSS SHA-256 signature; no order attempted",
+        };
+      }
+    }
+
     // ── Stale: revalidation failed ────────────────────────────────────────────
     if (Object.keys(diff).length > 0) {
       const note = Object.keys(diff).join(", ");
@@ -348,7 +362,6 @@ router.patch("/approvals/:id", async (req: Request, res: Response) => {
           : (current.bid_cents !== null ? 100 - current.bid_cents : approval.limit_price_cents))
       : approval.limit_price_cents;
 
-    const liveSubmission = kalshiLiveOrdersEnabled();
     const orderId = await insertApprovalOrder({
       signal_id:       approval.signal_id,
       approval_id:     id,

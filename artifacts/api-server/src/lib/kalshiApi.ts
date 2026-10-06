@@ -19,6 +19,8 @@
 
 import { cache, TTL } from "./cache.js";
 import { logger } from "./logger.js";
+import { STATIONS, isStation } from "./stations.js";
+import { isStationTradingDate, stationTradingDate } from "./weatherMarketGuards.js";
 
 const KALSHI_BASE = "https://api.elections.kalshi.com/trade-api/v2";
 const UA = "WxEdge/1.0 (kalshi-weather-edge)";
@@ -262,7 +264,13 @@ export async function fetchKalshiEvents(): Promise<KalshiFetchResult> {
     return { events: [], usingStubData: true, allStaleFiltered: false, failureReason: "polling_disabled" };
   }
 
-  const key = "kalshi:events";
+  const now = new Date();
+  // Invalidate selected events immediately at any station's day rollover,
+  // rather than serving yesterday's selected book until its TTL expires.
+  const tradingDates = Object.keys(STATION_SERIES).map(id =>
+    isStation(id) ? stationTradingDate(now, STATIONS[id].lstOffset) : ""
+  ).join(":");
+  const key = `kalshi:events:${tradingDates}`;
 
   // Peek before get: save the stale entry BEFORE cache.get() deletes it on expiry.
   // Used as a fallback if the fresh fetch returns 429 or fails.
@@ -278,11 +286,11 @@ export async function fetchKalshiEvents(): Promise<KalshiFetchResult> {
   // marked closed yet. Kalshi's weather markets for 26JUL25 continued to
   // appear as status=open well into 2026; client-side filtering is the
   // backstop. We use UTC midnight so the comparison is timezone-stable.
-  const todayUtc = new Date();
+  const todayUtc = new Date(now);
   todayUtc.setUTCHours(0, 0, 0, 0);
 
   const perStationResults = await Promise.allSettled(
-    stationEntries.map(async ([_stationId, series], i) => {
+    stationEntries.map(async ([stationId, series], i) => {
       if (i > 0) await new Promise((r) => setTimeout(r, i * 150));
       return (async () => {
         // limit MUST be > 1: Kalshi keeps yesterday's event status=open until it
@@ -321,6 +329,13 @@ export async function fetchKalshiEvents(): Promise<KalshiFetchResult> {
           // Cross-check: parsed ticker date vs strike_date (or vs today if absent).
           // A disagreement >2 days is a format bug we want to catch early.
           const tickerDate = parseEventSettlementDate(candidateTicker);
+          // The forecast/running-high model is for THIS station's standard-time
+          // day. Never depend on API ordering or pair tomorrow's book with
+          // today's weather, and never keep yesterday after the local rollover.
+          if (!isStation(stationId) ||
+              !isStationTradingDate(tickerDate, now, STATIONS[stationId].lstOffset)) {
+            continue;
+          }
           if (tickerDate) {
             if (!strikeTime) {
               // No strike_date — fall back to ticker date as the stale guard.

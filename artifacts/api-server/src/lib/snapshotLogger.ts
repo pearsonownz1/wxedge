@@ -32,6 +32,7 @@ import {
   type BookRow,
 } from "./db.js";
 import { logger } from "./logger.js";
+import { bookPriceSums, isBookCoherent } from "./weatherMarketGuards.js";
 
 const MAX_AGE_MIN = 10;  // Gap detection threshold (matches signal engine config default)
 
@@ -49,7 +50,7 @@ function toIsoDate(utcNow: Date, lstOffset: number): string {
  * Book-coherence invariant.
  *
  * In a well-formed exclusive binary market the YES prices must satisfy:
- *   sum(YES asks) ∈ [100, 115] cents  — below 100 is an arbitrage; above 115 is suspicious
+ *   sum(YES asks, empty asks bounded at 100¢) ∈ [100, 115] cents
  *   sum(YES bids) ≤ 105 cents         — the theoretical no-arb bound is 100, but Kalshi
  *     fees (~7% × P(1-P) per leg, across 6-7 brackets) make a 1-5¢ overshoot
  *     non-arbitrageable in practice. Live books routinely print sum(bids)=101-103;
@@ -59,16 +60,6 @@ function toIsoDate(utcNow: Date, lstOffset: number): string {
  *
  * Returns true when the book passes both checks.
  */
-const MAX_BID_SUM_CENTS = 105;
-
-function isBookCoherent(
-  brackets: Array<{ bidCents: number | null; askCents: number | null }>
-): boolean {
-  const sumAsk = brackets.reduce((s, b) => s + (b.askCents ?? 0), 0);
-  const sumBid = brackets.reduce((s, b) => s + (b.bidCents ?? 0), 0);
-  return sumAsk >= 100 && sumAsk <= 115 && sumBid <= MAX_BID_SUM_CENTS;
-}
-
 export async function logSnapshots(): Promise<void> {
   const now    = new Date();
   const tsUtc  = now.toISOString();
@@ -130,8 +121,7 @@ export async function logSnapshots(): Promise<void> {
         // ── Book coherence ────────────────────────────────────────────────────
         const coherent = isBookCoherent(bracketResult.brackets);
         if (!coherent) {
-          const sumAsk = bracketResult.brackets.reduce((s, b) => s + (b.askCents ?? 0), 0);
-          const sumBid = bracketResult.brackets.reduce((s, b) => s + (b.bidCents ?? 0), 0);
+          const { sumAsk, sumBid } = bookPriceSums(bracketResult.brackets);
           logger.warn(
             { stationId: id, sumAsk, sumBid },
             "Book-coherence invariant FAILED — signals suppressed for this station"

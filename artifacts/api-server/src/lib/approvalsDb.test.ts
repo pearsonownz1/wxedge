@@ -9,7 +9,7 @@ test("historical recovery changes only status; new rejections retain evidence; u
   const responseBody = '{"error":{"code":"insufficient_balance","message":"insufficient balance"}}';
   const evidence: ConfirmedRejectedSubmission = {
     orderId: 1, approvalId: 2, ticker: "KXHIGHAUS-26OCT04-B82.5", side: "YES",
-    priceCents: 11, contracts: 10, tsPlaced: "2026-10-04T06:06:15.498Z",
+    priceCents: 11, contracts: 10, tsPlaced: "2026-10-04T06:06:15.498961Z",
     httpStatus: 400, responseBody,
   };
   const rejection = new KalshiOrderPlacementError(400, responseBody);
@@ -36,6 +36,7 @@ test("historical recovery changes only status; new rejections retain evidence; u
       `);
       assert.equal(await rejectApprovalOrderSubmission(1, rejection, { ...evidence, contracts: 9 }, tx), false);
       assert.equal(await rejectApprovalOrderSubmission(1, rejection, { ...evidence, tsPlaced: "2026-10-04T06:06:16Z" }, tx), false);
+      assert.equal(await rejectApprovalOrderSubmission(1, rejection, { ...evidence, tsPlaced: "2026-10-04T06:06:15.498Z" }, tx), false);
       assert.equal(await rejectApprovalOrderSubmission(1, rejection, evidence, tx), true);
       assert.equal(await rejectApprovalOrderSubmission(1, rejection, evidence, tx), false);
       const { rows } = await tx.execute(sql`

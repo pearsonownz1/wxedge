@@ -5,6 +5,7 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { warmCache } from "./lib/warmup";
 import { isKalshiPollingEnabled } from "./lib/kalshiApi";
+import { hasUnresolvedOrderSubmission } from "./lib/approvalsDb";
 
 const rawPort = process.env["PORT"];
 
@@ -123,7 +124,18 @@ app.listen(port, (err) => {
 
   // Spawn the trader subprocess only in production (dev uses its own workflow).
   if (IS_PRODUCTION) {
-    spawnTrader();
+    // Release ONLY exactly matched, operator-confirmed rejection intents using
+    // the existing status-only reconciliation. Do not depend on a new proposal
+    // to reach this path: a quiet market must not strand the safety block.
+    hasUnresolvedOrderSubmission().then((unresolved) => {
+      logger.info({ unresolved }, "Confirmed-rejection startup reconciliation complete");
+      spawnTrader();
+    }).catch((err) => {
+      // Never clear unknown intents or retry orders on a reconciliation error.
+      // The approval endpoint retains its existing fail-closed check.
+      logger.error({ err }, "Startup reconciliation failed — unresolved intents remain blocked");
+      spawnTrader();
+    });
   } else {
     logger.info("Development mode — skipping trader subprocess (use the Trader workflow)");
   }

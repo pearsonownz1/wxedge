@@ -1,14 +1,14 @@
 ---
 name: Kalshi RSA signing key format
-description: The KALSHI_PRIVATE_KEY secret is PKCS1 with spaces instead of newlines — normalisePem must re-wrap base64, not just substitute \n.
+description: Kalshi requires an RSA key and RSA-PSS SHA-256; PEM normalization alone does not establish signing compatibility.
 ---
 
 # Kalshi RSA Signing Key Format
 
 ## The Rule
-`KALSHI_PRIVATE_KEY` on Replit is stored as a PKCS1 PEM (`-----BEGIN RSA PRIVATE KEY-----`) with **space-separated base64 lines** instead of real newlines. Node's crypto stack rejects it with `error:1E08010C:DECODER routines::unsupported` unless re-wrapped.
+Kalshi requires an RSA-compatible key, regardless of whether a stored PEM parses successfully. Do not assume the current credential has the algorithm or format used in an earlier session. An Ed25519 key cannot satisfy RSA-PSS SHA-256.
 
-**Why:** Replit secrets cannot store real newlines; the secret was pasted with the header/footer intact but spaces between base64 chunks.
+**Why:** A key parsed successfully but signing failed with `ERR_OSSL_INVALID_DIGEST`; it was a non-RSA key. Separately, historical RSA PEM values arrived with space-separated base64 lines and needed re-wrapping.
 
 ## How to apply
 `normalisePem()` in `artifacts/api-server/src/lib/kalshiOrderApi.ts` must:
@@ -16,7 +16,7 @@ description: The KALSHI_PRIVATE_KEY secret is PKCS1 with spaces instead of newli
 2. If a `-----BEGIN ... -----` header is present, **extract the base64 body, strip ALL whitespace, and re-wrap at 64 chars/line**
 3. If no header, wrap raw base64 as `-----BEGIN PRIVATE KEY-----` (PKCS8 fallback)
 
-The key is PKCS1 (RSA), not PKCS8.
+Validate RSA-PSS SHA-256 signing compatibility, not just PEM parsing, before reserving a submission intent. Support RSA PEM in PKCS1 or PKCS8 rather than assuming one current format. Never change credentials or substitute another signing algorithm without the user's authorization.
 
 ## CRITICAL: RSA-PSS Required (NOT PKCS1 v1.5)
 Kalshi v2 uses **RSA-PSS**, not the old `createSign("SHA256").sign(pem)` (PKCS1 v1.5).

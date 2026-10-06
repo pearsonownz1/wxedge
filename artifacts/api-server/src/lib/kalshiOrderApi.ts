@@ -48,7 +48,7 @@ function normalisePem(raw: string): string {
       const footer = footerMatch[0]!;
       // Strip ALL whitespace from the body (handles spaces or newlines)
       const b64 = s
-        .slice(header.length, s.lastIndexOf(footer))
+        .slice(s.indexOf(header) + header.length, s.lastIndexOf(footer))
         .replace(/\s+/g, "");
       const lines = b64.match(/.{1,64}/g) ?? [];
       return `${header}\n${lines.join("\n")}\n${footer}`;
@@ -75,6 +75,9 @@ function buildSignatureHeaders(
   //   sign("sha256", data, { key: pk, padding: RSA_PKCS1_PSS_PADDING, saltLength: RSA_PSS_SALTLEN_DIGEST })
   const pem = normalisePem(privateKey);
   const pk  = createPrivateKey({ key: pem });
+  if (pk.asymmetricKeyType !== "rsa" && pk.asymmetricKeyType !== "rsa-pss") {
+    throw new Error("Kalshi signing requires an RSA key for RSA-PSS SHA-256");
+  }
   const signature = cryptoSign(
     "sha256",
     Buffer.from(message),
@@ -88,6 +91,19 @@ function buildSignatureHeaders(
     "Content-Type":            "application/json",
     Accept:                    "application/json",
   };
+}
+
+/** Validate local signing BEFORE persisting an order intent.
+ * This creates a signature in memory only; it makes no HTTP request.
+ */
+export function assertKalshiSigningReady(
+  keyId: string | undefined,
+  privateKey: string | undefined,
+): void {
+  if (!keyId || !privateKey) {
+    throw new Error("Kalshi signing credentials are unavailable");
+  }
+  buildSignatureHeaders(keyId, privateKey, "GET", "/trade-api/v2/portfolio/balance");
 }
 
 // ─── Order placement ──────────────────────────────────────────────────────────

@@ -11,6 +11,7 @@
  */
 
 import { cache, TTL } from "./cache.js";
+import { stationTradingDate } from "./weatherMarketGuards.js";
 import { logger } from "./logger.js";
 import { lstDayStartUtcMs } from "./iemMetar.js";
 
@@ -97,7 +98,7 @@ export async function fetchIntradayObs(
   lstOffset: number,
   count = 72
 ): Promise<IntradayPoint[]> {
-  const key = `nws:obs:intraday:${stationId}`;
+  const key = `nws:obs:intraday:${stationId}:${stationTradingDate(new Date(), lstOffset)}`;
   const cached = cache.get<IntradayPoint[]>(key);
   if (cached) return cached.value;
 
@@ -267,7 +268,7 @@ export async function fetchNbmPercentiles(
   forecastMedianF: number,
   rmse: number
 ): Promise<NbmPercentiles> {
-  const key = `nws:nbm:percentiles:${lat.toFixed(4)}:${lon.toFixed(4)}`;
+  const key = `nws:nbm:percentiles:${lat.toFixed(4)}:${lon.toFixed(4)}:${stationTradingDate(new Date(), lstOffset)}`;
   const cached = cache.get<NbmPercentiles>(key);
   if (cached) return cached.value;
 
@@ -336,7 +337,7 @@ export async function fetchTodayMaxForecast(
   lon: number,
   lstOffset: number
 ): Promise<NwsForecast | null> {
-  const key = `nws:forecast:max:${lat}:${lon}`;
+  const key = `nws:forecast:max:${lat}:${lon}:${stationTradingDate(new Date(), lstOffset)}`;
   const cached = cache.get<NwsForecast>(key);
   if (cached) return cached.value;
 
