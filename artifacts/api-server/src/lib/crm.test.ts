@@ -3,14 +3,9 @@ import assert from "node:assert/strict";
 import { pool } from "@workspace/db";
 import { businessDate, normalizeLinkedIn, summary, upsert, listInvestors, validateInput } from "./crmData";
 import { importCsv, parseCsv, exportCsv } from "./crmCsv";
-import { tokenMatches, isOwner } from "../middlewares/crmAccess";
+import { isOwner } from "../middlewares/crmAccess";
 
-test("API authorization fails closed and owner identity is exact", () => {
-  assert.equal(tokenMatches(undefined, undefined), false);
-  assert.equal(tokenMatches("Bearer anything", ""), false);
-  assert.equal(tokenMatches("Bearer token", "token"), true);
-  assert.equal(tokenMatches("Bearer wrong", "token"), false);
-  assert.equal(tokenMatches("Basic token", "token"), false);
+test("Owner identity is exact and missing identity is rejected", () => {
   assert.equal(isOwner(undefined), false);
   assert.equal(isOwner("someone-else"), false);
 });

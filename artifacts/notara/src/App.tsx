@@ -4,9 +4,7 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
-import { useAuth } from '@workspace/replit-auth-web';
 import Dashboard from '@/pages/dashboard';
-import { LoginScreen, Splash } from '@/pages/login';
 import {
   Route,
   Switch,
@@ -16,20 +14,13 @@ import {
 
 const queryClient = new QueryClient();
 
-function Home() {
-  const { isLoading, isAuthenticated, login } = useAuth();
-  if (isLoading) return <Splash />;
-  if (!isAuthenticated) return <LoginScreen onLogin={login} />;
-  return <Dashboard />;
-}
-
 function Router() {
   return (
     // Keep a shared shell (sidebar, navbar) outside the boundary so it
     // survives a page crash.
     <RoutedErrorBoundary>
       <Switch>
-        <Route path="/" component={Home} />
+        <Route path="/" component={Dashboard} />
         <Route component={NotFound} />
       </Switch>
     </RoutedErrorBoundary>

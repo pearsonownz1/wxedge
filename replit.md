@@ -1,11 +1,11 @@
 # Notara — Investor Pipeline
 
-Private seed-round fundraising CRM for Notara, an AI-native notarization and eSign infrastructure startup. The former Kalshi weather app is retired in this codebase.
+Publicly viewable investor-pipeline interface for Notara, an AI-native notarization and eSign infrastructure startup. Fundraising records and activity history were cleared before making viewing public. The former Kalshi weather app is retired in this codebase.
 
 ## Product rules
 
-- Only the project owner may use the signed-in dashboard. Enforce identity on the server, not just in the UI.
-- The CRM never sends email. The founder approves pitches and sends them outside the app from Gmail.
+- Viewing the dashboard requires no login. Record changes remain owner-only; public viewing must not grant anonymous write access.
+- There are no investor-email sending or third-party email/CRM integrations. Do not reintroduce them unless requested.
 - Keep all historical weather/trading tables and data. Do not expose them through routes or UI, or restore trading/schedulers/order submission.
 - Preserve custom-domain configuration. Publishing is a separate, explicitly approved action.
 - Real investor data only: do not seed fabricated leads.
@@ -33,16 +33,16 @@ Useful checks:
 
 ## Authentication and API
 
-Browser authentication uses Replit Auth (OIDC + PKCE), with PostgreSQL sessions and secure HTTP-only cookies. `CRM_OWNER_ID` binds access to the project owner. Missing owner configuration denies access. Mutating browser requests must be same-origin.
+Viewing does not require authentication. Replit Auth sessions remain only for owner-authorized changes. `CRM_OWNER_ID` binds write access to the owner; missing owner configuration denies changes. Mutating browser requests must be same-origin.
 
-The session-authenticated browser routes live under `/api/crm`. The separate assistant routes require an exact bearer token matching `process.env.CRM_API_TOKEN`:
+The dashboard routes live under `/api/crm`. Reads are public; writes require an owner session. The former external CRM bearer-token integration has been removed:
 - `GET /api/investors?status=...`
 - `POST /api/investors` — create or upsert on email or LinkedIn URL
 - `PATCH /api/investors/:id`
 - `POST /api/investors/:id/activity`
 - `GET /api/summary`
 
-The user will add `CRM_API_TOKEN` through Secrets. Missing token configuration rejects all assistant requests, even when the caller has an owner browser session. Never expose or log credentials, authorization headers, investor payloads, or OIDC callback query strings.
+No Gmail, Hunter, ActiveCampaign, or other email/CRM keys or connections were configured when checked. Kalshi and unrelated credentials are preserved. Never expose or log credentials, authorization headers, investor payloads, or OIDC callback query strings.
 
 ## Data and contracts
 

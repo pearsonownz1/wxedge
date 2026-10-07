@@ -290,11 +290,7 @@
             }
           }
         ],
-        "security": [
-          {
-            "AssistantToken": []
-          }
-        ]
+        "security": []
       },
       "post": {
         "operationId": "upsertInvestor",
@@ -328,7 +324,7 @@
         },
         "security": [
           {
-            "AssistantToken": []
+            "OwnerSession": []
           }
         ]
       }
@@ -377,7 +373,8 @@
               ]
             }
           }
-        ]
+        ],
+        "security": []
       },
       "post": {
         "operationId": "browserUpsertInvestor",
@@ -408,7 +405,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "OwnerSession": []
+          }
+        ]
       }
     },
     "/investors/{id}": {
@@ -442,11 +444,7 @@
             }
           }
         ],
-        "security": [
-          {
-            "AssistantToken": []
-          }
-        ]
+        "security": []
       },
       "patch": {
         "operationId": "updateInvestor",
@@ -490,7 +488,7 @@
         ],
         "security": [
           {
-            "AssistantToken": []
+            "OwnerSession": []
           }
         ]
       }
@@ -525,7 +523,8 @@
               "type": "integer"
             }
           }
-        ]
+        ],
+        "security": []
       },
       "patch": {
         "operationId": "browserUpdateInvestor",
@@ -565,6 +564,11 @@
             "schema": {
               "type": "integer"
             }
+          }
+        ],
+        "security": [
+          {
+            "OwnerSession": []
           }
         ]
       }
@@ -612,7 +616,7 @@
         ],
         "security": [
           {
-            "AssistantToken": []
+            "OwnerSession": []
           }
         ]
       }
@@ -657,6 +661,11 @@
               "type": "integer"
             }
           }
+        ],
+        "security": [
+          {
+            "OwnerSession": []
+          }
         ]
       }
     },
@@ -681,11 +690,7 @@
             "description": "Owner only"
           }
         },
-        "security": [
-          {
-            "AssistantToken": []
-          }
-        ]
+        "security": []
       }
     },
     "/crm/summary": {
@@ -708,7 +713,8 @@
           "403": {
             "description": "Owner only"
           }
-        }
+        },
+        "security": []
       }
     },
     "/investors/import": {
@@ -744,7 +750,7 @@
         },
         "security": [
           {
-            "AssistantToken": []
+            "OwnerSession": []
           }
         ]
       }
@@ -779,7 +785,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "OwnerSession": []
+          }
+        ]
       }
     },
     "/investors/export": {
@@ -797,11 +808,7 @@
             }
           }
         },
-        "security": [
-          {
-            "AssistantToken": []
-          }
-        ]
+        "security": []
       }
     },
     "/crm/investors/export": {
@@ -818,7 +825,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     }
   },
@@ -1383,9 +1391,11 @@
       }
     },
     "securitySchemes": {
-      "AssistantToken": {
-        "type": "http",
-        "scheme": "bearer"
+      "OwnerSession": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "sid",
+        "description": "Owner session required for changes; viewing is public"
       }
     }
   }
