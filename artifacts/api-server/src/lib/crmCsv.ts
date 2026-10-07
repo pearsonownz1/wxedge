@@ -24,6 +24,12 @@ export function parseCsv(text: string): string[][] {
   row.push(cell); if (row.some(v => v !== "")) rows.push(row);
   return rows;
 }
+export function csvExpertField(value: string): "Dentistry" | "Economics" {
+  const field = value.trim().toLowerCase();
+  if (!field || field === "dentistry") return "Dentistry";
+  if (field === "economics") return "Economics";
+  throw new CrmError("expert_field must be Dentistry or Economics");
+}
 export async function importCsv(client: Client, text: string) {
   const rows = parseCsv(text);
   if (rows.length < 2) throw new CrmError("CSV must contain headers and at least one investor");
@@ -43,6 +49,7 @@ export async function importCsv(client: Client, text: string) {
       if (input.fit_score === 0) delete input.fit_score;
       if (input.status === "") delete input.status;
       if (input.investor_type === "") delete input.investor_type;
+      if (typeof input.expert_field === "string") input.expert_field = csvExpertField(input.expert_field);
       const result = await upsert(client, input);
       result.created ? created++ : updated++;
       const rawActivity = headers.includes("activity_log") ? rows[i][headers.indexOf("activity_log")] : "";

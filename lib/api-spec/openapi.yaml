@@ -690,7 +690,22 @@
             "description": "Owner only"
           }
         },
-        "security": []
+        "security": [],
+        "parameters": [
+          {
+            "name": "expert_field",
+            "in": "query",
+            "required": false,
+            "description": "Restrict summary metrics to this field; records without a field count as Dentistry. Omit for all experts.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Dentistry",
+                "Economics"
+              ]
+            }
+          }
+        ]
       }
     },
     "/crm/summary": {
@@ -714,7 +729,22 @@
             "description": "Owner only"
           }
         },
-        "security": []
+        "security": [],
+        "parameters": [
+          {
+            "name": "expert_field",
+            "in": "query",
+            "required": false,
+            "description": "Restrict summary metrics to this field; records without a field count as Dentistry. Omit for all experts.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Dentistry",
+                "Economics"
+              ]
+            }
+          }
+        ]
       }
     },
     "/investors/import": {
@@ -1046,6 +1076,13 @@
               "Passed",
               "Committed"
             ]
+          },
+          "expert_field": {
+            "type": "string",
+            "enum": [
+              "Dentistry",
+              "Economics"
+            ]
           }
         }
       },
@@ -1130,6 +1167,13 @@
               "Passed",
               "Committed"
             ]
+          },
+          "expert_field": {
+            "type": "string",
+            "enum": [
+              "Dentistry",
+              "Economics"
+            ]
           }
         }
       },
@@ -1182,7 +1226,8 @@
           "notes",
           "investor_type",
           "fit_score",
-          "status"
+          "status",
+          "expert_field"
         ],
         "properties": {
           "name": {
@@ -1277,6 +1322,13 @@
             "items": {
               "$ref": "#/components/schemas/Activity"
             }
+          },
+          "expert_field": {
+            "type": "string",
+            "enum": [
+              "Dentistry",
+              "Economics"
+            ]
           }
         }
       },

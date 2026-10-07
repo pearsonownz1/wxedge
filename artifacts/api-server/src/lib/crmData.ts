@@ -2,7 +2,7 @@ import { pool } from "@workspace/db";
 import { BrowserUpsertInvestorBody, type Investor } from "@workspace/api-zod";
 
 export const STATUSES = ["New", "Enriched", "Pitch Drafted", "Approved to Send", "Contacted", "Followed Up", "Responded", "Meeting Set", "Passed", "Committed"];
-export const FIELDS = ["name", "firm", "title", "email", "linkedin_url", "website", "location", "investor_type", "typical_check_size", "stage_focus", "thesis_notes", "warm_intro_path", "source_url", "fit_score", "status", "pitch_subject", "pitch_body", "last_contacted_date", "next_follow_up_date", "notes"];
+export const FIELDS = ["name", "firm", "title", "email", "linkedin_url", "website", "location", "investor_type", "expert_field", "typical_check_size", "stage_focus", "thesis_notes", "warm_intro_path", "source_url", "fit_score", "status", "pitch_subject", "pitch_body", "last_contacted_date", "next_follow_up_date", "notes"];
 export class CrmError extends Error {
   constructor(message: string, public status = 400) { super(message); }
 }
@@ -64,7 +64,7 @@ export async function getInvestor(client: Client, id: number): Promise<Investor>
   if (!r.rows[0]) throw new CrmError("Investor not found", 404);
   const row = r.rows[0];
   const a = await client.query(`SELECT id::text,to_char(created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS timestamp,message,kind FROM crm_activities WHERE investor_id=$1 ORDER BY created_at,id`, [id]);
-  return { ...row.data, id: row.id, created_at: row.created_at.toISOString(), updated_at: row.updated_at.toISOString(), activity_log: a.rows } as Investor;
+  return { ...row.data, expert_field: row.data.expert_field || "Dentistry", id: row.id, created_at: row.created_at.toISOString(), updated_at: row.updated_at.toISOString(), activity_log: a.rows } as Investor;
 }
 export async function listInvestors(client: Client, status?: string) {
   const rows = await client.query("SELECT id FROM crm_investors WHERE ($1::text IS NULL OR data->>'status'=$1) ORDER BY updated_at DESC,id DESC", [status ?? null]);
@@ -79,7 +79,7 @@ export async function upsert(client: Client, raw: unknown, id?: number) {
   if (id === undefined && matches.rows[0]) id = matches.rows[0].id;
   const old = id === undefined ? null : (await client.query("SELECT data FROM crm_investors WHERE id=$1 FOR UPDATE", [id])).rows[0]?.data;
   if (id !== undefined && !old) throw new CrmError("Investor not found", 404);
-  const defaults = { ...Object.fromEntries(FIELDS.map(key => [key, ""])), investor_type: "STANDARD", fit_score: 3, status: "New" };
+  const defaults = { ...Object.fromEntries(FIELDS.map(key => [key, ""])), investor_type: "STANDARD", expert_field: "Dentistry", fit_score: 3, status: "New" };
   const data = { ...defaults, ...old, ...input };
   if (!data.name.trim()) throw new CrmError("Investor name is required");
   if (input.status && ["Contacted", "Followed Up"].includes(input.status) && !input.last_contacted_date && old?.status !== input.status) data.last_contacted_date = businessDate();
@@ -93,7 +93,8 @@ export async function upsert(client: Client, raw: unknown, id?: number) {
   if (old?.status !== data.status) await activity(client, id!, `${old?.status ?? "New record"} → ${data.status}`, `status:${data.status}`);
   return { investor: await getInvestor(client, id!), created };
 }
-export function summary(investors: Awaited<ReturnType<typeof listInvestors>>, now = new Date()) {
+export function summary(investors: Awaited<ReturnType<typeof listInvestors>>, now = new Date(), expertField?: Investor["expert_field"]) {
+  if (expertField) investors = investors.filter(i => (i.expert_field || "Dentistry") === expertField);
   const today = businessDate(now);
   const day = new Date(`${today}T00:00:00Z`);
   day.setUTCDate(day.getUTCDate() - (day.getUTCDay() + 6) % 7);

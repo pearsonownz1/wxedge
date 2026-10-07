@@ -145,7 +145,8 @@ export const ListInvestorsResponseItem = zod.object({
   "timestamp": zod.string(),
   "message": zod.string(),
   "kind": zod.string()
-}))
+})),
+  "expert_field": zod.enum(['Dentistry', 'Economics'])
 })
 export const ListInvestorsResponse = zod.array(ListInvestorsResponseItem)
 
@@ -174,7 +175,8 @@ export const UpsertInvestorBody = zod.object({
   "notes": zod.string().optional(),
   "investor_type": zod.enum(['STANDARD', 'PREMIUM']).optional(),
   "fit_score": zod.number().min(1).max(upsertInvestorBodyFitScoreMax).optional(),
-  "status": zod.enum(['New', 'Enriched', 'Pitch Drafted', 'Approved to Send', 'Contacted', 'Followed Up', 'Responded', 'Meeting Set', 'Passed', 'Committed']).optional()
+  "status": zod.enum(['New', 'Enriched', 'Pitch Drafted', 'Approved to Send', 'Contacted', 'Followed Up', 'Responded', 'Meeting Set', 'Passed', 'Committed']).optional(),
+  "expert_field": zod.enum(['Dentistry', 'Economics']).optional()
 })
 
 export const upsertInvestorResponseFitScoreMax = 5;
@@ -210,7 +212,8 @@ export const UpsertInvestorResponse = zod.object({
   "timestamp": zod.string(),
   "message": zod.string(),
   "kind": zod.string()
-}))
+})),
+  "expert_field": zod.enum(['Dentistry', 'Economics'])
 })
 
 
@@ -251,7 +254,8 @@ export const BrowserListInvestorsResponseItem = zod.object({
   "timestamp": zod.string(),
   "message": zod.string(),
   "kind": zod.string()
-}))
+})),
+  "expert_field": zod.enum(['Dentistry', 'Economics'])
 })
 export const BrowserListInvestorsResponse = zod.array(BrowserListInvestorsResponseItem)
 
@@ -280,7 +284,8 @@ export const BrowserUpsertInvestorBody = zod.object({
   "notes": zod.string().optional(),
   "investor_type": zod.enum(['STANDARD', 'PREMIUM']).optional(),
   "fit_score": zod.number().min(1).max(browserUpsertInvestorBodyFitScoreMax).optional(),
-  "status": zod.enum(['New', 'Enriched', 'Pitch Drafted', 'Approved to Send', 'Contacted', 'Followed Up', 'Responded', 'Meeting Set', 'Passed', 'Committed']).optional()
+  "status": zod.enum(['New', 'Enriched', 'Pitch Drafted', 'Approved to Send', 'Contacted', 'Followed Up', 'Responded', 'Meeting Set', 'Passed', 'Committed']).optional(),
+  "expert_field": zod.enum(['Dentistry', 'Economics']).optional()
 })
 
 export const browserUpsertInvestorResponseFitScoreMax = 5;
@@ -316,7 +321,8 @@ export const BrowserUpsertInvestorResponse = zod.object({
   "timestamp": zod.string(),
   "message": zod.string(),
   "kind": zod.string()
-}))
+})),
+  "expert_field": zod.enum(['Dentistry', 'Economics'])
 })
 
 
@@ -357,7 +363,8 @@ export const GetInvestorResponse = zod.object({
   "timestamp": zod.string(),
   "message": zod.string(),
   "kind": zod.string()
-}))
+})),
+  "expert_field": zod.enum(['Dentistry', 'Economics'])
 })
 
 
@@ -389,7 +396,8 @@ export const UpdateInvestorBody = zod.object({
   "notes": zod.string().optional(),
   "investor_type": zod.enum(['STANDARD', 'PREMIUM']).optional(),
   "fit_score": zod.number().min(1).max(updateInvestorBodyFitScoreMax).optional(),
-  "status": zod.enum(['New', 'Enriched', 'Pitch Drafted', 'Approved to Send', 'Contacted', 'Followed Up', 'Responded', 'Meeting Set', 'Passed', 'Committed']).optional()
+  "status": zod.enum(['New', 'Enriched', 'Pitch Drafted', 'Approved to Send', 'Contacted', 'Followed Up', 'Responded', 'Meeting Set', 'Passed', 'Committed']).optional(),
+  "expert_field": zod.enum(['Dentistry', 'Economics']).optional()
 })
 
 export const updateInvestorResponseFitScoreMax = 5;
@@ -425,7 +433,8 @@ export const UpdateInvestorResponse = zod.object({
   "timestamp": zod.string(),
   "message": zod.string(),
   "kind": zod.string()
-}))
+})),
+  "expert_field": zod.enum(['Dentistry', 'Economics'])
 })
 
 
@@ -466,7 +475,8 @@ export const BrowserGetInvestorResponse = zod.object({
   "timestamp": zod.string(),
   "message": zod.string(),
   "kind": zod.string()
-}))
+})),
+  "expert_field": zod.enum(['Dentistry', 'Economics'])
 })
 
 
@@ -498,7 +508,8 @@ export const BrowserUpdateInvestorBody = zod.object({
   "notes": zod.string().optional(),
   "investor_type": zod.enum(['STANDARD', 'PREMIUM']).optional(),
   "fit_score": zod.number().min(1).max(browserUpdateInvestorBodyFitScoreMax).optional(),
-  "status": zod.enum(['New', 'Enriched', 'Pitch Drafted', 'Approved to Send', 'Contacted', 'Followed Up', 'Responded', 'Meeting Set', 'Passed', 'Committed']).optional()
+  "status": zod.enum(['New', 'Enriched', 'Pitch Drafted', 'Approved to Send', 'Contacted', 'Followed Up', 'Responded', 'Meeting Set', 'Passed', 'Committed']).optional(),
+  "expert_field": zod.enum(['Dentistry', 'Economics']).optional()
 })
 
 export const browserUpdateInvestorResponseFitScoreMax = 5;
@@ -534,7 +545,8 @@ export const BrowserUpdateInvestorResponse = zod.object({
   "timestamp": zod.string(),
   "message": zod.string(),
   "kind": zod.string()
-}))
+})),
+  "expert_field": zod.enum(['Dentistry', 'Economics'])
 })
 
 
@@ -583,7 +595,8 @@ export const AppendActivityResponse = zod.object({
   "timestamp": zod.string(),
   "message": zod.string(),
   "kind": zod.string()
-}))
+})),
+  "expert_field": zod.enum(['Dentistry', 'Economics'])
 })
 
 
@@ -632,9 +645,14 @@ export const BrowserAppendActivityResponse = zod.object({
   "timestamp": zod.string(),
   "message": zod.string(),
   "kind": zod.string()
-}))
+})),
+  "expert_field": zod.enum(['Dentistry', 'Economics'])
 })
 
+
+export const GetSummaryQueryParams = zod.object({
+  "expert_field": zod.enum(['Dentistry', 'Economics']).optional().describe('Restrict summary metrics to this field; records without a field count as Dentistry. Omit for all experts.')
+})
 
 export const GetSummaryResponse = zod.object({
   "total": zod.number(),
@@ -646,6 +664,10 @@ export const GetSummaryResponse = zod.object({
   "followups_due_today": zod.number()
 })
 
+
+export const BrowserGetSummaryQueryParams = zod.object({
+  "expert_field": zod.enum(['Dentistry', 'Economics']).optional().describe('Restrict summary metrics to this field; records without a field count as Dentistry. Omit for all experts.')
+})
 
 export const BrowserGetSummaryResponse = zod.object({
   "total": zod.number(),

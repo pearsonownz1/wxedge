@@ -4,22 +4,22 @@ import { useBrowserGetInvestor, useBrowserUpsertInvestor, useBrowserUpdateInvest
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { useToast } from '@/hooks/use-toast';
 import { Copy } from 'lucide-react';
-import { STATUSES, TYPES, FIELDS, fmtTs } from '@/lib/crm';
+import { STATUSES, TYPES, FIELDS, EXPERT_FIELDS, expertFieldOf, type ExpertField, fmtTs } from '@/lib/crm';
 
 type F = Record<string, string>;
-const empty = (): F => ({ ...Object.fromEntries(FIELDS.map((k) => [k, ''])), status: 'New', fit_score: '3', investor_type: 'STANDARD' });
+const empty = (expertField: ExpertField = 'Dentistry'): F => ({ ...Object.fromEntries(FIELDS.map((k) => [k, ''])), status: 'New', fit_score: '3', investor_type: 'STANDARD', expert_field: expertField });
 const LONG = ['thesis_notes', 'pitch_body', 'notes', 'warm_intro_path'];
 const DATES = ['last_contacted_date', 'next_follow_up_date'];
 const lbl = (k: string) => k === 'investor_type' ? 'expert tier' : k.replace(/_/g, ' ');
 const inp = 'w-full rounded-md border border-input bg-card px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring/40';
 
-export function InvestorSheet({ id, open, onClose }: { id: number | 'new' | null; open: boolean; onClose: () => void }) {
+export function InvestorSheet({ id, open, onClose, defaultExpertField = 'Dentistry' }: { id: number | 'new' | null; open: boolean; onClose: () => void; defaultExpertField?: ExpertField }) {
   const qc = useQueryClient();
   const { toast } = useToast();
   const isNew = id === 'new';
   const numId = typeof id === 'number' ? id : 0;
   const { data, isLoading, isError, refetch } = useBrowserGetInvestor(numId, { query: { enabled: !!numId && open, queryKey: getBrowserGetInvestorQueryKey(numId) } });
-  const [f, setF] = useState<F>(empty());
+  const [f, setF] = useState<F>(() => empty(defaultExpertField));
   const [msg, setMsg] = useState('');
   const dirty = useRef(false);
   useEffect(() => { dirty.current = false; setMsg(''); }, [numId, open]);
@@ -27,9 +27,9 @@ export function InvestorSheet({ id, open, onClose }: { id: number | 'new' | null
   const update = useBrowserUpdateInvestor();
   const append = useBrowserAppendActivity();
 
-  useEffect(() => { if (isNew) setF(empty()); }, [isNew, open]);
+  useEffect(() => { if (isNew && open) setF(empty(defaultExpertField)); }, [isNew, open, defaultExpertField]);
   useEffect(() => {
-    if (!dirty.current && data && data.id === numId) setF(Object.fromEntries(FIELDS.map((k) => [k, String((data as any)[k] ?? '')])));
+    if (!dirty.current && data && data.id === numId) setF(Object.fromEntries(FIELDS.map((k) => [k, k === 'expert_field' ? expertFieldOf(data) : String((data as any)[k] ?? '')])));
   }, [data?.id, data?.updated_at, numId]);
 
   const refresh = () => qc.invalidateQueries({ predicate: (q) => String(q.queryKey[0]).startsWith('/api/crm') });
@@ -60,6 +60,7 @@ export function InvestorSheet({ id, open, onClose }: { id: number | 'new' | null
       <span className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{lbl(k)}</span>
       {k === 'status' ? <select data-testid="select-status" className={inp} value={f[k]} onChange={(e) => set(k, e.target.value)}>{STATUSES.map((s) => <option key={s}>{s}</option>)}</select>
         : k === 'investor_type' ? <select data-testid="select-type" className={inp} value={f[k]} onChange={(e) => set(k, e.target.value)}>{TYPES.map((s) => <option key={s}>{s}</option>)}</select>
+        : k === 'expert_field' ? <select data-testid="select-expert-field" className={inp} value={f[k]} onChange={(e) => set(k, e.target.value)}>{EXPERT_FIELDS.map((s) => <option key={s}>{s}</option>)}</select>
         : k === 'fit_score' ? <select data-testid="select-fit" className={inp} value={f[k]} onChange={(e) => set(k, e.target.value)}>{[1, 2, 3, 4, 5].map((s) => <option key={s}>{s}</option>)}</select>
         : LONG.includes(k) ? <textarea data-testid={`input-${k}`} rows={k === 'pitch_body' ? 8 : 3} className={inp} value={f[k]} onChange={(e) => set(k, e.target.value)} />
         : <input data-testid={`input-${k}`} type={DATES.includes(k) ? 'date' : 'text'} className={inp} value={f[k]} onChange={(e) => set(k, e.target.value)} />}

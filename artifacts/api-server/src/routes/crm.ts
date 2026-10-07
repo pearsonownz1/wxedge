@@ -9,7 +9,11 @@ function id(value: string | string[]) {
   if (!Number.isSafeInteger(n) || n <= 0) throw new CrmError("Invalid investor id");
   return n;
 }
-router.get("/summary", async (_req, res) => res.json(summary(await listInvestors(pool))));
+router.get("/summary", async (req, res) => {
+  const expertField = req.query.expert_field;
+  if (expertField !== undefined && expertField !== "Dentistry" && expertField !== "Economics") throw new CrmError("Invalid expert field");
+  res.json(summary(await listInvestors(pool), new Date(), expertField));
+});
 router.get("/investors", async (req, res) => {
   const status = req.query.status;
   if (status !== undefined && (typeof status !== "string" || !STATUSES.includes(status))) throw new CrmError("Invalid status");

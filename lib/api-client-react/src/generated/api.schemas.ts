@@ -75,6 +75,14 @@ export const InvestorInputStatus = {
   Committed: 'Committed',
 } as const;
 
+export type InvestorInputExpertField = typeof InvestorInputExpertField[keyof typeof InvestorInputExpertField];
+
+
+export const InvestorInputExpertField = {
+  Dentistry: 'Dentistry',
+  Economics: 'Economics',
+} as const;
+
 export interface InvestorInput {
   name?: string;
   firm?: string;
@@ -100,6 +108,7 @@ export interface InvestorInput {
      */
   fit_score?: number;
   status?: InvestorInputStatus;
+  expert_field?: InvestorInputExpertField;
 }
 
 export type InvestorUpdateInvestorType = typeof InvestorUpdateInvestorType[keyof typeof InvestorUpdateInvestorType];
@@ -124,6 +133,14 @@ export const InvestorUpdateStatus = {
   Meeting_Set: 'Meeting Set',
   Passed: 'Passed',
   Committed: 'Committed',
+} as const;
+
+export type InvestorUpdateExpertField = typeof InvestorUpdateExpertField[keyof typeof InvestorUpdateExpertField];
+
+
+export const InvestorUpdateExpertField = {
+  Dentistry: 'Dentistry',
+  Economics: 'Economics',
 } as const;
 
 export interface InvestorUpdate {
@@ -151,6 +168,7 @@ export interface InvestorUpdate {
      */
   fit_score?: number;
   status?: InvestorUpdateStatus;
+  expert_field?: InvestorUpdateExpertField;
 }
 
 export interface Activity {
@@ -184,6 +202,14 @@ export const InvestorStatus = {
   Committed: 'Committed',
 } as const;
 
+export type InvestorExpertField = typeof InvestorExpertField[keyof typeof InvestorExpertField];
+
+
+export const InvestorExpertField = {
+  Dentistry: 'Dentistry',
+  Economics: 'Economics',
+} as const;
+
 export interface Investor {
   name: string;
   firm: string;
@@ -213,6 +239,7 @@ export interface Investor {
   created_at: string;
   updated_at: string;
   activity_log: Activity[];
+  expert_field: InvestorExpertField;
 }
 
 export interface ActivityInput {
@@ -303,5 +330,35 @@ export const BrowserListInvestorsStatus = {
   Meeting_Set: 'Meeting Set',
   Passed: 'Passed',
   Committed: 'Committed',
+} as const;
+
+export type GetSummaryParams = {
+/**
+ * Restrict summary metrics to this field; records without a field count as Dentistry. Omit for all experts.
+ */
+expert_field?: GetSummaryExpertField;
+};
+
+export type GetSummaryExpertField = typeof GetSummaryExpertField[keyof typeof GetSummaryExpertField];
+
+
+export const GetSummaryExpertField = {
+  Dentistry: 'Dentistry',
+  Economics: 'Economics',
+} as const;
+
+export type BrowserGetSummaryParams = {
+/**
+ * Restrict summary metrics to this field; records without a field count as Dentistry. Omit for all experts.
+ */
+expert_field?: BrowserGetSummaryExpertField;
+};
+
+export type BrowserGetSummaryExpertField = typeof BrowserGetSummaryExpertField[keyof typeof BrowserGetSummaryExpertField];
+
+
+export const BrowserGetSummaryExpertField = {
+  Dentistry: 'Dentistry',
+  Economics: 'Economics',
 } as const;
 

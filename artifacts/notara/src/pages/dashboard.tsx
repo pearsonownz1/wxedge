@@ -4,7 +4,7 @@ import { useAuth } from '@workspace/replit-auth-web';
 import { useBrowserListInvestors, useBrowserGetSummary, useBrowserUpdateInvestor, useBrowserImportInvestors, browserExportInvestors, getBrowserListInvestorsQueryKey, getBrowserGetSummaryQueryKey, type Investor } from '@workspace/api-client-react';
 import { useToast } from '@/hooks/use-toast';
 import { Search, Plus, Upload, Download, LayoutGrid, Table2, ArrowUpDown, Lock } from 'lucide-react';
-import { STATUSES, TYPES, STATUS_TONE, TEMPLATE_CSV, download } from '@/lib/crm';
+import { STATUSES, TYPES, STATUS_TONE, TEMPLATE_CSV, EXPERT_FIELD_FILTERS, filterExpertField, defaultExpertFieldFor, type ExpertFieldFilter, download } from '@/lib/crm';
 import { InvestorSheet } from '@/components/investor-sheet';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Splash } from '@/pages/login';
@@ -21,10 +21,12 @@ const Fit = ({ n }: { n: number }) => <span className="font-mono-ui text-xs" tit
 
 export default function Dashboard() {
   const { user, logout } = useAuth();
+  const [expertField, setExpertField] = useState<ExpertFieldFilter>('Dentistry');
   const qc = useQueryClient();
   const { toast } = useToast();
   const list = useBrowserListInvestors(undefined, { query: { queryKey: getBrowserListInvestorsQueryKey(), refetchInterval: POLL, retry: (n: number, e: unknown) => !isForbidden(e) && n < 2 } });
-  const sum = useBrowserGetSummary({ query: { queryKey: getBrowserGetSummaryQueryKey(), refetchInterval: POLL, retry: (n: number, e: unknown) => !isForbidden(e) && n < 2 } });
+  const summaryParams = expertField === 'All' ? undefined : { expert_field: expertField };
+  const sum = useBrowserGetSummary(summaryParams, { query: { queryKey: getBrowserGetSummaryQueryKey(summaryParams), refetchInterval: POLL, retry: (n: number, e: unknown) => !isForbidden(e) && n < 2 } });
   const update = useBrowserUpdateInvestor();
   const importer = useBrowserImportInvestors();
   const [view, setView] = useState<'board' | 'table'>('board');
@@ -35,12 +37,13 @@ export default function Dashboard() {
   const dragId = useRef<number | null>(null);
   const refresh = () => qc.invalidateQueries({ predicate: (x) => String(x.queryKey[0]).startsWith('/api/crm') });
 
+  const fieldRows = useMemo(() => filterExpertField(list.data ?? [], expertField), [list.data, expertField]);
   const rows = useMemo(() => {
     const s = q.trim().toLowerCase();
-    const r = (list.data ?? []).filter((i) => (!fs || i.status === fs) && (!ft || i.investor_type === ft) && (!ff || i.fit_score === +ff) &&
+    const r = fieldRows.filter((i) => (!fs || i.status === fs) && (!ft || i.investor_type === ft) && (!ff || i.fit_score === +ff) &&
       (!s || [i.name, i.firm, i.email, i.location, i.thesis_notes, i.stage_focus].join(' ').toLowerCase().includes(s)));
     return [...r].sort((a, b) => { const x = a[sort.k] as any, y = b[sort.k] as any; return (typeof x === 'number' ? x - y : String(x ?? '').localeCompare(String(y ?? ''))) * sort.d; });
-  }, [list.data, q, fs, ft, ff, sort]);
+  }, [fieldRows, q, fs, ft, ff, sort]);
 
   const move = (id: number, status: string) => update.mutate({ id, data: { status: status as any } }, { onSuccess: refresh, onError: () => toast({ title: 'Status change failed', variant: 'destructive' }) });
   const doExport = async () => { try { download('notara-investors.csv', await browserExportInvestors()); } catch { toast({ title: 'Export failed', variant: 'destructive' }); } };
@@ -62,6 +65,13 @@ export default function Dashboard() {
           <span className="hidden text-xs opacity-60 sm:inline">{user?.email ?? user?.firstName}</span>
         </div>
       </header>
+
+      <section className="flex flex-wrap items-center gap-3 border-b bg-card px-5 py-3">
+        <span className="text-xs font-medium text-muted-foreground">Expert field</span>
+        <div role="group" aria-label="Expert field filter" className="flex rounded-md border bg-background p-0.5">
+          {EXPERT_FIELD_FILTERS.map(({ value, label }) => <button key={value} data-testid={`filter-field-${value}`} aria-pressed={expertField === value} onClick={() => setExpertField(value)} className={`rounded px-3 py-1.5 text-sm font-medium ${expertField === value ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-secondary'}`}>{label}</button>)}
+        </div>
+      </section>
 
       <section className="border-b bg-card px-5 py-4">
         {sum.isLoading ? <div className="h-14 animate-pulse rounded bg-muted" /> : sum.isError ? <div className="text-sm">Summary failed to load. <button className="underline" onClick={() => sum.refetch()}>Retry</button></div> : s && (
@@ -91,7 +101,7 @@ export default function Dashboard() {
       <main className="px-5 pb-10">
         {list.isLoading ? <div className="flex gap-3 overflow-hidden">{[0, 1, 2, 3].map((i) => <div key={i} className="h-72 w-64 shrink-0 animate-pulse rounded-lg bg-muted" />)}</div>
         : list.isError ? <div className="rounded-lg border border-destructive/30 p-8 text-center"><p className="font-display text-xl">Could not load experts</p><button onClick={() => list.refetch()} className="mt-3 rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground">Retry</button></div>
-        : (list.data ?? []).length === 0 ? <div className="mx-auto mt-10 max-w-md rounded-lg border border-dashed bg-card p-8 text-center"><h2 className="font-display text-2xl">Your pipeline is empty</h2><p className="mb-4 mt-2 text-sm text-muted-foreground">Add an expert by hand, or import a CSV using the template headers.</p><div className="flex justify-center gap-2"><button onClick={() => setOpen('new')} className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground">Add expert</button><button onClick={() => setImp(true)} className="rounded-md border px-4 py-2 text-sm">Import CSV</button></div></div>
+        : fieldRows.length === 0 ? <div className="mx-auto mt-10 max-w-md rounded-lg border border-dashed bg-card p-8 text-center"><h2 className="font-display text-2xl">Your pipeline is empty</h2><p className="mb-4 mt-2 text-sm text-muted-foreground">Add an expert by hand, or import a CSV using the template headers.</p><div className="flex justify-center gap-2"><button onClick={() => setOpen('new')} className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground">Add expert</button><button onClick={() => setImp(true)} className="rounded-md border px-4 py-2 text-sm">Import CSV</button></div></div>
         : view === 'board' ? (
           <div className="flex gap-3 overflow-x-auto pb-3">
             {STATUSES.map((st) => { const col = rows.filter((i) => i.status === st); return (
@@ -121,11 +131,11 @@ export default function Dashboard() {
         )}
       </main>
 
-      <InvestorSheet id={open} open={open !== null} onClose={() => setOpen(null)} />
+      <InvestorSheet id={open} open={open !== null} onClose={() => setOpen(null)} defaultExpertField={defaultExpertFieldFor(expertField)} />
 
       <Dialog open={imp} onOpenChange={setImp}>
         <DialogContent className="max-w-xl">
-          <DialogHeader><DialogTitle className="font-display text-2xl">Import experts</DialogTitle><DialogDescription>Paste CSV text or choose a file. The first row must use these headers.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle className="font-display text-2xl">Import experts</DialogTitle><DialogDescription>Paste CSV text or choose a file. The first row must use these headers. expert_field is optional: Dentistry or Economics (case-insensitive). Blank means Dentistry.</DialogDescription></DialogHeader>
           <code className="block break-words rounded bg-muted p-2 font-mono-ui text-[11px]">{TEMPLATE_CSV.trim()}</code>
           <div className="flex gap-2"><button data-testid="button-template" onClick={() => download('notara-template.csv', TEMPLATE_CSV)} className="rounded-md border px-3 py-1.5 text-sm">Download template</button>
             <input data-testid="input-csv-file" type="file" accept=".csv,text/csv" className="text-sm" onChange={async (e) => { const f = e.target.files?.[0]; if (f) setCsv(await f.text()); }} /></div>

@@ -6,6 +6,7 @@
  * OpenAPI spec version: 1.0.0
  */
 import type { Activity } from './activity';
+import type { InvestorExpertField } from './investorExpertField';
 import type { InvestorInvestorType } from './investorInvestorType';
 import type { InvestorStatus } from './investorStatus';
 
@@ -38,4 +39,5 @@ export interface Investor {
   created_at: string;
   updated_at: string;
   activity_log: Activity[];
+  expert_field: InvestorExpertField;
 }

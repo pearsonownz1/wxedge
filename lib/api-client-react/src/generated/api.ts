@@ -23,9 +23,11 @@ import type {
   ActivityInput,
   AuthUserEnvelope,
   BeginBrowserLoginParams,
+  BrowserGetSummaryParams,
   BrowserListInvestorsParams,
   CsvInput,
   ErrorEnvelope,
+  GetSummaryParams,
   HandleBrowserLoginCallbackParams,
   HealthStatus,
   ImportResult,
@@ -1308,17 +1310,24 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       return useMutation(getBrowserAppendActivityMutationOptions(options));
     }
 
-export const getGetSummaryUrl = () => {
+export const getGetSummaryUrl = (params?: GetSummaryParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/summary`
+  return stringifiedParams.length > 0 ? `/api/summary?${stringifiedParams}` : `/api/summary`
 }
 
-export const getSummary = async ( options?: RequestInit): Promise<Summary> => {
+export const getSummary = async (params?: GetSummaryParams, options?: RequestInit): Promise<Summary> => {
 
-  return customFetch<Summary>(getGetSummaryUrl(),
+  return customFetch<Summary>(getGetSummaryUrl(params),
   {
     ...options,
     method: 'GET'
@@ -1331,23 +1340,23 @@ export const getSummary = async ( options?: RequestInit): Promise<Summary> => {
 
 
 
-export const getGetSummaryQueryKey = () => {
+export const getGetSummaryQueryKey = (params?: GetSummaryParams,) => {
     return [
-    `/api/summary`
+    `/api/summary`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetSummaryQueryOptions = <TData = Awaited<ReturnType<typeof getSummary>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetSummaryQueryOptions = <TData = Awaited<ReturnType<typeof getSummary>>, TError = ErrorType<void>>(params?: GetSummaryParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetSummaryQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getGetSummaryQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSummary>>> = ({ signal }) => getSummary({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSummary>>> = ({ signal }) => getSummary(params, { signal, ...requestOptions });
 
 
 
@@ -1362,11 +1371,11 @@ export type GetSummaryQueryError = ErrorType<void>
 
 
 export function useGetSummary<TData = Awaited<ReturnType<typeof getSummary>>, TError = ErrorType<void>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: GetSummaryParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getGetSummaryQueryOptions(options)
+  const queryOptions = getGetSummaryQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -1379,17 +1388,24 @@ export function useGetSummary<TData = Awaited<ReturnType<typeof getSummary>>, TE
 
 
 
-export const getBrowserGetSummaryUrl = () => {
+export const getBrowserGetSummaryUrl = (params?: BrowserGetSummaryParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/crm/summary`
+  return stringifiedParams.length > 0 ? `/api/crm/summary?${stringifiedParams}` : `/api/crm/summary`
 }
 
-export const browserGetSummary = async ( options?: RequestInit): Promise<Summary> => {
+export const browserGetSummary = async (params?: BrowserGetSummaryParams, options?: RequestInit): Promise<Summary> => {
 
-  return customFetch<Summary>(getBrowserGetSummaryUrl(),
+  return customFetch<Summary>(getBrowserGetSummaryUrl(params),
   {
     ...options,
     method: 'GET'
@@ -1402,23 +1418,23 @@ export const browserGetSummary = async ( options?: RequestInit): Promise<Summary
 
 
 
-export const getBrowserGetSummaryQueryKey = () => {
+export const getBrowserGetSummaryQueryKey = (params?: BrowserGetSummaryParams,) => {
     return [
-    `/api/crm/summary`
+    `/api/crm/summary`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getBrowserGetSummaryQueryOptions = <TData = Awaited<ReturnType<typeof browserGetSummary>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof browserGetSummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getBrowserGetSummaryQueryOptions = <TData = Awaited<ReturnType<typeof browserGetSummary>>, TError = ErrorType<void>>(params?: BrowserGetSummaryParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof browserGetSummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getBrowserGetSummaryQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getBrowserGetSummaryQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof browserGetSummary>>> = ({ signal }) => browserGetSummary({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof browserGetSummary>>> = ({ signal }) => browserGetSummary(params, { signal, ...requestOptions });
 
 
 
@@ -1433,11 +1449,11 @@ export type BrowserGetSummaryQueryError = ErrorType<void>
 
 
 export function useBrowserGetSummary<TData = Awaited<ReturnType<typeof browserGetSummary>>, TError = ErrorType<void>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof browserGetSummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: BrowserGetSummaryParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof browserGetSummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getBrowserGetSummaryQueryOptions(options)
+  const queryOptions = getBrowserGetSummaryQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

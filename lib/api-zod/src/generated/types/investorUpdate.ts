@@ -5,6 +5,7 @@
  * Notara private fundraising CRM
  * OpenAPI spec version: 1.0.0
  */
+import type { InvestorUpdateExpertField } from './investorUpdateExpertField';
 import type { InvestorUpdateInvestorType } from './investorUpdateInvestorType';
 import type { InvestorUpdateStatus } from './investorUpdateStatus';
 
@@ -33,4 +34,5 @@ export interface InvestorUpdate {
      */
   fit_score?: number;
   status?: InvestorUpdateStatus;
+  expert_field?: InvestorUpdateExpertField;
 }
