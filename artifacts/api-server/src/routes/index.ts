@@ -1,20 +1,12 @@
-import { Router, type IRouter } from "express";
-import healthRouter from "./health.js";
-import stationsRouter from "./stations.js";
-import marketsRouter from "./markets.js";
-import snapshotsRouter from "./snapshots.js";
-import approvalsRouter from "./approvals.js";
-import pipelineHealthRouter from "./pipeline-health.js";
-import dashboardRouter from "./dashboard.js";
-
-const router: IRouter = Router();
-
+import { Router } from "express";
+import healthRouter from "./health";
+import authRouter from "./auth";
+import crmRouter from "./crm";
+import { requireAssistantToken, requireOwner } from "../middlewares/crmAccess";
+const router = Router();
 router.use(healthRouter);
-router.use(stationsRouter);
-router.use(marketsRouter);
-router.use(snapshotsRouter);
-router.use(approvalsRouter);
-router.use(pipelineHealthRouter);
-router.use(dashboardRouter);
-
+router.use(authRouter);
+router.use("/crm", requireOwner, crmRouter);
+router.use(["/investors", "/summary"], requireAssistantToken);
+router.use(crmRouter);
 export default router;

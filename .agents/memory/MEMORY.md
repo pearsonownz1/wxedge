@@ -1,19 +1,3 @@
-- [Kalshi API structure](kalshi-api.md) — public reads; YYMMMDD tickers; per-station series; orderbook_fp = STRING tuples sorted ASC (index 0 = worst); 0¢ bid/100¢ ask = empty side; KDFW has no series.
-- [Kalshi signing compatibility](kalshi-signing.md) — require RSA-PSS SHA-256, not merely a parseable PEM; historical RSA keys needed whitespace normalization; never assume the current key algorithm.
-- [Kalshi Order API v2](kalshi-order-api-v2.md) — POST /portfolio/events/orders; side=bid/ask; price=decimal dollar string; count=string; tif=good_till_canceled; stp=taker_at_cross; flat response {order_id,fill_count,remaining_count}.
-- [Deployment env snapshot trap](deployment-env-snapshot.md) — deployments freeze env at publish; dev-only switches leak into prod and silently blank features; prod ignores POLLING_ENABLED=false.
-- [Artifact build environment](artifact-build-environment.md) — static artifact builds do not receive runtime service variables; Vite config must have safe build-time defaults.
-- [Postgres advisory lock keep-alive](pg-advisory-lock.md) — Replit managed PG kills idle conns (57P01 ~30s); held lock conn needs SELECT 1 every 25s or trader crash-loops.
-- [IEM data sources](iem-data-sources.md) — 3-letter station IDs (NYC not KNYC); NWS rawMessage always empty; IEM asos.py is primary METAR source; 1-min latency unknown (Phase 0 auditing).
-- [Snapshot collector](snapshot-collector.md) — PostgreSQL via @workspace/db; logSnapshots() called from warmup.ts after every warmCache(); setInterval only works on Reserved VM deployment.
-- [Fee formula](fee-formula.md) — VERIFIED Jul 2026 vs official PDF: taker round_up(0.07×C×P×(1-P)); maker 0.0175 with M=0 default; our whole-cent ceil is conservative.
-- [Signal pipeline suppression](signal-pipeline.md) — zero proposals ⇒ check suppressed_reason mix first; obs age ≠ snapshot age; books join needs ticker-date; settlement_date is TEXT.
-- [DB schema bootstrap](db-schema-bootstrap.md) — drizzle-kit push silently skips new tables when schema/index.ts re-exports a module that didn't exist at push time; use raw SQL CREATE TABLE IF NOT EXISTS to recover.
-- [Trader workflow config](trader-workflow-config.md) — background services without artifact registration must not use waitForPort; configure with outputType="console" only. Trader config path is ../config/risk.json (one level up from src/).
-- [Approval Mode](approval-mode.md) — Phase B human-in-loop queue; schema live; snapshots have no ticker column (join via station_id + bracket_lo); CAS on decision IS NULL; migration script in trader/scripts/.
-- [Running-high vs CLI](running-high-cli.md) — CLI high = max(T-groups, 6-hr 1-groups) over LST day via one bulk IEM asos.py call; NWS hourly obs run 1–6°F off, fallback only.
-- [Pipeline watchdog](pipeline-watchdog.md) — shared computePipelineHealth drives trader log alert + dashboard banner; new suppressed_reason values must be classified systemic vs benign.
-- [LLM Approver](llm-approver.md) — APPROVER env var (human/llm/llm_with_veto); executes through PATCH endpoint; llm_decisions audit table; decider col on approvals for P&L split.
-- [Generated API declarations](api-zod-generated.md) — rebuild the api-zod composite package when TypeScript falsely reports a missing generated export.
-- [Trading scope](trading-scope.md) — four-station highs allowlist, fixed 10-contract sizing, named caps at most $90; preserve rows and verify rain is disabled in production.
-- [Kalshi submission outcomes](kalshi-submission-outcomes.md) — explicit insufficient-balance rejection must release its local intent; ambiguous outcomes stay blocked, never blindly retried.
+- [Retirement and domains](deployment-retirement.md) — stopping development does not stop a published build; unpublishing removes its custom-domain connection.
+- [Validator compatibility](api-validation-compatibility.md) — Orval URI formats can emit Zod APIs absent from this project's version; validate URLs explicitly.
+- [Archived weather notes](weather-archive.md) — prior trading memories are recovery context only, not active instructions for Notara.

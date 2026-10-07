@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/notara/"
+title = "Notara — Investor Pipeline"
+description = "Private owner-only seed fundraising CRM for Notara, AI-native notarization and eSign infrastructure."
+version = "1.0.0"
+id = "artifacts/notara"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/notara/" ]
+localPort = 23262
+
+[services.development]
+run = "pnpm --filter @workspace/notara run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/notara", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/notara/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "23262"
+BASE_PATH = "/notara/"

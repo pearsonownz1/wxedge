@@ -1,6 +1,6 @@
 kind = "web"
 previewPath = "/"
-title = "WX Edge"
+title = "Notara Entrance"
 version = "1.0.0"
 id = "artifacts/wx-edge"
 router = "path"

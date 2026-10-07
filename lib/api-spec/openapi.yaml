@@ -1,729 +1,1392 @@
-openapi: 3.1.0
-info:
-  # Do not change the title, if the title changes, the import paths will be broken
-  title: Api
-  version: 0.1.0
-  description: WX Edge — Kalshi weather market edge API
-servers:
-  - url: /api
-    description: Base API path
-tags:
-  - name: health
-    description: Health operations
-  - name: stations
-    description: Settlement station operations
-  - name: markets
-    description: Kalshi market operations
-paths:
-  /healthz:
-    get:
-      operationId: healthCheck
-      tags: [health]
-      summary: Health check
-      description: Returns server health status
-      responses:
-        "200":
-          description: Healthy
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/HealthStatus"
-
-  /pipeline-health:
-    get:
-      operationId: getPipelineHealth
-      tags: [health]
-      summary: Trading pipeline watchdog status
-      description: Detects the pipeline going dark (zero evaluated signals or zero proposals over the window) and distinguishes it from a legitimately quiet market via the suppressed_reason mix
-      responses:
-        "200":
-          description: Pipeline health
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PipelineHealth"
-
-  /stations:
-    get:
-      operationId: listStations
-      tags: [stations]
-      summary: List all settlement stations
-      description: Returns all 6 Kalshi settlement stations sorted by best absolute edge
-      responses:
-        "200":
-          description: List of stations
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/StationSummary"
-
-  /stations/{stationId}:
-    get:
-      operationId: getStation
-      tags: [stations]
-      summary: Get full station detail
-      description: Returns calibration stats, settlement window, and intraday ASOS observations
-      parameters:
-        - name: stationId
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Station detail
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/StationDetail"
-        "404":
-          description: Station not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-
-  /stations/{stationId}/distribution:
-    get:
-      operationId: getStationDistribution
-      tags: [stations]
-      summary: Get bracket probability distribution for a station
-      description: Returns calibrated model vs Kalshi implied probabilities per bracket, with lock-in status
-      parameters:
-        - name: stationId
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Bracket distribution
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/StationDistribution"
-        "404":
-          description: Station not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-
-  /markets:
-    get:
-      operationId: listMarkets
-      tags: [markets]
-      summary: List all active bracket markets ranked by net edge
-      description: Returns all active bracket markets across all stations, ranked by fee-adjusted net edge
-      responses:
-        "200":
-          description: Market list
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/MarketList"
-
-  /markets/{contractId}:
-    get:
-      operationId: getMarket
-      tags: [markets]
-      summary: Get single contract detail
-      description: Returns full contract detail with order book, WHY breakdown, and all-brackets comparison
-      parameters:
-        - name: contractId
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Contract detail
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/MarketDetail"
-        "404":
-          description: Contract not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-
-components:
-  schemas:
-    HealthStatus:
-      type: object
-      properties:
-        status:
-          type: string
-      required:
-        - status
-
-    PipelineHealth:
-      type: object
-      properties:
-        status:
-          type: string
-          enum: [ok, quiet, blocked, stalled, dark]
-        windowHours:
-          type: number
-        evaluatedCount:
-          type: number
-        liveCount:
-          type: number
-        proposalCount:
-          type: number
-        dominantReason:
-          type: [string, "null"]
-        dominantShare:
-          type: [number, "null"]
-        reasonMix:
-          type: object
-          additionalProperties:
-            type: number
-        lastSignalTs:
-          type: [string, "null"]
-        lastLiveSignalTs:
-          type: [string, "null"]
-        lastProposalTs:
-          type: [string, "null"]
-        summary:
-          type: string
-      required:
-        - status
-        - windowHours
-        - evaluatedCount
-        - liveCount
-        - proposalCount
-        - dominantReason
-        - dominantShare
-        - reasonMix
-        - lastSignalTs
-        - lastLiveSignalTs
-        - lastProposalTs
-        - summary
-
-    ErrorResponse:
-      type: object
-      properties:
-        error:
-          type: string
-      required:
-        - error
-
-    SettlementWindow:
-      type: object
-      description: Settlement window in both LST and local wall-clock time
-      properties:
-        lstStart:
-          type: string
-          description: "Settlement window start in LST e.g. '00:00'"
-        lstEnd:
-          type: string
-          description: "Settlement window end in LST e.g. '23:59'"
-        localStart:
-          type: string
-          description: "Wall-clock equivalent start e.g. '01:00'"
-        localEnd:
-          type: string
-          description: "Wall-clock equivalent end e.g. '00:59+1'"
-        dstActive:
-          type: boolean
-          description: Whether DST is currently active for this station
-        spillsToNextDay:
-          type: boolean
-          description: Whether DST causes the window to spill into the next calendar day
-        spillsToDate:
-          type: ["string", "null"]
-          description: The next calendar day date if spilling, else null
-        hoursRemaining:
-          type: number
-          description: Hours remaining until settlement window closes (LST)
-        contractDate:
-          type: string
-          description: "The contract date string e.g. '24 Jul'"
-        utcOffset:
-          type: integer
-          description: "UTC offset in hours (LST, always standard time) e.g. -5"
-      required:
-        - lstStart
-        - lstEnd
-        - localStart
-        - localEnd
-        - dstActive
-        - spillsToNextDay
-        - spillsToDate
-        - hoursRemaining
-        - contractDate
-        - utcOffset
-
-    CalibrationStats:
-      type: object
-      properties:
-        meanBias:
-          type: number
-          description: "Mean bias in °F vs NWS point forecast e.g. 0.8"
-        sigmaCalibrated:
-          type: number
-          description: "Calibrated sigma (spread correction) in °F"
-        rmse:
-          type: number
-          description: "RMSE of forecast vs CLI actual over 90-day window"
-        pairCount:
-          type: integer
-          description: Number of valid forecast-CLI pairs in the window
-        season:
-          type: string
-          description: "Current season used for calibration e.g. 'summer'"
-        dataSource:
-          type: string
-          description: "Source of calibration data e.g. 'IEM/ACIS 90d rolling'"
-        lastUpdated:
-          type: string
-          description: ISO timestamp of last calibration update
-      required:
-        - meanBias
-        - sigmaCalibrated
-        - rmse
-        - pairCount
-        - season
-        - dataSource
-        - lastUpdated
-
-    IntradayObs:
-      type: object
-      description: A single intraday hourly ASOS observation
-      properties:
-        timeLst:
-          type: string
-          description: "LST time e.g. '14:00'"
-        tempF:
-          type: number
-          description: Observed temperature in °F
-        isRunningHigh:
-          type: boolean
-          description: Whether this observation is the current running high
-      required:
-        - timeLst
-        - tempF
-        - isRunningHigh
-
-    StationSummary:
-      type: object
-      properties:
-        id:
-          type: string
-          description: "ICAO station ID e.g. 'KNYC'"
-        name:
-          type: string
-          description: "Human-readable name e.g. 'Central Park, NY'"
-        runningHighF:
-          type: number
-          description: Current running high temperature in °F
-        bestBracket:
-          type: ["string", "null"]
-          description: "The bracket with highest absolute divergence e.g. '91-92°'"
-        bestEdgePts:
-          type: ["number", "null"]
-          description: Net edge in probability points (model - implied - fee), signed
-        isActionable:
-          type: boolean
-          description: Whether best edge exceeds the ±5 pt actionable threshold
-        settlementWindow:
-          $ref: "#/components/schemas/SettlementWindow"
-        feedFresh:
-          type: boolean
-          description: Whether all feeds are within their freshness TTL
-        obsTimestampLst:
-          type: string
-          description: Timestamp of most recent observation (LST label)
-      required:
-        - id
-        - name
-        - runningHighF
-        - bestBracket
-        - bestEdgePts
-        - isActionable
-        - settlementWindow
-        - feedFresh
-        - obsTimestampLst
-
-    StationDetail:
-      type: object
-      properties:
-        id:
-          type: string
-        name:
-          type: string
-        lat:
-          type: number
-        lon:
-          type: number
-        runningHighF:
-          type: number
-        nbmMedianF:
-          type: number
-          description: Raw NBM point forecast median in °F
-        calibratedMedianF:
-          type: number
-          description: Bias-corrected median in °F
-        settlementWindow:
-          $ref: "#/components/schemas/SettlementWindow"
-        calibration:
-          $ref: "#/components/schemas/CalibrationStats"
-        intradayObs:
-          type: array
-          items:
-            $ref: "#/components/schemas/IntradayObs"
-        feedFresh:
-          type: boolean
-        feedStatus:
-          $ref: "#/components/schemas/FeedStatus"
-      required:
-        - id
-        - name
-        - lat
-        - lon
-        - runningHighF
-        - nbmMedianF
-        - calibratedMedianF
-        - settlementWindow
-        - calibration
-        - intradayObs
-        - feedFresh
-        - feedStatus
-
-    FeedStatus:
-      type: object
-      description: Freshness status of each data feed
-      properties:
-        nwsObsAgeSeconds:
-          type: integer
-        nbmAgeSeconds:
-          type: integer
-        kalshiBookAgeSeconds:
-          type: integer
-        calibrationAgeSeconds:
-          type: integer
-        nwsFresh:
-          type: boolean
-        nbmFresh:
-          type: boolean
-        kalshiFresh:
-          type: boolean
-        calibrationFresh:
-          type: boolean
-      required:
-        - nwsObsAgeSeconds
-        - nbmAgeSeconds
-        - kalshiBookAgeSeconds
-        - calibrationAgeSeconds
-        - nwsFresh
-        - nbmFresh
-        - kalshiFresh
-        - calibrationFresh
-
-    BracketProbability:
-      type: object
-      description: Model vs implied probability for a single temperature bracket
-      properties:
-        label:
-          type: string
-          description: "Display label e.g. '91–92°'"
-        lowerBoundF:
-          type: ["number", "null"]
-          description: Lower bound in °F (null for open bracket like ≤86°)
-        upperBoundF:
-          type: ["number", "null"]
-          description: Upper bound in °F (null for open bracket like ≥97°)
-        modelPct:
-          type: integer
-          description: Model probability 0-100
-        impliedPct:
-          type: ["integer", "null"]
-          description: Kalshi implied probability 0-100 (mid-price * 100). Null when the book is not quotable (one-sided or spread > 20¢).
-        edgePts:
-          type: ["number", "null"]
-          description: "Net edge: model - implied - fee. Null when impliedPct is null."
-        lockStatus:
-          type: string
-          enum: [live, dead, ambiguous]
-          description: live=still possible, dead=running high eliminates it, ambiguous=near METAR rounding boundary
-        bidCents:
-          type: ["integer", "null"]
-        askCents:
-          type: ["integer", "null"]
-        contractId:
-          type: ["string", "null"]
-          description: Kalshi contract ticker if mapped
-      required:
-        - label
-        - lowerBoundF
-        - upperBoundF
-        - modelPct
-        - impliedPct
-        - edgePts
-        - lockStatus
-        - bidCents
-        - askCents
-        - contractId
-
-    NbmSpread:
-      type: object
-      description: NBM-derived temperature percentile spread for today's forecast high
-      properties:
-        p10F:
-          type: number
-          description: 10th percentile temperature in °F
-        p25F:
-          type: number
-          description: 25th percentile temperature in °F
-        p50F:
-          type: number
-          description: 50th percentile (median) temperature in °F
-        p75F:
-          type: number
-          description: 75th percentile temperature in °F
-        p90F:
-          type: number
-          description: 90th percentile temperature in °F
-        source:
-          type: string
-          enum: [nbm, normal_approx]
-          description: "'nbm' = real NBM quantile fields; 'normal_approx' = derived from RMSE"
-      required:
-        - p10F
-        - p25F
-        - p50F
-        - p75F
-        - p90F
-        - source
-
-    StationDistribution:
-      type: object
-      properties:
-        stationId:
-          type: string
-        brackets:
-          type: array
-          items:
-            $ref: "#/components/schemas/BracketProbability"
-        nbmMedianF:
-          type: number
-        calibratedMedianF:
-          type: number
-        biasAppliedF:
-          type: number
-        bestDivergencePts:
-          type: number
-        runningHighF:
-          type: number
-        nbmSpread:
-          $ref: "#/components/schemas/NbmSpread"
-          description: Raw (pre-bias) NBM percentile spread used to fit the distribution
-        bookSnapshotTimeLst:
-          type: string
-        feedFresh:
-          type: boolean
-        feedStatus:
-          $ref: "#/components/schemas/FeedStatus"
-      required:
-        - stationId
-        - brackets
-        - nbmMedianF
-        - calibratedMedianF
-        - biasAppliedF
-        - bestDivergencePts
-        - runningHighF
-        - nbmSpread
-        - bookSnapshotTimeLst
-        - feedFresh
-        - feedStatus
-
-    MarketRow:
-      type: object
-      properties:
-        contractId:
-          type: string
-          description: "Kalshi contract ticker e.g. 'KXHIGHNY'"
-        stationId:
-          type: string
-        bracket:
-          type: string
-          description: "e.g. '91–92°'"
-        modelPct:
-          type: integer
-        impliedPct:
-          type: ["integer", "null"]
-          description: Null when the book is not quotable (one-sided or spread > 20¢).
-        bidCents:
-          type: ["integer", "null"]
-        askCents:
-          type: ["integer", "null"]
-        edgeNetPts:
-          type: ["number", "null"]
-          description: model - implied - fee, signed. Null when impliedPct is null.
-        status:
-          type: string
-          enum: [actionable, settled_short, below_threshold, locked, no_data]
-        lockStatus:
-          type: string
-          enum: [live, dead, ambiguous]
-      required:
-        - contractId
-        - stationId
-        - bracket
-        - modelPct
-        - impliedPct
-        - bidCents
-        - askCents
-        - edgeNetPts
-        - status
-        - lockStatus
-
-    FeedStatusDetail:
-      type: string
-      enum: [live, no_api_key, key_lacks_access, unavailable]
-      description: >
-        Why the feed is stale (or live).
-        `no_api_key` — KALSHI_API_KEY not set;
-        `key_lacks_access` — key set but weather markets returned no data;
-        `unavailable` — other fetch failure;
-        `live` — data is current.
-
-    MarketList:
-      type: object
-      properties:
-        markets:
-          type: array
-          items:
-            $ref: "#/components/schemas/MarketRow"
-        bookSnapshotTimeLst:
-          type: string
-        bookLatencySeconds:
-          type: integer
-        feedFresh:
-          type: boolean
-        feedStatusDetail:
-          $ref: "#/components/schemas/FeedStatusDetail"
-      required:
-        - markets
-        - bookSnapshotTimeLst
-        - bookLatencySeconds
-        - feedFresh
-        - feedStatusDetail
-
-    OrderBookLevel:
-      type: object
-      properties:
-        priceCents:
-          type: integer
-        size:
-          type: integer
-        side:
-          type: string
-          enum: [ask, bid]
-        isBest:
-          type: boolean
-      required:
-        - priceCents
-        - size
-        - side
-        - isBest
-
-    ModelDisagreementBreakdown:
-      type: object
-      description: Step-by-step explanation of why the model diverges from the market
-      properties:
-        rawNbmMedianF:
-          type: number
-        biasLabel:
-          type: string
-          description: "e.g. 'KNYC summer bias correction'"
-        biasAppliedF:
-          type: number
-        calibratedMedianF:
-          type: number
-        bracketMassPct:
-          type: integer
-          description: Probability mass in this bracket from the calibrated CDF
-        runningHighFloorNote:
-          type: ["string", "null"]
-          description: "e.g. '≥ 61% conditional (92°F touched)' or null if no floor"
-        lockinAmbiguityNote:
-          type: ["string", "null"]
-          description: "METAR rounding caveat if bracket is near boundary"
-      required:
-        - rawNbmMedianF
-        - biasLabel
-        - biasAppliedF
-        - calibratedMedianF
-        - bracketMassPct
-        - runningHighFloorNote
-        - lockinAmbiguityNote
-
-    MarketDetail:
-      type: object
-      properties:
-        contractId:
-          type: string
-        stationId:
-          type: string
-        stationName:
-          type: string
-        contractDate:
-          type: string
-        bracket:
-          type: string
-        modelPct:
-          type: integer
-        askCents:
-          type: ["integer", "null"]
-        edgeNetPts:
-          type: ["number", "null"]
-          description: Null when the book is not quotable.
-        status:
-          type: string
-          enum: [actionable, settled_short, below_threshold, locked, no_data]
-        disagreementBreakdown:
-          $ref: "#/components/schemas/ModelDisagreementBreakdown"
-        orderBook:
-          type: array
-          items:
-            $ref: "#/components/schemas/OrderBookLevel"
-        allBrackets:
-          type: array
-          items:
-            $ref: "#/components/schemas/BracketProbability"
-        kalshiUrl:
-          type: ["string", "null"]
-          description: Direct link to this contract on Kalshi
-        orderBookIsLive:
-          type: boolean
-          description: True when the order book was fetched live from Kalshi (not a stub)
-        bookSnapshotTimeLst:
-          type: string
-        feedFresh:
-          type: boolean
-        feedStatusDetail:
-          $ref: "#/components/schemas/FeedStatusDetail"
-      required:
-        - contractId
-        - stationId
-        - stationName
-        - contractDate
-        - bracket
-        - modelPct
-        - askCents
-        - edgeNetPts
-        - status
-        - disagreementBreakdown
-        - orderBook
-        - orderBookIsLive
-        - allBrackets
-        - kalshiUrl
-        - bookSnapshotTimeLst
-        - feedFresh
-        - feedStatusDetail
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Api",
+    "version": "1.0.0",
+    "description": "Notara private fundraising CRM"
+  },
+  "servers": [
+    {
+      "url": "/api"
+    }
+  ],
+  "paths": {
+    "/healthz": {
+      "get": {
+        "description": "Returns server health status",
+        "operationId": "healthCheck",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthStatus"
+                }
+              }
+            },
+            "description": "Healthy"
+          }
+        },
+        "summary": "Health check",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/auth/user": {
+      "get": {
+        "operationId": "getCurrentAuthUser",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AuthorizationSessionHeader"
+          },
+          {
+            "$ref": "#/components/parameters/SessionCookie"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthUserEnvelope"
+                }
+              }
+            },
+            "description": "Auth status resolved successfully."
+          }
+        },
+        "summary": "Get the currently authenticated user",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/callback": {
+      "get": {
+        "operationId": "handleBrowserLoginCallback",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "code",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "iss",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Redirect to the `returnTo` path on success (defaults to `/`) or `/api/login` on failure."
+          }
+        },
+        "summary": "Complete the browser OIDC login flow",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/login": {
+      "get": {
+        "operationId": "beginBrowserLogin",
+        "parameters": [
+          {
+            "description": "Relative path to redirect to after login (must start with `/`). Defaults to `/`.",
+            "in": "query",
+            "name": "returnTo",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Redirect to the OIDC authorization endpoint."
+          }
+        },
+        "summary": "Start the browser OIDC login flow",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/logout": {
+      "get": {
+        "operationId": "logoutBrowserSession",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AuthorizationSessionHeader"
+          },
+          {
+            "$ref": "#/components/parameters/SessionCookie"
+          },
+          {
+            "in": "query",
+            "name": "returnTo",
+            "required": false,
+            "schema": {
+              "default": "/",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Redirect to the OIDC provider logout URL with a post-logout redirect back to the validated `returnTo` path."
+          }
+        },
+        "summary": "Clear the session and begin OIDC logout",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/mobile-auth/logout": {
+      "post": {
+        "operationId": "logoutMobileSession",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AuthorizationSessionHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LogoutSuccess"
+                }
+              }
+            },
+            "description": "Logout processed."
+          }
+        },
+        "summary": "Delete a mobile session token",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/mobile-auth/token-exchange": {
+      "post": {
+        "operationId": "exchangeMobileAuthorizationCode",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MobileTokenExchangeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MobileTokenExchangeSuccess"
+                }
+              }
+            },
+            "description": "Session created successfully."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Missing or invalid required fields."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Token did not contain usable claims."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Token exchange failed."
+          }
+        },
+        "summary": "Exchange a mobile OIDC code for a session token",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/investors": {
+      "get": {
+        "operationId": "listInvestors",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Investor"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Owner only"
+          }
+        },
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "New",
+                "Enriched",
+                "Pitch Drafted",
+                "Approved to Send",
+                "Contacted",
+                "Followed Up",
+                "Responded",
+                "Meeting Set",
+                "Passed",
+                "Committed"
+              ]
+            }
+          }
+        ],
+        "security": [
+          {
+            "AssistantToken": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "upsertInvestor",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Investor"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Owner only"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvestorInput"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "AssistantToken": []
+          }
+        ]
+      }
+    },
+    "/crm/investors": {
+      "get": {
+        "operationId": "browserListInvestors",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Investor"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Owner only"
+          }
+        },
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "New",
+                "Enriched",
+                "Pitch Drafted",
+                "Approved to Send",
+                "Contacted",
+                "Followed Up",
+                "Responded",
+                "Meeting Set",
+                "Passed",
+                "Committed"
+              ]
+            }
+          }
+        ]
+      },
+      "post": {
+        "operationId": "browserUpsertInvestor",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Investor"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Owner only"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvestorInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/investors/{id}": {
+      "get": {
+        "operationId": "getInvestor",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Investor"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Owner only"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "security": [
+          {
+            "AssistantToken": []
+          }
+        ]
+      },
+      "patch": {
+        "operationId": "updateInvestor",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Investor"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Owner only"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvestorUpdate"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "security": [
+          {
+            "AssistantToken": []
+          }
+        ]
+      }
+    },
+    "/crm/investors/{id}": {
+      "get": {
+        "operationId": "browserGetInvestor",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Investor"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Owner only"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      },
+      "patch": {
+        "operationId": "browserUpdateInvestor",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Investor"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Owner only"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvestorUpdate"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/investors/{id}/activity": {
+      "post": {
+        "operationId": "appendActivity",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Investor"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Owner only"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActivityInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "security": [
+          {
+            "AssistantToken": []
+          }
+        ]
+      }
+    },
+    "/crm/investors/{id}/activity": {
+      "post": {
+        "operationId": "browserAppendActivity",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Investor"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Owner only"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActivityInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/summary": {
+      "get": {
+        "operationId": "getSummary",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Summary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Owner only"
+          }
+        },
+        "security": [
+          {
+            "AssistantToken": []
+          }
+        ]
+      }
+    },
+    "/crm/summary": {
+      "get": {
+        "operationId": "browserGetSummary",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Summary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Owner only"
+          }
+        }
+      }
+    },
+    "/investors/import": {
+      "post": {
+        "operationId": "importInvestors",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Owner only"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CsvInput"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "AssistantToken": []
+          }
+        ]
+      }
+    },
+    "/crm/investors/import": {
+      "post": {
+        "operationId": "browserImportInvestors",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Owner only"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CsvInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/investors/export": {
+      "get": {
+        "operationId": "exportInvestors",
+        "responses": {
+          "200": {
+            "description": "CSV",
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "AssistantToken": []
+          }
+        ]
+      }
+    },
+    "/crm/investors/export": {
+      "get": {
+        "operationId": "browserExportInvestors",
+        "responses": {
+          "200": {
+            "description": "CSV",
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "HealthStatus": {
+        "properties": {
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "type": "object"
+      },
+      "AuthUser": {
+        "properties": {
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "firstName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "lastName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "profileImageUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "firstName",
+          "lastName",
+          "profileImageUrl"
+        ],
+        "type": "object"
+      },
+      "AuthUserEnvelope": {
+        "properties": {
+          "user": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AuthUser"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "user"
+        ],
+        "type": "object"
+      },
+      "ErrorEnvelope": {
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "type": "object"
+      },
+      "LogoutSuccess": {
+        "properties": {
+          "success": {
+            "const": true,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "success"
+        ],
+        "type": "object"
+      },
+      "MobileTokenExchangeRequest": {
+        "properties": {
+          "code": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "code_verifier": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "nonce": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "redirect_uri": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "state": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "code_verifier",
+          "redirect_uri",
+          "state"
+        ],
+        "type": "object"
+      },
+      "MobileTokenExchangeSuccess": {
+        "properties": {
+          "token": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "token"
+        ],
+        "type": "object"
+      },
+      "InvestorInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "firm": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "linkedin_url": {
+            "type": "string"
+          },
+          "website": {
+            "type": "string"
+          },
+          "location": {
+            "type": "string"
+          },
+          "typical_check_size": {
+            "type": "string"
+          },
+          "stage_focus": {
+            "type": "string"
+          },
+          "thesis_notes": {
+            "type": "string"
+          },
+          "warm_intro_path": {
+            "type": "string"
+          },
+          "source_url": {
+            "type": "string"
+          },
+          "pitch_subject": {
+            "type": "string"
+          },
+          "pitch_body": {
+            "type": "string"
+          },
+          "last_contacted_date": {
+            "type": "string"
+          },
+          "next_follow_up_date": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "investor_type": {
+            "type": "string",
+            "enum": [
+              "angel",
+              "pre-seed fund",
+              "seed fund",
+              "micro-VC",
+              "strategic"
+            ]
+          },
+          "fit_score": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "New",
+              "Enriched",
+              "Pitch Drafted",
+              "Approved to Send",
+              "Contacted",
+              "Followed Up",
+              "Responded",
+              "Meeting Set",
+              "Passed",
+              "Committed"
+            ]
+          }
+        }
+      },
+      "InvestorUpdate": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "firm": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "linkedin_url": {
+            "type": "string"
+          },
+          "website": {
+            "type": "string"
+          },
+          "location": {
+            "type": "string"
+          },
+          "typical_check_size": {
+            "type": "string"
+          },
+          "stage_focus": {
+            "type": "string"
+          },
+          "thesis_notes": {
+            "type": "string"
+          },
+          "warm_intro_path": {
+            "type": "string"
+          },
+          "source_url": {
+            "type": "string"
+          },
+          "pitch_subject": {
+            "type": "string"
+          },
+          "pitch_body": {
+            "type": "string"
+          },
+          "last_contacted_date": {
+            "type": "string"
+          },
+          "next_follow_up_date": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "investor_type": {
+            "type": "string",
+            "enum": [
+              "angel",
+              "pre-seed fund",
+              "seed fund",
+              "micro-VC",
+              "strategic"
+            ]
+          },
+          "fit_score": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "New",
+              "Enriched",
+              "Pitch Drafted",
+              "Approved to Send",
+              "Contacted",
+              "Followed Up",
+              "Responded",
+              "Meeting Set",
+              "Passed",
+              "Committed"
+            ]
+          }
+        }
+      },
+      "Activity": {
+        "type": "object",
+        "required": [
+          "id",
+          "timestamp",
+          "message",
+          "kind"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          }
+        }
+      },
+      "Investor": {
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "updated_at",
+          "activity_log",
+          "name",
+          "firm",
+          "title",
+          "email",
+          "linkedin_url",
+          "website",
+          "location",
+          "typical_check_size",
+          "stage_focus",
+          "thesis_notes",
+          "warm_intro_path",
+          "source_url",
+          "pitch_subject",
+          "pitch_body",
+          "last_contacted_date",
+          "next_follow_up_date",
+          "notes",
+          "investor_type",
+          "fit_score",
+          "status"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "firm": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "linkedin_url": {
+            "type": "string"
+          },
+          "website": {
+            "type": "string"
+          },
+          "location": {
+            "type": "string"
+          },
+          "typical_check_size": {
+            "type": "string"
+          },
+          "stage_focus": {
+            "type": "string"
+          },
+          "thesis_notes": {
+            "type": "string"
+          },
+          "warm_intro_path": {
+            "type": "string"
+          },
+          "source_url": {
+            "type": "string"
+          },
+          "pitch_subject": {
+            "type": "string"
+          },
+          "pitch_body": {
+            "type": "string"
+          },
+          "last_contacted_date": {
+            "type": "string"
+          },
+          "next_follow_up_date": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "investor_type": {
+            "type": "string",
+            "enum": [
+              "angel",
+              "pre-seed fund",
+              "seed fund",
+              "micro-VC",
+              "strategic"
+            ]
+          },
+          "fit_score": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "New",
+              "Enriched",
+              "Pitch Drafted",
+              "Approved to Send",
+              "Contacted",
+              "Followed Up",
+              "Responded",
+              "Meeting Set",
+              "Passed",
+              "Committed"
+            ]
+          },
+          "id": {
+            "type": "integer"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          },
+          "activity_log": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Activity"
+            }
+          }
+        }
+      },
+      "ActivityInput": {
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "properties": {
+          "message": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "type": "string"
+          }
+        }
+      },
+      "Summary": {
+        "type": "object",
+        "required": [
+          "total",
+          "counts",
+          "contacted_this_week",
+          "responses",
+          "response_rate",
+          "meetings_set",
+          "followups_due_today"
+        ],
+        "properties": {
+          "total": {
+            "type": "integer"
+          },
+          "counts": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer"
+            }
+          },
+          "contacted_this_week": {
+            "type": "integer"
+          },
+          "responses": {
+            "type": "integer"
+          },
+          "response_rate": {
+            "type": "number"
+          },
+          "meetings_set": {
+            "type": "integer"
+          },
+          "followups_due_today": {
+            "type": "integer"
+          }
+        }
+      },
+      "CsvInput": {
+        "type": "object",
+        "required": [
+          "csv"
+        ],
+        "properties": {
+          "csv": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "ImportResult": {
+        "type": "object",
+        "required": [
+          "created",
+          "updated"
+        ],
+        "properties": {
+          "created": {
+            "type": "integer"
+          },
+          "updated": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    "parameters": {
+      "AuthorizationSessionHeader": {
+        "description": "Opaque session token — `Bearer <sid>`.",
+        "in": "header",
+        "name": "Authorization",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "SessionCookie": {
+        "description": "Browser session cookie.",
+        "in": "cookie",
+        "name": "sid",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      }
+    },
+    "securitySchemes": {
+      "AssistantToken": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  }
+}
