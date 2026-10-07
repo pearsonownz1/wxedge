@@ -56,7 +56,7 @@ export default function Dashboard() {
       <header className="flex flex-wrap items-center gap-3 border-b bg-sidebar px-5 py-3 text-sidebar-foreground">
         <span className="font-display text-xl">Notara</span><span className="text-xs opacity-60">Seed pipeline</span>
         <div className="ml-auto flex flex-wrap items-center gap-2">
-          <button data-testid="button-new" onClick={() => setOpen('new')} className="flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground"><Plus className="h-4 w-4" />Investor</button>
+          <button data-testid="button-new" onClick={() => setOpen('new')} className="flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground"><Plus className="h-4 w-4" />Add expert</button>
           <button data-testid="button-import" onClick={() => setImp(true)} className="flex items-center gap-1 rounded-md border border-sidebar-border px-3 py-1.5 text-sm"><Upload className="h-4 w-4" />Import</button>
           <button data-testid="button-export" onClick={doExport} className="flex items-center gap-1 rounded-md border border-sidebar-border px-3 py-1.5 text-sm"><Download className="h-4 w-4" />Export</button>
           <span className="hidden text-xs opacity-60 sm:inline">{user?.email ?? user?.firstName}</span>
@@ -91,8 +91,8 @@ export default function Dashboard() {
 
       <main className="px-5 pb-10">
         {list.isLoading ? <div className="flex gap-3 overflow-hidden">{[0, 1, 2, 3].map((i) => <div key={i} className="h-72 w-64 shrink-0 animate-pulse rounded-lg bg-muted" />)}</div>
-        : list.isError ? <div className="rounded-lg border border-destructive/30 p-8 text-center"><p className="font-display text-xl">Could not load investors</p><button onClick={() => list.refetch()} className="mt-3 rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground">Retry</button></div>
-        : (list.data ?? []).length === 0 ? <div className="mx-auto mt-10 max-w-md rounded-lg border border-dashed bg-card p-8 text-center"><h2 className="font-display text-2xl">Your pipeline is empty</h2><p className="mb-4 mt-2 text-sm text-muted-foreground">Add an investor by hand, or import a CSV using the template headers.</p><div className="flex justify-center gap-2"><button onClick={() => setOpen('new')} className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground">Add investor</button><button onClick={() => setImp(true)} className="rounded-md border px-4 py-2 text-sm">Import CSV</button></div></div>
+        : list.isError ? <div className="rounded-lg border border-destructive/30 p-8 text-center"><p className="font-display text-xl">Could not load experts</p><button onClick={() => list.refetch()} className="mt-3 rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground">Retry</button></div>
+        : (list.data ?? []).length === 0 ? <div className="mx-auto mt-10 max-w-md rounded-lg border border-dashed bg-card p-8 text-center"><h2 className="font-display text-2xl">Your pipeline is empty</h2><p className="mb-4 mt-2 text-sm text-muted-foreground">Add an expert by hand, or import a CSV using the template headers.</p><div className="flex justify-center gap-2"><button onClick={() => setOpen('new')} className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground">Add expert</button><button onClick={() => setImp(true)} className="rounded-md border px-4 py-2 text-sm">Import CSV</button></div></div>
         : view === 'board' ? (
           <div className="flex gap-3 overflow-x-auto pb-3">
             {STATUSES.map((st) => { const col = rows.filter((i) => i.status === st); return (
@@ -117,7 +117,7 @@ export default function Dashboard() {
               <tbody>{rows.map((i) => <tr key={i.id} data-testid={`row-investor-${i.id}`} onClick={() => setOpen(i.id)} className="cursor-pointer border-b last:border-0 hover:bg-secondary/50"><td className="px-3 py-2 font-medium">{i.name}</td><td className="px-3 py-2">{i.firm}</td><td className="px-3 py-2">{i.investor_type}</td><td className="px-3 py-2">{i.typical_check_size}</td><td className="px-3 py-2"><Fit n={i.fit_score} /></td>
                 <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}><select value={i.status} onChange={(e) => move(i.id, e.target.value)} className="rounded border bg-background px-1 py-0.5 text-xs">{STATUSES.map((x) => <option key={x}>{x}</option>)}</select></td>
                 <td className="px-3 py-2 font-mono-ui text-xs">{i.next_follow_up_date}</td><td className="px-3 py-2 font-mono-ui text-xs">{i.updated_at?.slice(0, 10)}</td></tr>)}</tbody></table>
-            {rows.length === 0 && <div className="p-8 text-center text-sm text-muted-foreground">No investors match these filters.</div>}
+            {rows.length === 0 && <div className="p-8 text-center text-sm text-muted-foreground">No experts match these filters.</div>}
           </div>
         )}
       </main>
@@ -126,7 +126,7 @@ export default function Dashboard() {
 
       <Dialog open={imp} onOpenChange={setImp}>
         <DialogContent className="max-w-xl">
-          <DialogHeader><DialogTitle className="font-display text-2xl">Import investors</DialogTitle><DialogDescription>Paste CSV text or choose a file. The first row must use these headers.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle className="font-display text-2xl">Import experts</DialogTitle><DialogDescription>Paste CSV text or choose a file. The first row must use these headers.</DialogDescription></DialogHeader>
           <code className="block break-words rounded bg-muted p-2 font-mono-ui text-[11px]">{TEMPLATE_CSV.trim()}</code>
           <div className="flex gap-2"><button data-testid="button-template" onClick={() => download('notara-template.csv', TEMPLATE_CSV)} className="rounded-md border px-3 py-1.5 text-sm">Download template</button>
             <input data-testid="input-csv-file" type="file" accept=".csv,text/csv" className="text-sm" onChange={async (e) => { const f = e.target.files?.[0]; if (f) setCsv(await f.text()); }} /></div>

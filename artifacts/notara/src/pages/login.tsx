@@ -7,7 +7,7 @@ export function LoginScreen({ onLogin }: { onLogin: () => void }) {
         <div className="font-display text-2xl">Notara</div>
         <div>
           <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-full border-2 border-primary text-primary"><ShieldCheck className="h-7 w-7" /></div>
-          <h1 className="font-display text-5xl leading-tight">Every investor,<br />with the context<br />to close.</h1>
+          <h1 className="font-display text-5xl leading-tight">Every expert,<br />with the context<br />to close.</h1>
         </div>
         <p className="font-mono-ui text-xs opacity-60">Seed round workspace. Owner access only.</p>
       </div>

@@ -1,3 +1,4 @@
+- [Expert UI vocabulary](expert-ui-vocabulary.md) — visible CRM labels say expert; investor database/API naming remains unchanged.
 - [Retirement and domains](deployment-retirement.md) — stopping development does not stop a published build; unpublishing removes its custom-domain connection.
 - [Validator compatibility](api-validation-compatibility.md) — Orval URI formats can emit Zod APIs absent from this project's version; validate URLs explicitly.
 - [Archived weather notes](weather-archive.md) — prior trading memories are recovery context only, not active instructions for Notara.

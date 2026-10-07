@@ -10,7 +10,7 @@ type F = Record<string, string>;
 const empty = (): F => ({ ...Object.fromEntries(FIELDS.map((k) => [k, ''])), status: 'New', fit_score: '3', investor_type: 'angel' });
 const LONG = ['thesis_notes', 'pitch_body', 'notes', 'warm_intro_path'];
 const DATES = ['last_contacted_date', 'next_follow_up_date'];
-const lbl = (k: string) => k.replace(/_/g, ' ');
+const lbl = (k: string) => k === 'investor_type' ? 'expert type' : k.replace(/_/g, ' ');
 const inp = 'w-full rounded-md border border-input bg-card px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring/40';
 
 export function InvestorSheet({ id, open, onClose }: { id: number | 'new' | null; open: boolean; onClose: () => void }) {
@@ -71,11 +71,11 @@ export function InvestorSheet({ id, open, onClose }: { id: number | 'new' | null
     <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
       <SheetContent className="w-full overflow-y-auto bg-background sm:max-w-2xl">
         <SheetHeader>
-          <SheetTitle className="font-display text-2xl">{isNew ? 'New investor' : f.name || 'Investor'}</SheetTitle>
-          <SheetDescription>{isNew ? 'Add an investor to the pipeline.' : [f.title, f.firm].filter(Boolean).join(' at ') || 'Investor record'}</SheetDescription>
+          <SheetTitle className="font-display text-2xl">{isNew ? 'New expert' : f.name || 'Expert'}</SheetTitle>
+          <SheetDescription>{isNew ? 'Add an expert to the pipeline.' : [f.title, f.firm].filter(Boolean).join(' at ') || 'Expert record'}</SheetDescription>
         </SheetHeader>
         {!isNew && isLoading && <div className="mt-6 space-y-3">{[0, 1, 2, 3].map((i) => <div key={i} className="h-10 animate-pulse rounded bg-muted" />)}</div>}
-        {!isNew && isError && <div className="mt-6 rounded-md border border-destructive/30 p-4 text-sm">Could not load this investor. <button className="underline" onClick={() => refetch()}>Retry</button></div>}
+        {!isNew && isError && <div className="mt-6 rounded-md border border-destructive/30 p-4 text-sm">Could not load this expert. <button className="underline" onClick={() => refetch()}>Retry</button></div>}
         {(isNew || data) && (
           <div className="mt-5 space-y-6 pb-8">
             <div className="grid gap-3 sm:grid-cols-2">{FIELDS.filter((k) => k !== 'pitch_subject' && k !== 'pitch_body' && k !== 'notes' && k !== 'thesis_notes').map(field)}{field('thesis_notes')}{field('notes')}</div>
@@ -88,7 +88,7 @@ export function InvestorSheet({ id, open, onClose }: { id: number | 'new' | null
                 <button data-testid="button-copy-body" onClick={() => copy(f.pitch_body, 'Body')} className="flex w-fit items-center gap-1 rounded-md border px-2.5 py-1.5 text-xs hover:bg-muted"><Copy className="h-3.5 w-3.5" />Copy body</button>
               </div>
             </section>
-            <button data-testid="button-save" disabled={pending} onClick={save} className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60">{pending ? 'Saving...' : isNew ? 'Create investor' : 'Save changes'}</button>
+            <button data-testid="button-save" disabled={pending} onClick={save} className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60">{pending ? 'Saving...' : isNew ? 'Create expert' : 'Save changes'}</button>
             {!isNew && (
               <section>
                 <h3 className="font-display text-lg">Activity</h3>
