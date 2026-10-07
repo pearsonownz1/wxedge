@@ -1,5 +1,5 @@
 export const STATUSES = ['New','Enriched','Pitch Drafted','Approved to Send','Contacted','Followed Up','Responded','Meeting Set','Passed','Committed'] as const;
-export const TYPES = ['angel','pre-seed fund','seed fund','micro-VC','strategic'] as const;
+export const TYPES = ['STANDARD','PREMIUM'] as const;
 export const FIELDS = ['name','firm','title','email','linkedin_url','website','location','investor_type','typical_check_size','stage_focus','thesis_notes','warm_intro_path','source_url','fit_score','status','pitch_subject','pitch_body','last_contacted_date','next_follow_up_date','notes'] as const;
 export const TEMPLATE_CSV = FIELDS.join(',') + '\n';
 export const STATUS_TONE: Record<string,string> = {

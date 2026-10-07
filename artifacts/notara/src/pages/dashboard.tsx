@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@workspace/replit-auth-web';
 import { useBrowserListInvestors, useBrowserGetSummary, useBrowserUpdateInvestor, useBrowserImportInvestors, browserExportInvestors, getBrowserListInvestorsQueryKey, getBrowserGetSummaryQueryKey, type Investor } from '@workspace/api-client-react';
 import { useToast } from '@/hooks/use-toast';
-import { Search, Plus, Upload, Download, LogOut, LayoutGrid, Table2, ArrowUpDown, Lock } from 'lucide-react';
+import { Search, Plus, Upload, Download, LayoutGrid, Table2, ArrowUpDown, Lock } from 'lucide-react';
 import { STATUSES, TYPES, STATUS_TONE, TEMPLATE_CSV, download } from '@/lib/crm';
 import { InvestorSheet } from '@/components/investor-sheet';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -54,13 +54,12 @@ export default function Dashboard() {
   return (
     <div className="min-h-[100dvh]">
       <header className="flex flex-wrap items-center gap-3 border-b bg-sidebar px-5 py-3 text-sidebar-foreground">
-        <span className="font-display text-xl">Notara</span><span className="text-xs opacity-60">Seed pipeline</span>
+        <span className="font-display text-xl">Notara</span><span className="text-xs opacity-60">Expert pipeline</span>
         <div className="ml-auto flex flex-wrap items-center gap-2">
           <button data-testid="button-new" onClick={() => setOpen('new')} className="flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground"><Plus className="h-4 w-4" />Add expert</button>
           <button data-testid="button-import" onClick={() => setImp(true)} className="flex items-center gap-1 rounded-md border border-sidebar-border px-3 py-1.5 text-sm"><Upload className="h-4 w-4" />Import</button>
           <button data-testid="button-export" onClick={doExport} className="flex items-center gap-1 rounded-md border border-sidebar-border px-3 py-1.5 text-sm"><Download className="h-4 w-4" />Export</button>
           <span className="hidden text-xs opacity-60 sm:inline">{user?.email ?? user?.firstName}</span>
-          <button data-testid="button-logout" onClick={logout} title="Log out" className="rounded-md p-2 hover:bg-sidebar-accent"><LogOut className="h-4 w-4" /></button>
         </div>
       </header>
 
@@ -82,7 +81,7 @@ export default function Dashboard() {
       <div className="flex flex-wrap items-center gap-2 px-5 py-3">
         <div className="relative"><Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" /><input data-testid="input-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, firm, thesis" className={`${sel} w-64 pl-8`} /></div>
         <select data-testid="filter-status" className={sel} value={fs} onChange={(e) => setFs(e.target.value)}><option value="">All statuses</option>{STATUSES.map((x) => <option key={x}>{x}</option>)}</select>
-        <select data-testid="filter-type" className={sel} value={ft} onChange={(e) => setFt(e.target.value)}><option value="">All types</option>{TYPES.map((x) => <option key={x}>{x}</option>)}</select>
+        <select data-testid="filter-type" className={sel} value={ft} onChange={(e) => setFt(e.target.value)}><option value="">All tiers</option>{TYPES.map((x) => <option key={x}>{x}</option>)}</select>
         <select data-testid="filter-fit" className={sel} value={ff} onChange={(e) => setFf(e.target.value)}><option value="">Any fit</option>{[5, 4, 3, 2, 1].map((x) => <option key={x} value={x}>Fit {x}</option>)}</select>
         <div className="ml-auto flex rounded-md border bg-card p-0.5">
           {([['board', LayoutGrid, 'Board'], ['table', Table2, 'Table']] as const).map(([v, Ic, l]) => <button key={v} data-testid={`view-${v}`} onClick={() => setView(v)} className={`flex items-center gap-1 rounded px-3 py-1 text-sm ${view === v ? 'bg-sidebar text-sidebar-foreground' : ''}`}><Ic className="h-4 w-4" />{l}</button>)}
@@ -113,7 +112,7 @@ export default function Dashboard() {
           </div>
         ) : (
           <div className="overflow-x-auto rounded-lg border bg-card">
-            <table className="w-full text-sm"><thead className="border-b bg-secondary/60"><tr>{th('name', 'Name')}{th('firm', 'Firm')}{th('investor_type', 'Type')}{th('typical_check_size', 'Check')}{th('fit_score', 'Fit')}{th('status', 'Status')}{th('next_follow_up_date', 'Follow up')}{th('updated_at', 'Updated')}</tr></thead>
+            <table className="w-full text-sm"><thead className="border-b bg-secondary/60"><tr>{th('name', 'Name')}{th('firm', 'Firm')}{th('investor_type', 'Tier')}{th('typical_check_size', 'Check')}{th('fit_score', 'Fit')}{th('status', 'Status')}{th('next_follow_up_date', 'Follow up')}{th('updated_at', 'Updated')}</tr></thead>
               <tbody>{rows.map((i) => <tr key={i.id} data-testid={`row-investor-${i.id}`} onClick={() => setOpen(i.id)} className="cursor-pointer border-b last:border-0 hover:bg-secondary/50"><td className="px-3 py-2 font-medium">{i.name}</td><td className="px-3 py-2">{i.firm}</td><td className="px-3 py-2">{i.investor_type}</td><td className="px-3 py-2">{i.typical_check_size}</td><td className="px-3 py-2"><Fit n={i.fit_score} /></td>
                 <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}><select value={i.status} onChange={(e) => move(i.id, e.target.value)} className="rounded border bg-background px-1 py-0.5 text-xs">{STATUSES.map((x) => <option key={x}>{x}</option>)}</select></td>
                 <td className="px-3 py-2 font-mono-ui text-xs">{i.next_follow_up_date}</td><td className="px-3 py-2 font-mono-ui text-xs">{i.updated_at?.slice(0, 10)}</td></tr>)}</tbody></table>

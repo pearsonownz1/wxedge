@@ -55,11 +55,8 @@ export type InvestorInputInvestorType = typeof InvestorInputInvestorType[keyof t
 
 
 export const InvestorInputInvestorType = {
-  angel: 'angel',
-  'pre-seed_fund': 'pre-seed fund',
-  seed_fund: 'seed fund',
-  'micro-VC': 'micro-VC',
-  strategic: 'strategic',
+  STANDARD: 'STANDARD',
+  PREMIUM: 'PREMIUM',
 } as const;
 
 export type InvestorInputStatus = typeof InvestorInputStatus[keyof typeof InvestorInputStatus];
@@ -109,11 +106,8 @@ export type InvestorUpdateInvestorType = typeof InvestorUpdateInvestorType[keyof
 
 
 export const InvestorUpdateInvestorType = {
-  angel: 'angel',
-  'pre-seed_fund': 'pre-seed fund',
-  seed_fund: 'seed fund',
-  'micro-VC': 'micro-VC',
-  strategic: 'strategic',
+  STANDARD: 'STANDARD',
+  PREMIUM: 'PREMIUM',
 } as const;
 
 export type InvestorUpdateStatus = typeof InvestorUpdateStatus[keyof typeof InvestorUpdateStatus];
@@ -170,11 +164,8 @@ export type InvestorInvestorType = typeof InvestorInvestorType[keyof typeof Inve
 
 
 export const InvestorInvestorType = {
-  angel: 'angel',
-  'pre-seed_fund': 'pre-seed fund',
-  seed_fund: 'seed fund',
-  'micro-VC': 'micro-VC',
-  strategic: 'strategic',
+  STANDARD: 'STANDARD',
+  PREMIUM: 'PREMIUM',
 } as const;
 
 export type InvestorStatus = typeof InvestorStatus[keyof typeof InvestorStatus];

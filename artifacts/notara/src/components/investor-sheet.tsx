@@ -7,10 +7,10 @@ import { Copy } from 'lucide-react';
 import { STATUSES, TYPES, FIELDS, fmtTs } from '@/lib/crm';
 
 type F = Record<string, string>;
-const empty = (): F => ({ ...Object.fromEntries(FIELDS.map((k) => [k, ''])), status: 'New', fit_score: '3', investor_type: 'angel' });
+const empty = (): F => ({ ...Object.fromEntries(FIELDS.map((k) => [k, ''])), status: 'New', fit_score: '3', investor_type: 'STANDARD' });
 const LONG = ['thesis_notes', 'pitch_body', 'notes', 'warm_intro_path'];
 const DATES = ['last_contacted_date', 'next_follow_up_date'];
-const lbl = (k: string) => k === 'investor_type' ? 'expert type' : k.replace(/_/g, ' ');
+const lbl = (k: string) => k === 'investor_type' ? 'expert tier' : k.replace(/_/g, ' ');
 const inp = 'w-full rounded-md border border-input bg-card px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring/40';
 
 export function InvestorSheet({ id, open, onClose }: { id: number | 'new' | null; open: boolean; onClose: () => void }) {

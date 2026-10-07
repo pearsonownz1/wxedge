@@ -10,9 +10,6 @@ export type InvestorInvestorType = typeof InvestorInvestorType[keyof typeof Inve
 
 
 export const InvestorInvestorType = {
-  angel: 'angel',
-  'pre-seed_fund': 'pre-seed fund',
-  seed_fund: 'seed fund',
-  'micro-VC': 'micro-VC',
-  strategic: 'strategic',
+  STANDARD: 'STANDARD',
+  PREMIUM: 'PREMIUM',
 } as const;

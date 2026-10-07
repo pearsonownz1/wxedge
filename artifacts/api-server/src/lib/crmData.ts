@@ -79,7 +79,7 @@ export async function upsert(client: Client, raw: unknown, id?: number) {
   if (id === undefined && matches.rows[0]) id = matches.rows[0].id;
   const old = id === undefined ? null : (await client.query("SELECT data FROM crm_investors WHERE id=$1 FOR UPDATE", [id])).rows[0]?.data;
   if (id !== undefined && !old) throw new CrmError("Investor not found", 404);
-  const defaults = { ...Object.fromEntries(FIELDS.map(key => [key, ""])), investor_type: "angel", fit_score: 3, status: "New" };
+  const defaults = { ...Object.fromEntries(FIELDS.map(key => [key, ""])), investor_type: "STANDARD", fit_score: 3, status: "New" };
   const data = { ...defaults, ...old, ...input };
   if (!data.name.trim()) throw new CrmError("Investor name is required");
   if (input.status && ["Contacted", "Followed Up"].includes(input.status) && !input.last_contacted_date && old?.status !== input.status) data.last_contacted_date = businessDate();
