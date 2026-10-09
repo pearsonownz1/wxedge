@@ -32,6 +32,7 @@ export default function Dashboard() {
   const [sort, setSort] = useState<{ k: keyof Investor; d: 1 | -1 }>({ k: 'updated_at', d: -1 });
   const [open, setOpen] = useState<number | 'new' | null>(null);
   const [imp, setImp] = useState(false); const [csv, setCsv] = useState('');
+  const [importError, setImportError] = useState('');
   const dragId = useRef<number | null>(null);
   const refresh = () => qc.invalidateQueries({ predicate: (x) => String(x.queryKey[0]).startsWith('/api/crm') });
 
@@ -45,7 +46,18 @@ export default function Dashboard() {
 
   const move = (id: number, status: string) => update.mutate({ id, data: { status: status as any } }, { onSuccess: refresh, onError: () => toast({ title: 'Status change failed', variant: 'destructive' }) });
   const doExport = async () => { try { download('notara-investors.csv', await browserExportInvestors()); } catch { toast({ title: 'Export failed', variant: 'destructive' }); } };
-  const doImport = () => importer.mutate({ data: { csv } }, { onSuccess: (r) => { toast({ title: `Imported: ${r.created} created, ${r.updated} updated` }); setImp(false); setCsv(''); refresh(); }, onError: () => toast({ title: 'Import failed. Check headers.', variant: 'destructive' }) });
+  const doImport = () => {
+    setImportError('');
+    importer.mutate({ data: { csv } }, {
+      onSuccess: (r) => { toast({ title: `Imported: ${r.created} created, ${r.updated} updated` }); setImp(false); setCsv(''); refresh(); },
+      onError: (err) => {
+        const body = (err as { data?: { error?: string } }).data;
+        const message = body?.error || (err instanceof Error ? err.message : 'Import failed');
+        setImportError(message);
+        toast({ title: 'Import failed', description: message, variant: 'destructive' });
+      },
+    });
+  };
 
   if (isForbidden(list.error) || isForbidden(sum.error)) return <Splash><h1 className="font-display text-3xl">Session expired</h1><p className="max-w-sm text-sm text-muted-foreground">Reload to sign in with your PIN.</p><button onClick={() => window.location.reload()} className="mt-2 rounded-md border px-4 py-2 text-sm">Reload</button></Splash>;
 
@@ -137,6 +149,7 @@ export default function Dashboard() {
           <div className="flex gap-2"><button data-testid="button-template" onClick={() => download('notara-template.csv', TEMPLATE_CSV)} className="rounded-md border px-3 py-1.5 text-sm">Download template</button>
             <input data-testid="input-csv-file" type="file" accept=".csv,text/csv" className="text-sm" onChange={async (e) => { const f = e.target.files?.[0]; if (f) setCsv(await f.text()); }} /></div>
           <textarea data-testid="input-csv" rows={6} value={csv} onChange={(e) => setCsv(e.target.value)} className="w-full rounded-md border bg-card p-2 font-mono-ui text-xs" />
+          {importError && <p role="alert" data-testid="text-import-error" className="break-words rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{importError}</p>}
           <button data-testid="button-run-import" disabled={!csv.trim() || importer.isPending} onClick={doImport} className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50">{importer.isPending ? 'Importing...' : 'Import'}</button>
         </DialogContent>
       </Dialog>

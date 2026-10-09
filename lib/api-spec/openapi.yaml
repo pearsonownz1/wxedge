@@ -781,6 +781,10 @@
       "post": {
         "operationId": "importInvestors",
         "responses": {
+          "400": {
+            "description": "Invalid CSV; row, field and rejected value are returned when identifiable",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CrmValidationError"}}}
+          },
           "200": {
             "description": "Success",
             "content": {
@@ -815,6 +819,10 @@
       "post": {
         "operationId": "browserImportInvestors",
         "responses": {
+          "400": {
+            "description": "Invalid CSV; row, field and rejected value are returned when identifiable",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CrmValidationError"}}}
+          },
           "200": {
             "description": "Success",
             "content": {
@@ -884,6 +892,17 @@
   },
   "components": {
     "schemas": {
+      "CrmValidationError": {
+        "type": "object",
+        "required": ["error"],
+        "properties": {
+          "error": {"type": "string"},
+          "row": {"type": "integer", "description": "CSV record number including the header as row 1"},
+          "field": {"type": "string"},
+          "value": {},
+          "reason": {"type": "string"}
+        }
+      },
       "CrmPinInput": {
         "type": "object",
         "required": ["pin"],

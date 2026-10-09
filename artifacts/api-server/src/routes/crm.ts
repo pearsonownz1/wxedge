@@ -3,6 +3,7 @@ import { BrowserAppendActivityBody, BrowserImportInvestorsBody } from "@workspac
 import { pool } from "@workspace/db";
 import { CrmError, STATUSES, activity, getInvestor, listInvestors, summary, transaction, upsert } from "../lib/crmData";
 import { exportCsv, importCsv } from "../lib/crmCsv";
+import { logger } from "../lib/logger";
 const router = Router();
 function id(value: string | string[]) {
   const n = Number(value);
@@ -49,8 +50,12 @@ router.post("/investors/:id/activity", async (req, res) => {
   });
   res.status(201).json(result);
 });
-router.use((err: Error & { code?: string }, _req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => {
-  if (err instanceof CrmError) res.status(err.status).json({ error: err.message });
+router.use((err: Error & { code?: string }, req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => {
+  if (err instanceof CrmError) {
+    // Log location only, never the uploaded record's private data or pitch content.
+    if (req.path === "/investors/import") logger.warn({ row: err.details?.row, field: err.details?.field, status: err.status }, "CSV import rejected");
+    res.status(err.status).json({ error: err.message, ...err.details });
+  }
   else if (err.code === "23505") res.status(409).json({ error: "Email or LinkedIn is already assigned to another investor" });
   else next(err);
 });

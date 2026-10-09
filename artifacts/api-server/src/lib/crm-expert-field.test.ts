@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import type { Investor } from "@workspace/api-zod";
-import { FIELDS, getInvestor, summary, upsert, validateInput, type Client } from "./crmData";
+import { CrmError, FIELDS, getInvestor, summary, upsert, validateInput, type Client } from "./crmData";
 import { csvExpertField, exportCsv, importCsv, parseCsv } from "./crmCsv";
 
 type Row = { id: number; data: Record<string, unknown>; created_at: Date; updated_at: Date };
@@ -93,6 +93,57 @@ test("CSV matches shuffled headers including expert_field, without modifying unr
     assert.equal(imported.investor_type, "PREMIUM");
     assert.equal(JSON.stringify(row), before);
   }
+});
+
+test("CSV errors identify the row, field and original rejected value", async () => {
+  const cases = [
+    ["expert_field", "Law_Firms", /Dentistry, Economics or Law Firms/],
+    ["investor_type", "Law Firms", /STANDARD/],
+    ["fit_score", "excellent", /number/],
+    ["fit_score", "6", /5/],
+    ["status", "Interested", /New/],
+    ["email", "not-an-email", /Invalid email/],
+    ["linkedin_url", "https://example.test/profile", /linkedin.com/],
+    ["website", "https://", /http or https/],
+    ["source_url", "example.test", /http or https/],
+    ["last_contacted_date", "10/09/2026", /YYYY-MM-DD/],
+    ["next_follow_up_date", "2026-02-30", /YYYY-MM-DD/],
+  ] as const;
+  for (const [field, value, expected] of cases) {
+    const memory = memoryClient();
+    await assert.rejects(importCsv(memory.client, `name,${field}\nExample,${value}`), err => {
+      assert.ok(err instanceof CrmError);
+      assert.equal(err.details?.row, 2);
+      assert.equal(err.details?.field, field);
+      assert.equal(err.details?.value, value);
+      assert.match(err.message, /CSV row 2:/);
+      assert.ok(err.message.includes(`${field}=${JSON.stringify(value)}`));
+      assert.match(err.message, expected);
+      return true;
+    });
+    assert.equal(memory.rows.length, 0);
+    assert.equal(memory.calls.length, 0);
+  }
+  const memory = memoryClient();
+  await assert.rejects(importCsv(memory.client, 'name,expert_field\nValid,Law Firms\nInvalid,Law_Firms'), err => {
+    assert.ok(err instanceof CrmError);
+    assert.equal(err.details?.row, 3);
+    assert.equal(err.details?.field, "expert_field");
+    return true;
+  });
+});
+
+test("A 60-row Law Firms CSV with the reported headers is supported", async () => {
+  const headers = "name,firm,title,email,linkedin_url,website,location,investor_type,typical_check_size,stage_focus,thesis_notes,warm_intro_path,source_url,fit_score,status,pitch_subject,pitch_body,last_contacted_date,next_follow_up_date,notes,expert_field";
+  const defaults: Record<string, string> = {
+    name: "Test firm", investor_type: "STANDARD", fit_score: "3", status: "New", expert_field: "Law Firms",
+  };
+  const values = headers.split(",").map(field => defaults[field] ?? "");
+  const memory = memoryClient();
+  const csv = [headers, ...Array.from({ length: 60 }, (_, i) => values.map((value, column) => column === 0 ? `${value} ${i + 1}` : value).join(","))].join("\n");
+  assert.deepEqual(await importCsv(memory.client, csv), { created: 60, updated: 0 });
+  assert.equal(memory.rows.length, 60);
+  assert.ok(memory.rows.every(row => row.data.expert_field === "Law Firms"));
 });
 
 test("Law Firms starts empty, accepts creation and CSV import, and preserves existing records", async () => {

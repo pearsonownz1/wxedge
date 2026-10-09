@@ -4,7 +4,11 @@ import { BrowserUpsertInvestorBody, type Investor } from "@workspace/api-zod";
 export const STATUSES = ["New", "Enriched", "Pitch Drafted", "Approved to Send", "Contacted", "Followed Up", "Responded", "Meeting Set", "Passed", "Committed"];
 export const FIELDS = ["name", "firm", "title", "email", "linkedin_url", "website", "location", "investor_type", "expert_field", "typical_check_size", "stage_focus", "thesis_notes", "warm_intro_path", "source_url", "fit_score", "status", "pitch_subject", "pitch_body", "last_contacted_date", "next_follow_up_date", "notes"];
 export class CrmError extends Error {
-  constructor(message: string, public status = 400) { super(message); }
+  constructor(message: string, public status = 400, public details?: { field?: string; value?: unknown; row?: number; reason?: string }) { super(message); }
+}
+export function fieldError(field: string, value: unknown, reason: string) {
+  const shown = JSON.stringify(value) ?? "missing";
+  return new CrmError(`${field}=${shown.length > 200 ? shown.slice(0, 200) + "…" : shown}: ${reason}`, 400, { field, value, reason });
 }
 export type Client = { query: typeof pool.query };
 export function businessDate(now = new Date()): string {
@@ -16,32 +20,37 @@ export function normalizeLinkedIn(value: string): string | null {
   if (!value.trim()) return null;
   let url: URL;
   try { url = new URL(value.includes("://") ? value : `https://${value}`); }
-  catch { throw new CrmError("Invalid LinkedIn URL"); }
-  if (!["https:", "http:"].includes(url.protocol) || !/^(www\.)?linkedin\.com$/i.test(url.hostname) || !url.pathname.replace(/\/+$/, "")) throw new CrmError("Use a linkedin.com profile URL");
+  catch { throw fieldError("linkedin_url", value, "Invalid LinkedIn URL"); }
+  if (!["https:", "http:"].includes(url.protocol) || !/^(www\.)?linkedin\.com$/i.test(url.hostname) || !url.pathname.replace(/\/+$/, "")) throw fieldError("linkedin_url", value, "Use a linkedin.com profile URL");
   return `https://www.linkedin.com${url.pathname.toLowerCase().replace(/\/+$/, "")}`;
 }
 export function validateInput(raw: unknown) {
   const parsed = BrowserUpsertInvestorBody.strict().safeParse(raw);
-  if (!parsed.success) throw new CrmError(parsed.error.issues.map(x => `${x.path.join(".")}: ${x.message}`).join("; "));
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    const field = issue.path.join(".") || "record";
+    const value = raw && typeof raw === "object" ? (raw as Record<string, unknown>)[String(issue.path[0])] : raw;
+    throw fieldError(field, value, issue.message);
+  }
   const data = parsed.data;
   for (const [key, value] of Object.entries(data)) {
-    if (typeof value === "string" && value.length > 50000) throw new CrmError(`${key} is too long`);
+    if (typeof value === "string" && value.length > 50000) throw fieldError(key, value, `${key} is too long`);
   }
   if (data.name !== undefined) data.name = data.name.trim();
   if (data.email !== undefined) {
     data.email = data.email.trim().toLowerCase();
-    if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) throw new CrmError("Invalid email");
+    if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) throw fieldError("email", data.email, "Invalid email");
   }
   if (data.linkedin_url !== undefined) data.linkedin_url = normalizeLinkedIn(data.linkedin_url) ?? "";
   for (const key of ["website", "source_url"] as const) {
     if (data[key]) {
       try { if (!["http:", "https:"].includes(new URL(data[key]).protocol)) throw Error(); }
-      catch { throw new CrmError(`${key} must be an http or https URL`); }
+      catch { throw fieldError(key, data[key], `${key} must be an http or https URL`); }
     }
   }
   for (const key of ["last_contacted_date", "next_follow_up_date"] as const) {
     const date = data[key];
-    if (date && (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(date)) || new Date(date).toISOString().slice(0, 10) !== date)) throw new CrmError(`${key} must be YYYY-MM-DD`);
+    if (date && (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(date)) || new Date(date).toISOString().slice(0, 10) !== date)) throw fieldError(key, date, `${key} must be YYYY-MM-DD`);
   }
   return data;
 }
@@ -81,7 +90,7 @@ export async function upsert(client: Client, raw: unknown, id?: number) {
   if (id !== undefined && !old) throw new CrmError("Investor not found", 404);
   const defaults = { ...Object.fromEntries(FIELDS.map(key => [key, ""])), investor_type: "STANDARD", expert_field: "Dentistry", fit_score: 3, status: "New" };
   const data = { ...defaults, ...old, ...input };
-  if (!data.name.trim()) throw new CrmError("Investor name is required");
+  if (!data.name.trim()) throw fieldError("name", data.name, "Investor name is required");
   if (input.status && ["Contacted", "Followed Up"].includes(input.status) && !input.last_contacted_date && old?.status !== input.status) data.last_contacted_date = businessDate();
   const payload = [data.email || null, normalizeLinkedIn(data.linkedin_url), JSON.stringify(data)];
   const created = id === undefined;

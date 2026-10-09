@@ -27,6 +27,7 @@ import type {
   BrowserListInvestorsParams,
   CrmPinInput,
   CrmPinSessionStatus,
+  CrmValidationError,
   CsvInput,
   ErrorEnvelope,
   GetSummaryParams,
@@ -1710,7 +1711,7 @@ export const importInvestors = async (csvInput: CsvInput, options?: RequestInit)
 
 
 
-export const getImportInvestorsMutationOptions = <TError = ErrorType<void>,
+export const getImportInvestorsMutationOptions = <TError = ErrorType<CrmValidationError | void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importInvestors>>, TError,{data: BodyType<CsvInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof importInvestors>>, TError,{data: BodyType<CsvInput>}, TContext> => {
 
@@ -1739,9 +1740,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type ImportInvestorsMutationResult = NonNullable<Awaited<ReturnType<typeof importInvestors>>>
     export type ImportInvestorsMutationBody = BodyType<CsvInput>
-    export type ImportInvestorsMutationError = ErrorType<void>
+    export type ImportInvestorsMutationError = ErrorType<CrmValidationError | void>
 
-    export const useImportInvestors = <TError = ErrorType<void>,
+    export const useImportInvestors = <TError = ErrorType<CrmValidationError | void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importInvestors>>, TError,{data: BodyType<CsvInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof importInvestors>>,
@@ -1775,7 +1776,7 @@ export const browserImportInvestors = async (csvInput: CsvInput, options?: Reque
 
 
 
-export const getBrowserImportInvestorsMutationOptions = <TError = ErrorType<void>,
+export const getBrowserImportInvestorsMutationOptions = <TError = ErrorType<CrmValidationError | void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof browserImportInvestors>>, TError,{data: BodyType<CsvInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof browserImportInvestors>>, TError,{data: BodyType<CsvInput>}, TContext> => {
 
@@ -1804,9 +1805,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type BrowserImportInvestorsMutationResult = NonNullable<Awaited<ReturnType<typeof browserImportInvestors>>>
     export type BrowserImportInvestorsMutationBody = BodyType<CsvInput>
-    export type BrowserImportInvestorsMutationError = ErrorType<void>
+    export type BrowserImportInvestorsMutationError = ErrorType<CrmValidationError | void>
 
-    export const useBrowserImportInvestors = <TError = ErrorType<void>,
+    export const useBrowserImportInvestors = <TError = ErrorType<CrmValidationError | void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof browserImportInvestors>>, TError,{data: BodyType<CsvInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof browserImportInvestors>>,

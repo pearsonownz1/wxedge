@@ -5,6 +5,15 @@
  * Notara private fundraising CRM
  * OpenAPI spec version: 1.0.0
  */
+export interface CrmValidationError {
+  error: string;
+  /** CSV record number including the header as row 1 */
+  row?: number;
+  field?: string;
+  value?: unknown;
+  reason?: string;
+}
+
 export interface CrmPinInput {
   /**
      * @minLength 1
