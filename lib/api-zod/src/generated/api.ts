@@ -9,6 +9,41 @@ import * as zod from 'zod';
 
 
 /**
+ * @summary Check browser PIN session
+ */
+export const GetCrmPinSessionResponse = zod.object({
+  "signed_in": zod.boolean(),
+  "configured": zod.boolean()
+})
+
+
+/**
+ * @summary Sign in with the server-side PIN
+ */
+export const loginCrmPinBodyPinMax = 128;
+
+
+
+export const LoginCrmPinBody = zod.object({
+  "pin": zod.string().min(1).max(loginCrmPinBodyPinMax)
+})
+
+export const LoginCrmPinResponse = zod.object({
+  "signed_in": zod.boolean(),
+  "configured": zod.boolean()
+})
+
+
+/**
+ * @summary Clear this browser's PIN session
+ */
+export const LogoutCrmPinResponse = zod.object({
+  "signed_in": zod.boolean(),
+  "configured": zod.boolean()
+})
+
+
+/**
  * Returns server health status
  * @summary Health check
  */

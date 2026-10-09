@@ -1,9 +1,8 @@
 import { useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useAuth } from '@workspace/replit-auth-web';
 import { useBrowserListInvestors, useBrowserGetSummary, useBrowserUpdateInvestor, useBrowserImportInvestors, browserExportInvestors, getBrowserListInvestorsQueryKey, getBrowserGetSummaryQueryKey, type Investor } from '@workspace/api-client-react';
 import { useToast } from '@/hooks/use-toast';
-import { Search, Plus, Upload, Download, LayoutGrid, Table2, ArrowUpDown, Lock } from 'lucide-react';
+import { Search, Plus, Upload, Download, LayoutGrid, Table2, ArrowUpDown } from 'lucide-react';
 import { STATUSES, TYPES, STATUS_TONE, TEMPLATE_CSV, EXPERT_FIELD_FILTERS, filterExpertField, defaultExpertFieldFor, type ExpertFieldFilter, download } from '@/lib/crm';
 import { InvestorSheet } from '@/components/investor-sheet';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -20,7 +19,6 @@ const Pill = ({ s }: { s: string }) => <span className={`whitespace-nowrap round
 const Fit = ({ n }: { n: number }) => <span className="font-mono-ui text-xs" title={`Fit ${n}/5`}>{'●'.repeat(n)}<span className="opacity-20">{'●'.repeat(Math.max(0, 5 - n))}</span></span>;
 
 export default function Dashboard() {
-  const { user, logout } = useAuth();
   const [expertField, setExpertField] = useState<ExpertFieldFilter>('Dentistry');
   const qc = useQueryClient();
   const { toast } = useToast();
@@ -49,7 +47,7 @@ export default function Dashboard() {
   const doExport = async () => { try { download('notara-investors.csv', await browserExportInvestors()); } catch { toast({ title: 'Export failed', variant: 'destructive' }); } };
   const doImport = () => importer.mutate({ data: { csv } }, { onSuccess: (r) => { toast({ title: `Imported: ${r.created} created, ${r.updated} updated` }); setImp(false); setCsv(''); refresh(); }, onError: () => toast({ title: 'Import failed. Check headers.', variant: 'destructive' }) });
 
-  if (isForbidden(list.error) || isForbidden(sum.error)) return <Splash><Lock className="h-8 w-8 text-primary" /><h1 className="font-display text-3xl" data-testid="text-access-denied">Access denied</h1><p className="max-w-sm text-sm text-muted-foreground">This workspace belongs to its owner. Your account does not have access.</p><button onClick={logout} className="mt-2 rounded-md border px-4 py-2 text-sm">Log out</button></Splash>;
+  if (isForbidden(list.error) || isForbidden(sum.error)) return <Splash><h1 className="font-display text-3xl">Session expired</h1><p className="max-w-sm text-sm text-muted-foreground">Reload to sign in with your PIN.</p><button onClick={() => window.location.reload()} className="mt-2 rounded-md border px-4 py-2 text-sm">Reload</button></Splash>;
 
   const th = (k: keyof Investor, label: string) => <th className="px-3 py-2 text-left"><button onClick={() => setSort((p) => ({ k, d: p.k === k ? (-p.d as 1 | -1) : 1 }))} className="flex items-center gap-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground hover:text-foreground">{label}<ArrowUpDown className="h-3 w-3" /></button></th>;
   const s = sum.data;
@@ -62,7 +60,6 @@ export default function Dashboard() {
           <button data-testid="button-new" onClick={() => setOpen('new')} className="flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground"><Plus className="h-4 w-4" />Add expert</button>
           <button data-testid="button-import" onClick={() => setImp(true)} className="flex items-center gap-1 rounded-md border border-sidebar-border px-3 py-1.5 text-sm"><Upload className="h-4 w-4" />Import</button>
           <button data-testid="button-export" onClick={doExport} className="flex items-center gap-1 rounded-md border border-sidebar-border px-3 py-1.5 text-sm"><Download className="h-4 w-4" />Export</button>
-          <span className="hidden text-xs opacity-60 sm:inline">{user?.email ?? user?.firstName}</span>
         </div>
       </header>
 
@@ -135,7 +132,7 @@ export default function Dashboard() {
 
       <Dialog open={imp} onOpenChange={setImp}>
         <DialogContent className="max-w-xl">
-          <DialogHeader><DialogTitle className="font-display text-2xl">Import experts</DialogTitle><DialogDescription>Paste CSV text or choose a file. The first row must use these headers. expert_field is optional: Dentistry, Economics or Law Firms (case-insensitive). Blank means Dentistry.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle className="font-display text-2xl">Import experts</DialogTitle><DialogDescription>Paste CSV text or choose a file. Columns can be in any order; values are matched by header name. expert_field is optional: Dentistry, Economics or Law Firms (case-insensitive). Blank means Dentistry.</DialogDescription></DialogHeader>
           <code className="block break-words rounded bg-muted p-2 font-mono-ui text-[11px]">{TEMPLATE_CSV.trim()}</code>
           <div className="flex gap-2"><button data-testid="button-template" onClick={() => download('notara-template.csv', TEMPLATE_CSV)} className="rounded-md border px-3 py-1.5 text-sm">Download template</button>
             <input data-testid="input-csv-file" type="file" accept=".csv,text/csv" className="text-sm" onChange={async (e) => { const f = e.target.files?.[0]; if (f) setCsv(await f.text()); }} /></div>

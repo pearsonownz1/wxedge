@@ -1,4 +1,5 @@
 - [Expert UI vocabulary](expert-ui-vocabulary.md) — visible CRM labels say expert; investor database/API naming remains unchanged.
+- [CRM PIN access](crm-pin-access.md) — the whole CRM requires a persistent browser PIN session; anonymous writes and owner-only CRM checks are superseded.
 - [Expert field defaults](expert-field-defaults.md) — missing field means Dentistry without backfilling; the Economists toggle defaults new experts to Economics.
 - [Retirement and domains](deployment-retirement.md) — stopping development does not stop a published build; unpublishing removes its custom-domain connection.
 - [Validator compatibility](api-validation-compatibility.md) — Orval URI formats can emit Zod APIs absent from this project's version; validate URLs explicitly.

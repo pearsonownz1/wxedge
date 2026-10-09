@@ -72,6 +72,29 @@ test("CSV field is optional, case-insensitive, defaults blanks, rejects invalid 
   assert.deepEqual(values.map(row => row[headers.indexOf("expert_field")]), ["Economics", "Dentistry", "Dentistry"]);
 });
 
+test("CSV matches shuffled headers including expert_field, without modifying unrelated records", async () => {
+  const existing = { id: 1, data: { name: "Existing", notes: "Keep" }, created_at: now, updated_at: now };
+  const headers = ["expert_field", "notes", "email", "fit_score", "status", "name", "investor_type"];
+  const values = ["lAw FiRmS", "A note, with commas", "law@example.test", "4", "Meeting Set", "Law example", "PREMIUM"];
+  for (let offset = 0; offset < headers.length; offset++) {
+    const row = { ...existing, data: { ...existing.data } };
+    const memory = memoryClient([row]);
+    const before = JSON.stringify(row);
+    const rotate = (items: string[]) => [...items.slice(offset), ...items.slice(0, offset)];
+    const quote = (value: string) => `"${value.replace(/"/g, '""')}"`;
+    assert.deepEqual(await importCsv(memory.client, `${rotate(headers).join(",")}\n${rotate(values).map(quote).join(",")}`), { created: 1, updated: 0 });
+    const imported = memory.rows[1].data;
+    assert.equal(imported.expert_field, "Law Firms");
+    assert.equal(imported.name, "Law example");
+    assert.equal(imported.email, "law@example.test");
+    assert.equal(imported.fit_score, 4);
+    assert.equal(imported.status, "Meeting Set");
+    assert.equal(imported.notes, "A note, with commas");
+    assert.equal(imported.investor_type, "PREMIUM");
+    assert.equal(JSON.stringify(row), before);
+  }
+});
+
 test("Law Firms starts empty, accepts creation and CSV import, and preserves existing records", async () => {
   const existing = { id: 1, data: { name: "Existing dentist", notes: "Keep" }, created_at: now, updated_at: now };
   const memory = memoryClient([existing]);

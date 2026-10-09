@@ -16,6 +16,8 @@ export * from './browserGetSummaryExpertField';
 export * from './browserGetSummaryParams';
 export * from './browserListInvestorsParams';
 export * from './browserListInvestorsStatus';
+export * from './crmPinInput';
+export * from './crmPinSessionStatus';
 export * from './csvInput';
 export * from './errorEnvelope';
 export * from './getSummaryExpertField';

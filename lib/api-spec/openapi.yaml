@@ -11,6 +11,50 @@
     }
   ],
   "paths": {
+    "/crm/session": {
+      "get": {
+        "operationId": "getCrmPinSession",
+        "summary": "Check browser PIN session",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Session status",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CrmPinSessionStatus"}}}
+          }
+        }
+      },
+      "post": {
+        "operationId": "loginCrmPin",
+        "summary": "Sign in with the server-side PIN",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CrmPinInput"}}}
+        },
+        "responses": {
+          "200": {
+            "description": "Persistent HttpOnly session cookie set",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CrmPinSessionStatus"}}}
+          },
+          "401": {"description": "Incorrect PIN"},
+          "403": {"description": "Same-origin request required"},
+          "429": {"description": "Too many PIN attempts"},
+          "503": {"description": "PIN login is not configured"}
+        }
+      },
+      "delete": {
+        "operationId": "logoutCrmPin",
+        "summary": "Clear this browser's PIN session",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Signed out",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CrmPinSessionStatus"}}}
+          },
+          "403": {"description": "Same-origin request required"}
+        }
+      }
+    },
     "/healthz": {
       "get": {
         "description": "Returns server health status",
@@ -290,7 +334,7 @@
             }
           }
         ],
-        "security": []
+        "security": [{"CrmPinSession": []}]
       },
       "post": {
         "operationId": "upsertInvestor",
@@ -322,11 +366,7 @@
             }
           }
         },
-        "security": [
-          {
-            "OwnerSession": []
-          }
-        ]
+        "security": [{"CrmPinSession": []}]
       }
     },
     "/crm/investors": {
@@ -374,7 +414,7 @@
             }
           }
         ],
-        "security": []
+        "security": [{"CrmPinSession": []}]
       },
       "post": {
         "operationId": "browserUpsertInvestor",
@@ -406,11 +446,7 @@
             }
           }
         },
-        "security": [
-          {
-            "OwnerSession": []
-          }
-        ]
+        "security": [{"CrmPinSession": []}]
       }
     },
     "/investors/{id}": {
@@ -444,7 +480,7 @@
             }
           }
         ],
-        "security": []
+        "security": [{"CrmPinSession": []}]
       },
       "patch": {
         "operationId": "updateInvestor",
@@ -486,11 +522,7 @@
             }
           }
         ],
-        "security": [
-          {
-            "OwnerSession": []
-          }
-        ]
+        "security": [{"CrmPinSession": []}]
       }
     },
     "/crm/investors/{id}": {
@@ -524,7 +556,7 @@
             }
           }
         ],
-        "security": []
+        "security": [{"CrmPinSession": []}]
       },
       "patch": {
         "operationId": "browserUpdateInvestor",
@@ -566,11 +598,7 @@
             }
           }
         ],
-        "security": [
-          {
-            "OwnerSession": []
-          }
-        ]
+        "security": [{"CrmPinSession": []}]
       }
     },
     "/investors/{id}/activity": {
@@ -616,7 +644,7 @@
         ],
         "security": [
           {
-            "OwnerSession": []
+            "CrmPinSession": []
           }
         ]
       }
@@ -664,7 +692,7 @@
         ],
         "security": [
           {
-            "OwnerSession": []
+            "CrmPinSession": []
           }
         ]
       }
@@ -690,7 +718,7 @@
             "description": "Owner only"
           }
         },
-        "security": [],
+        "security": [{"CrmPinSession": []}],
         "parameters": [
           {
             "name": "expert_field",
@@ -730,7 +758,7 @@
             "description": "Owner only"
           }
         },
-        "security": [],
+        "security": [{"CrmPinSession": []}],
         "parameters": [
           {
             "name": "expert_field",
@@ -780,11 +808,7 @@
             }
           }
         },
-        "security": [
-          {
-            "OwnerSession": []
-          }
-        ]
+        "security": [{"CrmPinSession": []}]
       }
     },
     "/crm/investors/import": {
@@ -818,11 +842,7 @@
             }
           }
         },
-        "security": [
-          {
-            "OwnerSession": []
-          }
-        ]
+        "security": [{"CrmPinSession": []}]
       }
     },
     "/investors/export": {
@@ -840,7 +860,7 @@
             }
           }
         },
-        "security": []
+        "security": [{"CrmPinSession": []}]
       }
     },
     "/crm/investors/export": {
@@ -858,12 +878,22 @@
             }
           }
         },
-        "security": []
+        "security": [{"CrmPinSession": []}]
       }
     }
   },
   "components": {
     "schemas": {
+      "CrmPinInput": {
+        "type": "object",
+        "required": ["pin"],
+        "properties": {"pin": {"type": "string", "minLength": 1, "maxLength": 128}}
+      },
+      "CrmPinSessionStatus": {
+        "type": "object",
+        "required": ["signed_in", "configured"],
+        "properties": {"signed_in": {"type": "boolean"}, "configured": {"type": "boolean"}}
+      },
       "HealthStatus": {
         "properties": {
           "status": {
@@ -1439,11 +1469,11 @@
       }
     },
     "securitySchemes": {
-      "OwnerSession": {
+      "CrmPinSession": {
         "type": "apiKey",
         "in": "cookie",
-        "name": "sid",
-        "description": "Owner session required for changes; viewing is public"
+        "name": "crm_pin_session",
+        "description": "Persistent PIN session required for all CRM reads and writes"
       }
     }
   }

@@ -25,6 +25,8 @@ import type {
   BeginBrowserLoginParams,
   BrowserGetSummaryParams,
   BrowserListInvestorsParams,
+  CrmPinInput,
+  CrmPinSessionStatus,
   CsvInput,
   ErrorEnvelope,
   GetSummaryParams,
@@ -68,6 +70,225 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export const getGetCrmPinSessionUrl = () => {
+
+
+
+
+  return `/api/crm/session`
+}
+
+/**
+ * @summary Check browser PIN session
+ */
+export const getCrmPinSession = async ( options?: RequestInit): Promise<CrmPinSessionStatus> => {
+
+  return customFetch<CrmPinSessionStatus>(getGetCrmPinSessionUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCrmPinSessionQueryKey = () => {
+    return [
+    `/api/crm/session`
+    ] as const;
+    }
+
+
+export const getGetCrmPinSessionQueryOptions = <TData = Awaited<ReturnType<typeof getCrmPinSession>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCrmPinSession>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCrmPinSessionQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCrmPinSession>>> = ({ signal }) => getCrmPinSession({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCrmPinSession>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCrmPinSessionQueryResult = NonNullable<Awaited<ReturnType<typeof getCrmPinSession>>>
+export type GetCrmPinSessionQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Check browser PIN session
+ */
+
+export function useGetCrmPinSession<TData = Awaited<ReturnType<typeof getCrmPinSession>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCrmPinSession>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCrmPinSessionQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getLoginCrmPinUrl = () => {
+
+
+
+
+  return `/api/crm/session`
+}
+
+/**
+ * @summary Sign in with the server-side PIN
+ */
+export const loginCrmPin = async (crmPinInput: CrmPinInput, options?: RequestInit): Promise<CrmPinSessionStatus> => {
+
+  return customFetch<CrmPinSessionStatus>(getLoginCrmPinUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(crmPinInput)
+  }
+);}
+
+
+
+
+
+export const getLoginCrmPinMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof loginCrmPin>>, TError,{data: BodyType<CrmPinInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof loginCrmPin>>, TError,{data: BodyType<CrmPinInput>}, TContext> => {
+
+const mutationKey = ['loginCrmPin'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof loginCrmPin>>, {data: BodyType<CrmPinInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  loginCrmPin(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type LoginCrmPinMutationResult = NonNullable<Awaited<ReturnType<typeof loginCrmPin>>>
+    export type LoginCrmPinMutationBody = BodyType<CrmPinInput>
+    export type LoginCrmPinMutationError = ErrorType<void>
+
+    /**
+ * @summary Sign in with the server-side PIN
+ */
+export const useLoginCrmPin = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof loginCrmPin>>, TError,{data: BodyType<CrmPinInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof loginCrmPin>>,
+        TError,
+        {data: BodyType<CrmPinInput>},
+        TContext
+      > => {
+      return useMutation(getLoginCrmPinMutationOptions(options));
+    }
+
+export const getLogoutCrmPinUrl = () => {
+
+
+
+
+  return `/api/crm/session`
+}
+
+/**
+ * @summary Clear this browser's PIN session
+ */
+export const logoutCrmPin = async ( options?: RequestInit): Promise<CrmPinSessionStatus> => {
+
+  return customFetch<CrmPinSessionStatus>(getLogoutCrmPinUrl(),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getLogoutCrmPinMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof logoutCrmPin>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof logoutCrmPin>>, TError,void, TContext> => {
+
+const mutationKey = ['logoutCrmPin'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof logoutCrmPin>>, void> = () => {
+
+
+          return  logoutCrmPin(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type LogoutCrmPinMutationResult = NonNullable<Awaited<ReturnType<typeof logoutCrmPin>>>
+
+    export type LogoutCrmPinMutationError = ErrorType<void>
+
+    /**
+ * @summary Clear this browser's PIN session
+ */
+export const useLogoutCrmPin = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof logoutCrmPin>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof logoutCrmPin>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getLogoutCrmPinMutationOptions(options));
+    }
 
 export const getHealthCheckUrl = () => {
 

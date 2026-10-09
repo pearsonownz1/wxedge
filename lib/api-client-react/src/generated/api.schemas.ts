@@ -5,6 +5,19 @@
  * Notara private fundraising CRM
  * OpenAPI spec version: 1.0.0
  */
+export interface CrmPinInput {
+  /**
+     * @minLength 1
+     * @maxLength 128
+     */
+  pin: string;
+}
+
+export interface CrmPinSessionStatus {
+  signed_in: boolean;
+  configured: boolean;
+}
+
 export interface HealthStatus {
   status: string;
 }
