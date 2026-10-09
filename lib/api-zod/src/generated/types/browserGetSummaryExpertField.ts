@@ -12,4 +12,5 @@ export type BrowserGetSummaryExpertField = typeof BrowserGetSummaryExpertField[k
 export const BrowserGetSummaryExpertField = {
   Dentistry: 'Dentistry',
   Economics: 'Economics',
+  Law_Firms: 'Law Firms',
 } as const;

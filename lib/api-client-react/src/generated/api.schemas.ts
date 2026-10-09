@@ -81,6 +81,7 @@ export type InvestorInputExpertField = typeof InvestorInputExpertField[keyof typ
 export const InvestorInputExpertField = {
   Dentistry: 'Dentistry',
   Economics: 'Economics',
+  Law_Firms: 'Law Firms',
 } as const;
 
 export interface InvestorInput {
@@ -141,6 +142,7 @@ export type InvestorUpdateExpertField = typeof InvestorUpdateExpertField[keyof t
 export const InvestorUpdateExpertField = {
   Dentistry: 'Dentistry',
   Economics: 'Economics',
+  Law_Firms: 'Law Firms',
 } as const;
 
 export interface InvestorUpdate {
@@ -208,6 +210,7 @@ export type InvestorExpertField = typeof InvestorExpertField[keyof typeof Invest
 export const InvestorExpertField = {
   Dentistry: 'Dentistry',
   Economics: 'Economics',
+  Law_Firms: 'Law Firms',
 } as const;
 
 export interface Investor {
@@ -345,6 +348,7 @@ export type GetSummaryExpertField = typeof GetSummaryExpertField[keyof typeof Ge
 export const GetSummaryExpertField = {
   Dentistry: 'Dentistry',
   Economics: 'Economics',
+  Law_Firms: 'Law Firms',
 } as const;
 
 export type BrowserGetSummaryParams = {
@@ -360,5 +364,6 @@ export type BrowserGetSummaryExpertField = typeof BrowserGetSummaryExpertField[k
 export const BrowserGetSummaryExpertField = {
   Dentistry: 'Dentistry',
   Economics: 'Economics',
+  Law_Firms: 'Law Firms',
 } as const;
 

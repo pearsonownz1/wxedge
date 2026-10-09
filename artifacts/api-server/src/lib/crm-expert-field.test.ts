@@ -72,6 +72,26 @@ test("CSV field is optional, case-insensitive, defaults blanks, rejects invalid 
   assert.deepEqual(values.map(row => row[headers.indexOf("expert_field")]), ["Economics", "Dentistry", "Dentistry"]);
 });
 
+test("Law Firms starts empty, accepts creation and CSV import, and preserves existing records", async () => {
+  const existing = { id: 1, data: { name: "Existing dentist", notes: "Keep" }, created_at: now, updated_at: now };
+  const memory = memoryClient([existing]);
+  const before = JSON.stringify(existing);
+  const original = await getInvestor(memory.client, 1);
+  assert.equal(summary([original], now, "Law Firms").total, 0);
+  const lawFirm = await upsert(memory.client, { name: "New law firm", expert_field: "Law Firms" });
+  assert.equal(lawFirm.investor.expert_field, "Law Firms");
+  assert.equal(csvExpertField(" lAw FiRmS "), "Law Firms");
+  await importCsv(memory.client, "name,expert_field\nImported law firm,lAW FIRms");
+  assert.equal(memory.rows[2].data.expert_field, "Law Firms");
+  const experts = await Promise.all(memory.rows.map(r => getInvestor(memory.client, r.id)));
+  assert.equal(summary(experts, now, "Law Firms").total, 2);
+  assert.equal(summary(experts, now, "Law Firms").counts.New, 2);
+  assert.equal(summary(experts, now, "Dentistry").total, 1);
+  assert.equal(summary(experts, now, "Economics").total, 0);
+  assert.equal(summary(experts, now).total, 3);
+  assert.equal(JSON.stringify(existing), before);
+});
+
 test("Every summary metric and status count uses the selected field, including legacy records", () => {
   const make = (id: number, field: string | undefined, overrides: Partial<Investor>): Investor => {
     const data: Record<string, unknown> = {

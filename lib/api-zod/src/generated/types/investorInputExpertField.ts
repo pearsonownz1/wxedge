@@ -12,4 +12,5 @@ export type InvestorInputExpertField = typeof InvestorInputExpertField[keyof typ
 export const InvestorInputExpertField = {
   Dentistry: 'Dentistry',
   Economics: 'Economics',
+  Law_Firms: 'Law Firms',
 } as const;

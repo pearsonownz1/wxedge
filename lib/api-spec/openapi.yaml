@@ -701,7 +701,8 @@
               "type": "string",
               "enum": [
                 "Dentistry",
-                "Economics"
+                "Economics",
+                "Law Firms"
               ]
             }
           }
@@ -740,7 +741,8 @@
               "type": "string",
               "enum": [
                 "Dentistry",
-                "Economics"
+                "Economics",
+                "Law Firms"
               ]
             }
           }
@@ -1081,7 +1083,8 @@
             "type": "string",
             "enum": [
               "Dentistry",
-              "Economics"
+              "Economics",
+              "Law Firms"
             ]
           }
         }
@@ -1172,7 +1175,8 @@
             "type": "string",
             "enum": [
               "Dentistry",
-              "Economics"
+              "Economics",
+              "Law Firms"
             ]
           }
         }
@@ -1327,7 +1331,8 @@
             "type": "string",
             "enum": [
               "Dentistry",
-              "Economics"
+              "Economics",
+              "Law Firms"
             ]
           }
         }
