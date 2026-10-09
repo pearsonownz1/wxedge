@@ -11,13 +11,9 @@ export type InvestorUpdateStatus = typeof InvestorUpdateStatus[keyof typeof Inve
 
 export const InvestorUpdateStatus = {
   New: 'New',
-  Enriched: 'Enriched',
-  Pitch_Drafted: 'Pitch Drafted',
-  Approved_to_Send: 'Approved to Send',
   Contacted: 'Contacted',
   Followed_Up: 'Followed Up',
   Responded: 'Responded',
   Meeting_Set: 'Meeting Set',
-  Passed: 'Passed',
-  Committed: 'Committed',
+  Closed: 'Closed',
 } as const;

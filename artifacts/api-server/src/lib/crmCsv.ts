@@ -1,4 +1,5 @@
-import { CrmError, FIELDS, fieldError, upsert, type Client } from "./crmData";
+import { CrmError, FIELDS, activity, fieldError, upsert, type Client } from "./crmData";
+import { normalizeStage, STAGES } from "./crmStages";
 import type { Investor } from "@workspace/api-zod";
 export function parseCsv(text: string): string[][] {
   const rows: string[][] = []; let row: string[] = []; let cell = ""; let quoted = false; let endedQuote = false;
@@ -54,11 +55,22 @@ export async function importCsv(client: Client, text: string) {
       const input: Record<string, unknown> = {};
       headers.forEach((key, j) => { if (FIELDS.includes(key)) input[key] = key === "fit_score" ? Number(rows[i][j]) : rows[i][j]; });
       if (input.fit_score === 0) delete input.fit_score;
-      if (input.status === "") delete input.status;
+      const originalStage = input.status;
+      if (typeof originalStage === "string") {
+        if (!originalStage.trim()) delete input.status;
+        else {
+          const stage = normalizeStage(originalStage);
+          if (!stage) throw fieldError("status", originalStage, `Expected ${STAGES.join(", ")} or a supported legacy stage`);
+          input.status = stage;
+        }
+      }
       if (input.investor_type === "") delete input.investor_type;
       if (typeof input.expert_field === "string") input.expert_field = csvExpertField(input.expert_field);
       const result = await upsert(client, input);
       result.created ? created++ : updated++;
+      if (typeof originalStage === "string" && originalStage.trim() && originalStage !== input.status) {
+        await activity(client, result.investor.id, `Imported legacy stage: ${originalStage} → ${input.status}`, `stage_migration:${originalStage}`);
+      }
       const rawActivity = headers.includes("activity_log") ? rows[i][headers.indexOf("activity_log")] : "";
       if (rawActivity) {
         let entries: unknown;

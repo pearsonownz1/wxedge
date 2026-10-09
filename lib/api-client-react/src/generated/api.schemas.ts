@@ -86,15 +86,11 @@ export type InvestorInputStatus = typeof InvestorInputStatus[keyof typeof Invest
 
 export const InvestorInputStatus = {
   New: 'New',
-  Enriched: 'Enriched',
-  Pitch_Drafted: 'Pitch Drafted',
-  Approved_to_Send: 'Approved to Send',
   Contacted: 'Contacted',
   Followed_Up: 'Followed Up',
   Responded: 'Responded',
   Meeting_Set: 'Meeting Set',
-  Passed: 'Passed',
-  Committed: 'Committed',
+  Closed: 'Closed',
 } as const;
 
 export type InvestorInputExpertField = typeof InvestorInputExpertField[keyof typeof InvestorInputExpertField];
@@ -147,15 +143,11 @@ export type InvestorUpdateStatus = typeof InvestorUpdateStatus[keyof typeof Inve
 
 export const InvestorUpdateStatus = {
   New: 'New',
-  Enriched: 'Enriched',
-  Pitch_Drafted: 'Pitch Drafted',
-  Approved_to_Send: 'Approved to Send',
   Contacted: 'Contacted',
   Followed_Up: 'Followed Up',
   Responded: 'Responded',
   Meeting_Set: 'Meeting Set',
-  Passed: 'Passed',
-  Committed: 'Committed',
+  Closed: 'Closed',
 } as const;
 
 export type InvestorUpdateExpertField = typeof InvestorUpdateExpertField[keyof typeof InvestorUpdateExpertField];
@@ -215,15 +207,11 @@ export type InvestorStatus = typeof InvestorStatus[keyof typeof InvestorStatus];
 
 export const InvestorStatus = {
   New: 'New',
-  Enriched: 'Enriched',
-  Pitch_Drafted: 'Pitch Drafted',
-  Approved_to_Send: 'Approved to Send',
   Contacted: 'Contacted',
   Followed_Up: 'Followed Up',
   Responded: 'Responded',
   Meeting_Set: 'Meeting Set',
-  Passed: 'Passed',
-  Committed: 'Committed',
+  Closed: 'Closed',
 } as const;
 
 export type InvestorExpertField = typeof InvestorExpertField[keyof typeof InvestorExpertField];
@@ -326,15 +314,11 @@ export type ListInvestorsStatus = typeof ListInvestorsStatus[keyof typeof ListIn
 
 export const ListInvestorsStatus = {
   New: 'New',
-  Enriched: 'Enriched',
-  Pitch_Drafted: 'Pitch Drafted',
-  Approved_to_Send: 'Approved to Send',
   Contacted: 'Contacted',
   Followed_Up: 'Followed Up',
   Responded: 'Responded',
   Meeting_Set: 'Meeting Set',
-  Passed: 'Passed',
-  Committed: 'Committed',
+  Closed: 'Closed',
 } as const;
 
 export type BrowserListInvestorsParams = {
@@ -346,15 +330,11 @@ export type BrowserListInvestorsStatus = typeof BrowserListInvestorsStatus[keyof
 
 export const BrowserListInvestorsStatus = {
   New: 'New',
-  Enriched: 'Enriched',
-  Pitch_Drafted: 'Pitch Drafted',
-  Approved_to_Send: 'Approved to Send',
   Contacted: 'Contacted',
   Followed_Up: 'Followed Up',
   Responded: 'Responded',
   Meeting_Set: 'Meeting Set',
-  Passed: 'Passed',
-  Committed: 'Committed',
+  Closed: 'Closed',
 } as const;
 
 export type GetSummaryParams = {

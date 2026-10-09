@@ -95,6 +95,25 @@ test("CSV matches shuffled headers including expert_field, without modifying unr
   }
 });
 
+test("CSV accepts legacy stage names across all expert categories and exports only canonical stages", async () => {
+  const mappings: [string, string][] = [
+    ["New", "New"], ["Enriched", "New"], ["Pitch Drafted", "New"], ["Approved to Send", "New"],
+    ["Sent", "Contacted"], ["Contacted", "Contacted"], ["Follow-up", "Followed Up"],
+    ["Follow-up 2", "Followed Up"], ["Followed Up", "Followed Up"], ["Replied", "Responded"],
+    ["Responded", "Responded"], ["Meeting", "Meeting Set"], ["Meeting Set", "Meeting Set"],
+    ["Won", "Closed"], ["Lost", "Closed"], ["Closed", "Closed"], ["Passed", "Closed"], ["Committed", "Closed"],
+  ];
+  const memory = memoryClient();
+  for (const category of ["Dentistry", "Economics", "Law Firms"]) {
+    const csv = "expert_field,status,name\n" + mappings.map(([stage], index) => `${category},${stage},Sample ${index}`).join("\n");
+    await importCsv(memory.client, csv);
+  }
+  assert.deepEqual(memory.rows.map(row => row.data.status), [...mappings, ...mappings, ...mappings].map(([, stage]) => stage));
+  const experts = await Promise.all(memory.rows.map(row => getInvestor(memory.client, row.id)));
+  const [headers, ...values] = parseCsv(exportCsv(experts));
+  assert.deepEqual(values.map(row => row[headers.indexOf("status")]), memory.rows.map(row => row.data.status));
+});
+
 test("CSV errors identify the row, field and original rejected value", async () => {
   const cases = [
     ["expert_field", "Law_Firms", /Dentistry, Economics or Law Firms/],

@@ -1,7 +1,8 @@
 import { pool } from "@workspace/db";
 import { BrowserUpsertInvestorBody, type Investor } from "@workspace/api-zod";
 
-export const STATUSES = ["New", "Enriched", "Pitch Drafted", "Approved to Send", "Contacted", "Followed Up", "Responded", "Meeting Set", "Passed", "Committed"];
+import { STAGES } from "./crmStages";
+export const STATUSES: string[] = [...STAGES];
 export const FIELDS = ["name", "firm", "title", "email", "linkedin_url", "website", "location", "investor_type", "expert_field", "typical_check_size", "stage_focus", "thesis_notes", "warm_intro_path", "source_url", "fit_score", "status", "pitch_subject", "pitch_body", "last_contacted_date", "next_follow_up_date", "notes"];
 export class CrmError extends Error {
   constructor(message: string, public status = 400, public details?: { field?: string; value?: unknown; row?: number; reason?: string }) { super(message); }
@@ -109,7 +110,7 @@ export function summary(investors: Awaited<ReturnType<typeof listInvestors>>, no
   day.setUTCDate(day.getUTCDate() - (day.getUTCDay() + 6) % 7);
   const monday = day.toISOString().slice(0, 10);
   const counts = Object.fromEntries(STATUSES.map(status => [status, investors.filter(i => i.status === status).length]));
-  const hasStatus = (i: typeof investors[number], statuses: string[]) => statuses.includes(i.status) || i.activity_log.some(a => statuses.some(s => a.kind === `status:${s}`));
+  const hasStatus = (i: typeof investors[number], statuses: string[]) => statuses.includes(i.status) || i.activity_log.some(a => statuses.some(s => a.kind === `status:${s}` || a.kind === `stage_migration:${s}`));
   const contacted = investors.filter(i => !!i.last_contacted_date || hasStatus(i, ["Contacted", "Followed Up", "Responded", "Meeting Set", "Committed"])).length;
   const responses = investors.filter(i => hasStatus(i, ["Responded", "Meeting Set", "Committed"])).length;
   return {
@@ -117,6 +118,6 @@ export function summary(investors: Awaited<ReturnType<typeof listInvestors>>, no
     contacted_this_week: investors.filter(i => i.last_contacted_date >= monday && i.last_contacted_date <= today).length,
     responses, response_rate: contacted ? responses / contacted : 0,
     meetings_set: investors.filter(i => hasStatus(i, ["Meeting Set", "Committed"])).length,
-    followups_due_today: investors.filter(i => i.next_follow_up_date === today && !["Passed", "Committed"].includes(i.status)).length,
+    followups_due_today: investors.filter(i => i.next_follow_up_date === today && i.status !== "Closed").length,
   };
 }

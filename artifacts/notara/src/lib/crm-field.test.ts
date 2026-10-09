@@ -1,6 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { defaultExpertFieldFor, expertFieldOf, filterExpertField, TEMPLATE_CSV } from './crm';
+import { defaultExpertFieldFor, expertFieldOf, filterExpertField, TEMPLATE_CSV, STATUSES, STATUS_TONE } from './crm';
+
+test('All CRM views share exactly six ordered stages', () => {
+  assert.deepEqual(STATUSES, ['New', 'Contacted', 'Followed Up', 'Responded', 'Meeting Set', 'Closed']);
+  assert.deepEqual(Object.keys(STATUS_TONE), [...STATUSES]);
+});
 
 test('Field filtering includes legacy experts under Dentistry without changing records', () => {
   const records: { id: number; expert_field?: string | null }[] = [
