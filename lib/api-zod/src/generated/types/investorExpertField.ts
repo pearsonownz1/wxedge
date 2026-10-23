@@ -15,5 +15,4 @@ export const InvestorExpertField = {
   Law_Firms: 'Law Firms',
   Chinese_Law: 'Chinese Law',
   Indian_Law: 'Indian Law',
-  Brazilian_Law: 'Brazilian Law',
 } as const;

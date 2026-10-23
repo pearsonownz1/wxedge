@@ -30,15 +30,14 @@ export function parseCsv(text: string): string[][] {
   row.push(cell); if (row.some(v => v !== "")) rows.push(row);
   return rows;
 }
-export function csvExpertField(value: string): "Dentistry" | "Economics" | "Law Firms" | "Chinese Law" | "Indian Law" | "Brazilian Law" {
+export function csvExpertField(value: string): "Dentistry" | "Economics" | "Law Firms" | "Chinese Law" | "Indian Law" {
   const field = value.trim().toLowerCase();
   if (!field || field === "dentistry") return "Dentistry";
   if (field === "economics") return "Economics";
   if (field === "law firms") return "Law Firms";
   if (field === "chinese law") return "Chinese Law";
   if (field === "indian law") return "Indian Law";
-  if (field === "brazilian law") return "Brazilian Law";
-  throw fieldError("expert_field", value, "expert_field must be Dentistry, Economics, Law Firms, Chinese Law, Indian Law or Brazilian Law");
+  throw fieldError("expert_field", value, "expert_field must be Dentistry, Economics, Law Firms, Chinese Law or Indian Law");
 }
 export async function importCsv(client: Client, text: string) {
   const rows = parseCsv(text);

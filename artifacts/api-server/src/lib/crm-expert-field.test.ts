@@ -104,11 +104,11 @@ test("CSV accepts legacy stage names across all expert categories and exports on
     ["Won", "Closed"], ["Lost", "Closed"], ["Closed", "Closed"], ["Passed", "Closed"], ["Committed", "Closed"],
   ];
   const memory = memoryClient();
-  for (const category of ["Dentistry", "Economics", "Law Firms", "Chinese Law", "Indian Law", "Brazilian Law"]) {
+  for (const category of ["Dentistry", "Economics", "Law Firms", "Chinese Law", "Indian Law"]) {
     const csv = "expert_field,status,name\n" + mappings.map(([stage], index) => `${category},${stage},Sample ${index}`).join("\n");
     await importCsv(memory.client, csv);
   }
-  assert.deepEqual(memory.rows.map(row => row.data.status), [...mappings, ...mappings, ...mappings, ...mappings, ...mappings, ...mappings].map(([, stage]) => stage));
+  assert.deepEqual(memory.rows.map(row => row.data.status), [...mappings, ...mappings, ...mappings, ...mappings, ...mappings].map(([, stage]) => stage));
   const experts = await Promise.all(memory.rows.map(row => getInvestor(memory.client, row.id)));
   const [headers, ...values] = parseCsv(exportCsv(experts));
   assert.deepEqual(values.map(row => row[headers.indexOf("status")]), memory.rows.map(row => row.data.status));
@@ -116,7 +116,7 @@ test("CSV accepts legacy stage names across all expert categories and exports on
 
 test("CSV errors identify the row, field and original rejected value", async () => {
   const cases = [
-    ["expert_field", "Law_Firms", /Dentistry, Economics, Law Firms, Chinese Law, Indian Law or Brazilian Law/],
+    ["expert_field", "Law_Firms", /Dentistry, Economics, Law Firms, Chinese Law or Indian Law/],
     ["investor_type", "Law Firms", /STANDARD/],
     ["fit_score", "excellent", /number/],
     ["fit_score", "6", /5/],
@@ -165,27 +165,22 @@ test("A 60-row Law Firms CSV with the reported headers is supported", async () =
   assert.ok(memory.rows.every(row => row.data.expert_field === "Law Firms"));
 });
 
-test("Brazilian Law supports creation, editing, CSV import and scoped counts without changing existing experts", async () => {
-  const original = { id: 1, data: { name: "Existing Indian law expert", expert_field: "Indian Law", status: "New", notes: "Keep" }, created_at: now, updated_at: now };
+test("Removed Brazilian Law and the Brazil display label are not stored field values; Law Firms remains unchanged", async () => {
+  const original = { id: 1, data: { name: "Existing law expert", expert_field: "Law Firms", status: "New", notes: "Keep" }, created_at: now, updated_at: now };
   const memory = memoryClient([original]);
   const before = JSON.stringify(original);
-  assert.equal(summary([await getInvestor(memory.client, 1)], now, "Brazilian Law").total, 0);
-  const created = await upsert(memory.client, { name: "Brazilian law example", expert_field: "Brazilian Law" });
-  assert.equal(created.investor.expert_field, "Brazilian Law");
-  assert.equal(created.investor.status, "New");
-  const edited = await upsert(memory.client, { notes: "New note" }, created.investor.id);
-  assert.equal(edited.investor.expert_field, "Brazilian Law");
-  assert.equal(csvExpertField(" bRaZiLiAn LaW "), "Brazilian Law");
-  await importCsv(memory.client, "expert_field,status,name\n brazilian LAW ,Meeting,Imported example");
-  const experts = await Promise.all(memory.rows.map(row => getInvestor(memory.client, row.id)));
-  const result = summary(experts, now, "Brazilian Law");
-  assert.equal(result.total, 2);
-  assert.equal(result.counts.New, 1);
-  assert.equal(result.counts["Meeting Set"], 1);
-  assert.equal(summary(experts, now, "Indian Law").total, 1);
+  for (const value of ["Brazilian Law", "Brazil"]) {
+    assert.throws(() => csvExpertField(value), /expert_field/);
+    await assert.rejects(upsert(memory.client, { name: "Invalid category", expert_field: value }), /expert_field/);
+    await assert.rejects(importCsv(memory.client, `name,expert_field\nInvalid category,${value}`), /CSV row 2.*expert_field/);
+  }
+  assert.equal(memory.calls.length, 0);
+  assert.equal(csvExpertField(" law firms "), "Law Firms");
   assert.equal(JSON.stringify(original), before);
+  const experts = [await getInvestor(memory.client, 1)];
+  assert.equal(summary(experts, now, "Law Firms").total, 1);
   const [headers, ...rows] = parseCsv(exportCsv(experts));
-  assert.deepEqual(rows.map(row => row[headers.indexOf("expert_field")]), ["Indian Law", "Brazilian Law", "Brazilian Law"]);
+  assert.deepEqual(rows.map(row => row[headers.indexOf("expert_field")]), ["Law Firms"]);
 });
 
 test("Indian Law supports creation, editing, CSV import and scoped counts without changing existing experts", async () => {
