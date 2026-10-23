@@ -144,7 +144,7 @@ export default function Dashboard() {
 
       <Dialog open={imp} onOpenChange={setImp}>
         <DialogContent className="max-w-xl">
-          <DialogHeader><DialogTitle className="font-display text-2xl">Import experts</DialogTitle><DialogDescription>Paste CSV text or choose a file. Columns can be in any order; values are matched by header name. expert_field is optional: Dentistry, Economics or Law Firms (case-insensitive). Blank means Dentistry.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle className="font-display text-2xl">Import experts</DialogTitle><DialogDescription>Paste CSV text or choose a file. Columns can be in any order; values are matched by header name. expert_field is optional: Dentistry, Economics, Law Firms or Chinese Law (case-insensitive). Blank means Dentistry.</DialogDescription></DialogHeader>
           <code className="block break-words rounded bg-muted p-2 font-mono-ui text-[11px]">{TEMPLATE_CSV.trim()}</code>
           <div className="flex gap-2"><button data-testid="button-template" onClick={() => download('notara-template.csv', TEMPLATE_CSV)} className="rounded-md border px-3 py-1.5 text-sm">Download template</button>
             <input data-testid="input-csv-file" type="file" accept=".csv,text/csv" className="text-sm" onChange={async (e) => { const f = e.target.files?.[0]; if (f) setCsv(await f.text()); }} /></div>

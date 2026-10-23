@@ -100,6 +100,7 @@ export const InvestorInputExpertField = {
   Dentistry: 'Dentistry',
   Economics: 'Economics',
   Law_Firms: 'Law Firms',
+  Chinese_Law: 'Chinese Law',
 } as const;
 
 export interface InvestorInput {
@@ -157,6 +158,7 @@ export const InvestorUpdateExpertField = {
   Dentistry: 'Dentistry',
   Economics: 'Economics',
   Law_Firms: 'Law Firms',
+  Chinese_Law: 'Chinese Law',
 } as const;
 
 export interface InvestorUpdate {
@@ -221,6 +223,7 @@ export const InvestorExpertField = {
   Dentistry: 'Dentistry',
   Economics: 'Economics',
   Law_Firms: 'Law Firms',
+  Chinese_Law: 'Chinese Law',
 } as const;
 
 export interface Investor {
@@ -351,6 +354,7 @@ export const GetSummaryExpertField = {
   Dentistry: 'Dentistry',
   Economics: 'Economics',
   Law_Firms: 'Law Firms',
+  Chinese_Law: 'Chinese Law',
 } as const;
 
 export type BrowserGetSummaryParams = {
@@ -367,5 +371,6 @@ export const BrowserGetSummaryExpertField = {
   Dentistry: 'Dentistry',
   Economics: 'Economics',
   Law_Firms: 'Law Firms',
+  Chinese_Law: 'Chinese Law',
 } as const;
 

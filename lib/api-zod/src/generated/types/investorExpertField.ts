@@ -13,4 +13,5 @@ export const InvestorExpertField = {
   Dentistry: 'Dentistry',
   Economics: 'Economics',
   Law_Firms: 'Law Firms',
+  Chinese_Law: 'Chinese Law',
 } as const;
