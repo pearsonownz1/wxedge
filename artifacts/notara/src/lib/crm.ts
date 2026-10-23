@@ -1,7 +1,7 @@
 export const STATUSES = ['New','Contacted','Followed Up','Responded','Meeting Set','Closed'] as const;
 export const TYPES = ['STANDARD','PREMIUM'] as const;
 export const FIELDS = ['name','firm','title','email','linkedin_url','website','location','investor_type','expert_field','typical_check_size','stage_focus','thesis_notes','warm_intro_path','source_url','fit_score','status','pitch_subject','pitch_body','last_contacted_date','next_follow_up_date','notes'] as const;
-export const EXPERT_FIELDS = ['Dentistry', 'Economics', 'Law Firms', 'Chinese Law'] as const;
+export const EXPERT_FIELDS = ['Dentistry', 'Economics', 'Law Firms', 'Chinese Law', 'Indian Law'] as const;
 export type ExpertField = typeof EXPERT_FIELDS[number];
 export type ExpertFieldFilter = ExpertField | 'All';
 export const EXPERT_FIELD_FILTERS = [
@@ -9,6 +9,7 @@ export const EXPERT_FIELD_FILTERS = [
   { value: 'Economics', label: 'Economists' },
   { value: 'Law Firms', label: 'Law Firms' },
   { value: 'Chinese Law', label: 'Chinese Law' },
+  { value: 'Indian Law', label: 'Indian Law' },
   { value: 'All', label: 'All' },
 ] as const;
 export function expertFieldOf(record: { expert_field?: string | null }): ExpertField {

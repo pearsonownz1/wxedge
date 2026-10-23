@@ -181,7 +181,7 @@ export const ListInvestorsResponseItem = zod.object({
   "message": zod.string(),
   "kind": zod.string()
 })),
-  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law'])
+  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law', 'Indian Law'])
 })
 export const ListInvestorsResponse = zod.array(ListInvestorsResponseItem)
 
@@ -211,7 +211,7 @@ export const UpsertInvestorBody = zod.object({
   "investor_type": zod.enum(['STANDARD', 'PREMIUM']).optional(),
   "fit_score": zod.number().min(1).max(upsertInvestorBodyFitScoreMax).optional(),
   "status": zod.enum(['New', 'Contacted', 'Followed Up', 'Responded', 'Meeting Set', 'Closed']).optional(),
-  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law']).optional()
+  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law', 'Indian Law']).optional()
 })
 
 export const upsertInvestorResponseFitScoreMax = 5;
@@ -248,7 +248,7 @@ export const UpsertInvestorResponse = zod.object({
   "message": zod.string(),
   "kind": zod.string()
 })),
-  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law'])
+  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law', 'Indian Law'])
 })
 
 
@@ -290,7 +290,7 @@ export const BrowserListInvestorsResponseItem = zod.object({
   "message": zod.string(),
   "kind": zod.string()
 })),
-  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law'])
+  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law', 'Indian Law'])
 })
 export const BrowserListInvestorsResponse = zod.array(BrowserListInvestorsResponseItem)
 
@@ -320,7 +320,7 @@ export const BrowserUpsertInvestorBody = zod.object({
   "investor_type": zod.enum(['STANDARD', 'PREMIUM']).optional(),
   "fit_score": zod.number().min(1).max(browserUpsertInvestorBodyFitScoreMax).optional(),
   "status": zod.enum(['New', 'Contacted', 'Followed Up', 'Responded', 'Meeting Set', 'Closed']).optional(),
-  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law']).optional()
+  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law', 'Indian Law']).optional()
 })
 
 export const browserUpsertInvestorResponseFitScoreMax = 5;
@@ -357,7 +357,7 @@ export const BrowserUpsertInvestorResponse = zod.object({
   "message": zod.string(),
   "kind": zod.string()
 })),
-  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law'])
+  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law', 'Indian Law'])
 })
 
 
@@ -399,7 +399,7 @@ export const GetInvestorResponse = zod.object({
   "message": zod.string(),
   "kind": zod.string()
 })),
-  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law'])
+  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law', 'Indian Law'])
 })
 
 
@@ -432,7 +432,7 @@ export const UpdateInvestorBody = zod.object({
   "investor_type": zod.enum(['STANDARD', 'PREMIUM']).optional(),
   "fit_score": zod.number().min(1).max(updateInvestorBodyFitScoreMax).optional(),
   "status": zod.enum(['New', 'Contacted', 'Followed Up', 'Responded', 'Meeting Set', 'Closed']).optional(),
-  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law']).optional()
+  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law', 'Indian Law']).optional()
 })
 
 export const updateInvestorResponseFitScoreMax = 5;
@@ -469,7 +469,7 @@ export const UpdateInvestorResponse = zod.object({
   "message": zod.string(),
   "kind": zod.string()
 })),
-  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law'])
+  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law', 'Indian Law'])
 })
 
 
@@ -511,7 +511,7 @@ export const BrowserGetInvestorResponse = zod.object({
   "message": zod.string(),
   "kind": zod.string()
 })),
-  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law'])
+  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law', 'Indian Law'])
 })
 
 
@@ -544,7 +544,7 @@ export const BrowserUpdateInvestorBody = zod.object({
   "investor_type": zod.enum(['STANDARD', 'PREMIUM']).optional(),
   "fit_score": zod.number().min(1).max(browserUpdateInvestorBodyFitScoreMax).optional(),
   "status": zod.enum(['New', 'Contacted', 'Followed Up', 'Responded', 'Meeting Set', 'Closed']).optional(),
-  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law']).optional()
+  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law', 'Indian Law']).optional()
 })
 
 export const browserUpdateInvestorResponseFitScoreMax = 5;
@@ -581,7 +581,7 @@ export const BrowserUpdateInvestorResponse = zod.object({
   "message": zod.string(),
   "kind": zod.string()
 })),
-  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law'])
+  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law', 'Indian Law'])
 })
 
 
@@ -631,7 +631,7 @@ export const AppendActivityResponse = zod.object({
   "message": zod.string(),
   "kind": zod.string()
 })),
-  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law'])
+  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law', 'Indian Law'])
 })
 
 
@@ -681,12 +681,12 @@ export const BrowserAppendActivityResponse = zod.object({
   "message": zod.string(),
   "kind": zod.string()
 })),
-  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law'])
+  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law', 'Indian Law'])
 })
 
 
 export const GetSummaryQueryParams = zod.object({
-  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law']).optional().describe('Restrict summary metrics to this field; records without a field count as Dentistry. Omit for all experts.')
+  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law', 'Indian Law']).optional().describe('Restrict summary metrics to this field; records without a field count as Dentistry. Omit for all experts.')
 })
 
 export const GetSummaryResponse = zod.object({
@@ -701,7 +701,7 @@ export const GetSummaryResponse = zod.object({
 
 
 export const BrowserGetSummaryQueryParams = zod.object({
-  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law']).optional().describe('Restrict summary metrics to this field; records without a field count as Dentistry. Omit for all experts.')
+  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law', 'Indian Law']).optional().describe('Restrict summary metrics to this field; records without a field count as Dentistry. Omit for all experts.')
 })
 
 export const BrowserGetSummaryResponse = zod.object({

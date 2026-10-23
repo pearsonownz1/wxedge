@@ -12,7 +12,7 @@ function id(value: string | string[]) {
 }
 router.get("/summary", async (req, res) => {
   const expertField = req.query.expert_field;
-  if (expertField !== undefined && expertField !== "Dentistry" && expertField !== "Economics" && expertField !== "Law Firms" && expertField !== "Chinese Law") throw new CrmError("Invalid expert field");
+  if (expertField !== undefined && expertField !== "Dentistry" && expertField !== "Economics" && expertField !== "Law Firms" && expertField !== "Chinese Law" && expertField !== "Indian Law") throw new CrmError("Invalid expert field");
   res.json(summary(await listInvestors(pool), new Date(), expertField));
 });
 router.get("/investors", async (req, res) => {

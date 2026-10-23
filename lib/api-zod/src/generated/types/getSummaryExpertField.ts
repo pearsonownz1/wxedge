@@ -14,4 +14,5 @@ export const GetSummaryExpertField = {
   Economics: 'Economics',
   Law_Firms: 'Law Firms',
   Chinese_Law: 'Chinese Law',
+  Indian_Law: 'Indian Law',
 } as const;
