@@ -102,6 +102,7 @@ export const InvestorInputExpertField = {
   Law_Firms: 'Law Firms',
   Chinese_Law: 'Chinese Law',
   Indian_Law: 'Indian Law',
+  Brazilian_Law: 'Brazilian Law',
 } as const;
 
 export interface InvestorInput {
@@ -161,6 +162,7 @@ export const InvestorUpdateExpertField = {
   Law_Firms: 'Law Firms',
   Chinese_Law: 'Chinese Law',
   Indian_Law: 'Indian Law',
+  Brazilian_Law: 'Brazilian Law',
 } as const;
 
 export interface InvestorUpdate {
@@ -227,6 +229,7 @@ export const InvestorExpertField = {
   Law_Firms: 'Law Firms',
   Chinese_Law: 'Chinese Law',
   Indian_Law: 'Indian Law',
+  Brazilian_Law: 'Brazilian Law',
 } as const;
 
 export interface Investor {
@@ -359,6 +362,7 @@ export const GetSummaryExpertField = {
   Law_Firms: 'Law Firms',
   Chinese_Law: 'Chinese Law',
   Indian_Law: 'Indian Law',
+  Brazilian_Law: 'Brazilian Law',
 } as const;
 
 export type BrowserGetSummaryParams = {
@@ -377,5 +381,6 @@ export const BrowserGetSummaryExpertField = {
   Law_Firms: 'Law Firms',
   Chinese_Law: 'Chinese Law',
   Indian_Law: 'Indian Law',
+  Brazilian_Law: 'Brazilian Law',
 } as const;
 
