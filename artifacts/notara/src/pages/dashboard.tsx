@@ -474,7 +474,7 @@ export default function Dashboard() {
               onClick={purgeDuplicates}
               className="flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
             >
-              <Sparkles className="h-3.5 w-3.5 text-blue-600" /> Dedup
+              <Sparkles className="h-3.5 w-3.5 text-blue-600" /> Remove Duplicates
             </button>
             <button
               data-testid="button-new"
