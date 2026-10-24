@@ -24,7 +24,7 @@ export type ExpertField = typeof EXPERT_FIELDS[number];
 export type ExpertFieldFilter = ExpertField | 'All';
 
 export const EXPERT_FIELD_FILTERS = [
-  { value: 'Law Firms', label: 'Law Firms' },
+  { value: 'Law Firms', label: 'Brazil' },
   { value: 'Chinese Law', label: 'Chinese Law' },
   { value: 'Indian Law', label: 'Indian Law' },
   { value: 'All', label: 'All' },

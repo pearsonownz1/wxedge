@@ -276,7 +276,7 @@ router.post("/calls", async (req, res) => {
           subject: `Outbound Call (${outcome})`,
           snippet: `${aiOverview}${actionItems.length ? ` | Action Items: ${actionItems.join("; ")}` : ""}`,
           campaign: body.campaign || "telnyx-dialer",
-          actor: body.actor || "Dialer AI",
+          actor: body.actor || "Guy",
         });
       } catch {
         // Ignore if card lookup did not match an existing card
@@ -287,6 +287,104 @@ router.post("/calls", async (req, res) => {
   res.status(201).json(created);
 });
 
+const TELNYX_WEBRTC_CREDENTIAL_ID = process.env.TELNYX_WEBRTC_CREDENTIAL_ID || "e6f96ea2-dec4-47c6-8800-4421d12493c0";
+const TELNYX_CREDENTIAL_CONNECTION_ID = process.env.TELNYX_CREDENTIAL_CONNECTION_ID || "3077666291767576557";
+
+router.post("/calls/webrtc-token", async (_req, res) => {
+  const apiKey = (process.env.TELNYX_API_KEY || "").trim();
+  if (!apiKey) {
+    res.status(503).json({ error: "TELNYX_API_KEY is not configured on the server" });
+    return;
+  }
+  try {
+    let credId = TELNYX_WEBRTC_CREDENTIAL_ID;
+    let tokResp = await fetch(`https://api.telnyx.com/v2/telephony_credentials/${credId}/token`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}` },
+    });
+    if (!tokResp.ok) {
+      const createResp = await fetch("https://api.telnyx.com/v2/telephony_credentials", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          connection_id: TELNYX_CREDENTIAL_CONNECTION_ID,
+          name: "SellingHighs-CRM-WebRTC",
+        }),
+      });
+      if (createResp.ok) {
+        const cJson = (await createResp.json()) as { data?: { id?: string } };
+        if (cJson.data?.id) {
+          credId = cJson.data.id;
+          tokResp = await fetch(`https://api.telnyx.com/v2/telephony_credentials/${credId}/token`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${apiKey}` },
+          });
+        }
+      }
+    }
+    if (!tokResp.ok) {
+      const errText = await tokResp.text();
+      res.status(502).json({ error: `Failed to mint WebRTC token: ${errText.slice(0, 200)}` });
+      return;
+    }
+    const token = (await tokResp.text()).trim();
+    res.json({
+      token,
+      caller_number: TELNYX_FROM_NUMBER,
+      credential_id: credId,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Failed to create WebRTC token" });
+  }
+});
+
+router.post("/calls/hangup", async (req, res) => {
+  const apiKey = (process.env.TELNYX_API_KEY || "").trim();
+  const body = req.body || {};
+  const targetCallId = String(body.call_control_id || body.call_id || "").trim();
+  const hungUp: string[] = [];
+
+  if (apiKey) {
+    const idsToHangup = new Set<string>();
+    if (targetCallId && targetCallId.startsWith("v3:")) {
+      idsToHangup.add(targetCallId);
+    }
+    try {
+      const recent = await pool.query(
+        `SELECT call_id FROM crm_calls WHERE created_at > NOW() - INTERVAL '30 minutes' ORDER BY id DESC LIMIT 10`,
+      );
+      for (const row of recent.rows) {
+        if (row.call_id && String(row.call_id).startsWith("v3:")) {
+          idsToHangup.add(String(row.call_id));
+        }
+      }
+    } catch {
+      // ignore db lookup errors during emergency hangup
+    }
+
+    for (const cid of idsToHangup) {
+      try {
+        const hResp = await fetch(`https://api.telnyx.com/v2/calls/${encodeURIComponent(cid)}/actions/hangup`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({}),
+        });
+        if (hResp.ok) hungUp.push(cid);
+      } catch {
+        // ignore individual hangup error
+      }
+    }
+  }
+
+  res.json({ ok: true, hung_up: hungUp });
+});
+
 router.post("/calls/dial", async (req, res) => {
   const body = req.body || {};
   const toRaw = String(body.to || body.to_number || "").trim();
@@ -294,52 +392,41 @@ router.post("/calls/dial", async (req, res) => {
   const digits = toRaw.replace(/\D/g, "");
   const toE164 = toRaw.startsWith("+") ? `+${digits}` : digits.length === 10 ? `+1${digits}` : `+${digits}`;
   const cardId = body.card_id || body.investor_id ? Number(body.card_id || body.investor_id) : undefined;
-  const goal = String(body.goal || "Introduce our EB-2 NIW expert opinion letter service and schedule a 15-minute partner call.").trim();
+  const notes = String(body.notes || body.goal || "").trim();
+  const durationSec = Math.max(0, Number(body.duration_sec ?? 0) || 0);
+  const outcome = String(body.outcome || "connected").trim();
+  const callId = String(body.call_id || `webrtc-${Date.now()}`).trim();
+  const firmName = String(body.firm || body.contact_name || toE164);
+  const actor = String(body.actor || "Guy").trim();
 
-  let telnyxCallControlId = `telnyx-sim-${Date.now()}`;
-  let liveDialed = false;
-  if (process.env.TELNYX_API_KEY) {
+  // Try to fetch the latest Telnyx recording for this destination number if available
+  let recordingUrl = String(body.recording_url || "").trim();
+  const apiKey = (process.env.TELNYX_API_KEY || "").trim();
+  if (!recordingUrl && apiKey) {
     try {
-      const dialResp = await fetch("https://api.telnyx.com/v2/calls", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${process.env.TELNYX_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          connection_id: TELNYX_CONNECTION_ID,
-          to: toE164,
-          from: TELNYX_FROM_NUMBER,
-          record: "record-from-answer",
-          record_channels: "dual",
-          record_format: "mp3",
-          time_limit_secs: 300,
-          timeout_secs: 45,
-        }),
+      const recResp = await fetch(`https://api.telnyx.com/v2/recordings?page[size]=5`, {
+        headers: { Authorization: `Bearer ${apiKey}` },
       });
-      if (dialResp.ok) {
-        const dJson = (await dialResp.json()) as { data?: { call_control_id?: string } };
-        telnyxCallControlId = dJson.data?.call_control_id || telnyxCallControlId;
-        liveDialed = true;
+      if (recResp.ok) {
+        const recJson = (await recResp.json()) as {
+          data?: Array<{ to?: string; download_urls?: { mp3?: string; wav?: string }; created_at?: string }>;
+        };
+        const match = (recJson.data || []).find(r => r.to && r.to.replace(/\D/g, "") === toE164.replace(/\D/g, ""));
+        if (match?.download_urls?.mp3 || match?.download_urls?.wav) {
+          recordingUrl = match.download_urls.mp3 || match.download_urls.wav || "";
+        }
       }
     } catch {
-      // Fallback to logged call intelligence entry
+      // ignore recording lookup errors
     }
   }
 
-  const firmName = String(body.firm || body.contact_name || toE164);
-  const aiOverview = liveDialed
-    ? `Live outbound call initiated from ${TELNYX_FROM_NUMBER} to ${firmName} (${toE164}). Goal: ${goal}`
-    : `Outbound call logged (${TELNYX_FROM_NUMBER} → ${toE164}) for ${firmName}. Goal: ${goal}`;
-  const actionItems = [
-    `Send follow-up email with EB-2 NIW sample expert opinion letter & volume pricing to ${firmName}`,
-    `Schedule 15-minute partner discovery call and update stage to 'Meeting set'`,
-  ];
-  const nextSteps = `Follow up within 24 hours with sample letter PDF and calendar link.`;
-  const transcript = [
-    { user: "callee", text: `Thank you for calling ${firmName}, how can I direct your call?`, created_at: new Date().toISOString() },
-    { user: "assistant", text: `Hi! Calling regarding turnkey 48-hour EB-2 NIW expert opinion letters for ${firmName}. ${goal}`, created_at: new Date().toISOString() },
-  ];
+  const summaryText = notes
+    ? `Live phone call by ${actor} to ${firmName} (${toE164}). Notes: ${notes}`
+    : `Live phone call by ${actor} to ${firmName} (${toE164}).`;
+  const actionItems = notes
+    ? [notes]
+    : [`Follow up with ${firmName} regarding EB-2 NIW expert opinion letter partnership`];
 
   const created = await transaction(async client => {
     const ins = await client.query(
@@ -348,28 +435,28 @@ router.post("/calls/dial", async (req, res) => {
        RETURNING *`,
       [
         cardId ?? null,
-        telnyxCallControlId,
+        callId,
         TELNYX_FROM_NUMBER,
         toE164,
-        42,
-        body.recording_url || "",
-        aiOverview,
-        "connected_interested",
+        durationSec,
+        recordingUrl,
+        summaryText,
+        outcome,
         "positive",
         JSON.stringify(actionItems),
-        nextSteps,
-        JSON.stringify(transcript),
-        JSON.stringify({ connection_id: TELNYX_CONNECTION_ID, live_dialed: liveDialed, goal }),
+        notes || "Follow up with sample letter PDF.",
+        JSON.stringify([]),
+        JSON.stringify({ mode: "webrtc_human", actor, notes }),
       ],
     );
     if (cardId) {
       await logOutboundActivity(client, {
         card_id: cardId,
         event_type: "call_logged",
-        subject: `Outbound Call to ${toE164}`,
-        snippet: `${aiOverview} | Action Items: ${actionItems.join("; ")}`,
-        campaign: body.campaign || "telnyx-outbound",
-        actor: body.actor || "Guy",
+        subject: `Outbound Call to ${toE164} (${durationSec}s)`,
+        snippet: summaryText,
+        campaign: body.campaign || "outbound-dialer",
+        actor,
       });
     }
     return ins.rows[0];

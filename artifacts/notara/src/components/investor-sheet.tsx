@@ -49,7 +49,7 @@ export function InvestorSheet({
   open,
   onClose,
   defaultExpertField = 'Law Firms',
-  teamOwners = ['Guy', 'Growth', 'Grok'],
+  teamOwners = ['Guy', 'Eduardo', 'Growth'],
   onDialContact,
   onOpenWhatsApp,
 }: {
@@ -184,7 +184,7 @@ export function InvestorSheet({
                 subject: eventType === 'proposal_sent' ? 'Proposal Sent' : eventType === 'email_sent' ? f.pitch_subject || 'Outbound Email' : 'CRM Activity',
                 snippet: msg.trim(),
                 campaign: campaignTag,
-                actor: f.owner || 'Grok',
+                actor: f.owner || 'Guy',
               },
         ),
       });
@@ -225,7 +225,7 @@ export function InvestorSheet({
           className={inp}
           value={f[k]}
           onChange={(e) => set(k, e.target.value)}
-          placeholder="Guy, Growth, Grok..."
+          placeholder="Guy, Eduardo, Growth..."
         />
       ) : k === 'expert_field' ? (
         <select data-testid="select-expert-field" className={inp} value={f[k]} onChange={(e) => set(k, e.target.value)}>
@@ -380,7 +380,7 @@ export function InvestorSheet({
             <section className="rounded-xl border bg-white p-4 shadow-sm">
               <h3 className="font-display text-base font-bold text-slate-900">Outbound Pitch / Proposal Template</h3>
               <p className="mb-3 text-xs text-slate-500">
-                Synced automatically when Grok or @Growth logs an email_sent or proposal_sent event.
+                Synced automatically when an email_sent or proposal_sent event is logged.
               </p>
               <div className="grid gap-3">
                 <div className="flex items-end gap-2">
@@ -418,7 +418,7 @@ export function InvestorSheet({
             {!isNew && (
               <section className="rounded-xl border bg-white p-4 shadow-sm">
                 <h3 className="font-display text-base font-bold text-slate-900">
-                  Activity Log (Grok Outbound, Emails, Replies, Proposals &amp; Calls)
+                  Activity Log (Outbound, Emails, Replies, Proposals &amp; Calls)
                 </h3>
                 <div className="mt-2 grid gap-2 sm:grid-cols-3">
                   <select

@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { Calendar, CheckCircle2, PhoneCall, MessageSquare, Trash2, Play } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { TelnyxRTC } from '@telnyx/webrtc';
+import { Calendar, CheckCircle2, PhoneCall, PhoneOff, Mic, MicOff, Hash, MessageSquare, Trash2, Play } from 'lucide-react';
 import type { Investor, CrmUser } from '@workspace/api-client-react';
 import { STATUS_TONE, fmtCurrency, fmtTs } from '@/lib/crm';
 
@@ -152,7 +153,7 @@ export function CampaignsPanel({
   const [actCampaign, setActCampaign] = useState('law-firms-niw-q4');
   const [actBusy, setActBusy] = useState(false);
 
-  const submitGrokActivity = async (e: React.FormEvent) => {
+  const submitOutboundActivity = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!actEmailOrId.trim()) return;
     setActBusy(true);
@@ -168,7 +169,7 @@ export function CampaignsPanel({
           subject: actSubject.trim(),
           snippet: actSnippet.trim(),
           campaign: actCampaign.trim(),
-          actor: 'Grok',
+          actor: 'Guy',
         }),
       });
       if (!r.ok) {
@@ -178,7 +179,7 @@ export function CampaignsPanel({
       setActSubject('');
       setActSnippet('');
       onLogSuccess();
-      toast({ title: `Grok logged ${actType} and auto-advanced pipeline stage` });
+      toast({ title: `Logged ${actType} and auto-advanced pipeline stage` });
     } catch (err) {
       toast({ title: err instanceof Error ? err.message : 'Activity log failed', variant: 'destructive' });
     } finally {
@@ -191,7 +192,7 @@ export function CampaignsPanel({
       <div className="rounded-xl border bg-white p-5 shadow-xs">
         <h2 className="mb-1 font-display text-lg font-bold text-slate-900">Outbound Campaigns</h2>
         <p className="mb-4 text-xs text-slate-500">
-          Automated outbound campaigns run by Grok &amp; @Growth with automatic stage progression
+          Outbound email, WhatsApp, and call campaigns with automatic stage progression
         </p>
         <table className="w-full text-sm">
           <thead className="border-b bg-slate-50 text-xs text-slate-500">
@@ -219,9 +220,9 @@ export function CampaignsPanel({
         </table>
       </div>
 
-      <form onSubmit={submitGrokActivity} className="rounded-xl border bg-white p-5 shadow-xs">
+      <form onSubmit={submitOutboundActivity} className="rounded-xl border bg-white p-5 shadow-xs">
         <h3 className="font-display text-base font-bold text-slate-900">
-          Register Grok Outbound Activity (`POST /api/crm/activity`)
+          Log Outbound Activity (`POST /api/crm/activity`)
         </h3>
         <p className="mb-4 text-xs text-slate-500">
           Logs `email_sent`, `reply_received`, or `proposal_sent` by Card ID or Email and auto-advances stages (`New` → `Contacted`, → `Proposal sent`).
@@ -307,52 +308,298 @@ export function TelnyxPhonePanel({
   onDialSuccess: () => void;
   toast: any;
 }) {
-  const [dialGoal, setDialGoal] = useState('Introduce our 48-hour EB-2 NIW expert opinion letter service and book a 15-min partner call.');
-  const [dialBusy, setDialBusy] = useState(false);
+  const [callNotes, setCallNotes] = useState('');
+  const [callOutcome, setCallOutcome] = useState('connected_interested');
+  const [webrtcStatus, setWebrtcStatus] = useState<'connecting' | 'ready' | 'error'>('connecting');
+  const [callState, setCallState] = useState<'idle' | 'dialing' | 'ringing' | 'active'>('idle');
+  const [isMuted, setIsMuted] = useState(false);
+  const [showKeypad, setShowKeypad] = useState(false);
+  const [elapsedSec, setElapsedSec] = useState(0);
+  const [callerId, setCallerId] = useState('+15619031414');
 
-  const triggerTelnyxDial = async (e: React.FormEvent) => {
+  const clientRef = useRef<any>(null);
+  const activeCallRef = useRef<any>(null);
+  const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
+  const timerRef = useRef<any>(null);
+  const callStartMsRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function initSoftphone() {
+      try {
+        const r = await fetch('/api/crm/calls/webrtc-token', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+        });
+        if (!r.ok) throw new Error('Token fetch failed');
+        const data = await r.json();
+        if (cancelled) return;
+        if (data.caller_number) setCallerId(data.caller_number);
+
+        const client = new TelnyxRTC({
+          login_token: data.token,
+        });
+        if (remoteAudioRef.current) {
+          client.remoteElement = remoteAudioRef.current;
+        }
+        client.on('telnyx.ready', () => {
+          if (!cancelled) setWebrtcStatus('ready');
+        });
+        client.on('telnyx.error', () => {
+          if (!cancelled) setWebrtcStatus('error');
+        });
+        client.on('telnyx.notification', (notification: any) => {
+          if (notification.type !== 'callUpdate') return;
+          const call = notification.call;
+          activeCallRef.current = call;
+          const st = String(call.state || '');
+          if (st === 'new' || st === 'requesting' || st === 'trying') {
+            setCallState('dialing');
+          } else if (st === 'ringing' || st === 'early') {
+            setCallState('ringing');
+          } else if (st === 'active') {
+            setCallState('active');
+            if (!callStartMsRef.current) {
+              callStartMsRef.current = Date.now();
+              if (timerRef.current) clearInterval(timerRef.current);
+              timerRef.current = setInterval(() => {
+                if (callStartMsRef.current) {
+                  setElapsedSec(Math.floor((Date.now() - callStartMsRef.current) / 1000));
+                }
+              }, 1000);
+            }
+          } else if (st === 'hangup' || st === 'destroy' || st === 'purge') {
+            const finalDur = callStartMsRef.current
+              ? Math.max(1, Math.round((Date.now() - callStartMsRef.current) / 1000))
+              : elapsedSec;
+            if (timerRef.current) {
+              clearInterval(timerRef.current);
+              timerRef.current = null;
+            }
+            callStartMsRef.current = null;
+            activeCallRef.current = null;
+            setCallState('idle');
+            setIsMuted(false);
+            // Automatically log the completed human call
+            fetch('/api/crm/calls/dial', {
+              method: 'POST',
+              credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                card_id: dialCardId || undefined,
+                to: dialPhone.trim(),
+                firm: dialFirm.trim() || dialPhone.trim(),
+                notes: callNotes.trim(),
+                outcome: callOutcome,
+                duration_sec: finalDur,
+                call_id: call.id || `webrtc-${Date.now()}`,
+                actor: workspaceOwner === 'All' ? 'Guy' : workspaceOwner,
+              }),
+            })
+              .then(() => onDialSuccess())
+              .catch(() => {});
+          }
+        });
+        client.connect();
+        clientRef.current = client;
+      } catch {
+        if (!cancelled) setWebrtcStatus('error');
+      }
+    }
+    initSoftphone();
+    return () => {
+      cancelled = true;
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (clientRef.current) {
+        try {
+          clientRef.current.disconnect();
+        } catch {}
+      }
+    };
+  }, []);
+
+  const formatTimer = (sec: number) => {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  };
+
+  const startBrowserCall = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!dialPhone.trim()) {
+    const raw = dialPhone.trim();
+    if (!raw) {
       toast({ title: 'Enter a destination phone number', variant: 'destructive' });
       return;
     }
-    setDialBusy(true);
+    const digits = raw.replace(/\D/g, '');
+    const toE164 = raw.startsWith('+') ? `+${digits}` : digits.length === 10 ? `+1${digits}` : `+${digits}`;
+
     try {
-      const r = await fetch('/api/crm/calls/dial', {
+      await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch {
+      toast({
+        title: 'Microphone permission is required in your browser to talk on the call',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!clientRef.current || webrtcStatus !== 'ready') {
+      toast({ title: 'Softphone is still connecting—try again in a moment', variant: 'destructive' });
+      return;
+    }
+
+    try {
+      setElapsedSec(0);
+      callStartMsRef.current = null;
+      setCallState('dialing');
+      const call = clientRef.current.newCall({
+        destinationNumber: toE164,
+        callerNumber: callerId,
+        audio: true,
+        video: false,
+      });
+      activeCallRef.current = call;
+      toast({ title: `Calling ${dialFirm || toE164} through your browser mic & speakers...` });
+    } catch (err) {
+      setCallState('idle');
+      toast({ title: err instanceof Error ? err.message : 'Failed to start browser call', variant: 'destructive' });
+    }
+  };
+
+  const hangupCall = async () => {
+    if (activeCallRef.current) {
+      try {
+        activeCallRef.current.hangup();
+      } catch {}
+      activeCallRef.current = null;
+    }
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    callStartMsRef.current = null;
+    setCallState('idle');
+    setIsMuted(false);
+    // Also trigger backend hangup for any server-side leg just in case
+    try {
+      await fetch('/api/crm/calls/hangup', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          card_id: dialCardId || undefined,
-          to: dialPhone.trim(),
-          firm: dialFirm.trim() || dialPhone.trim(),
-          goal: dialGoal.trim(),
-          actor: workspaceOwner === 'All' ? 'Guy' : workspaceOwner,
-        }),
+        body: JSON.stringify({ to: dialPhone.trim() }),
       });
-      if (!r.ok) throw new Error('Dial failed');
-      toast({ title: `Call initiated from +15619031414 → ${dialPhone}` });
-      onDialSuccess();
-    } catch {
-      toast({ title: 'Failed to place call', variant: 'destructive' });
-    } finally {
-      setDialBusy(false);
+    } catch {}
+    toast({ title: 'Call ended' });
+  };
+
+  const toggleMute = () => {
+    if (!activeCallRef.current) return;
+    try {
+      if (isMuted) {
+        activeCallRef.current.unmuteAudio();
+        setIsMuted(false);
+      } else {
+        activeCallRef.current.muteAudio();
+        setIsMuted(true);
+      }
+    } catch {}
+  };
+
+  const sendDtmf = (digit: string) => {
+    if (activeCallRef.current) {
+      try {
+        activeCallRef.current.dtmf(digit);
+      } catch {}
+    } else {
+      setDialPhone(dialPhone + digit);
     }
   };
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_1.45fr]">
-      <form onSubmit={triggerTelnyxDial} className="rounded-xl border bg-white p-5 shadow-xs">
-        <div className="mb-3 flex items-center gap-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
-            <PhoneCall className="h-5 w-5" />
+      <div className="rounded-xl border bg-white p-5 shadow-xs">
+        <audio ref={remoteAudioRef} id="crm-remote-audio" autoPlay playsInline className="hidden" />
+        <div className="mb-4 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
+              <PhoneCall className="h-5 w-5" />
+            </div>
+            <div>
+              <h2 className="font-display text-lg font-bold text-slate-900">Live Softphone Dialer</h2>
+              <p className="text-xs text-slate-500">Talk directly via browser mic &amp; headset · Caller ID {callerId}</p>
+            </div>
           </div>
-          <div>
-            <h2 className="font-display text-lg font-bold text-slate-900">Dialer</h2>
-            <p className="text-xs text-slate-500">Outbound Caller ID +15619031414</p>
-          </div>
+          <span
+            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+              webrtcStatus === 'ready'
+                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                : webrtcStatus === 'connecting'
+                ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                : 'bg-red-50 text-red-700 border border-red-200'
+            }`}
+          >
+            <span
+              className={`h-2 w-2 rounded-full ${
+                webrtcStatus === 'ready'
+                  ? 'bg-emerald-500'
+                  : webrtcStatus === 'connecting'
+                  ? 'bg-amber-500 animate-pulse'
+                  : 'bg-red-500'
+              }`}
+            />
+            {webrtcStatus === 'ready' ? 'Mic & Audio Ready' : webrtcStatus === 'connecting' ? 'Connecting Audio...' : 'Audio Offline'}
+          </span>
         </div>
-        <div className="space-y-3">
+
+        {callState !== 'idle' && (
+          <div className="mb-4 rounded-xl border-2 border-emerald-500 bg-emerald-50/70 p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-xs font-bold uppercase tracking-wider text-emerald-800">
+                  {callState === 'dialing' ? 'Dialing...' : callState === 'ringing' ? 'Ringing...' : 'Live Call Connected'}
+                </div>
+                <div className="mt-0.5 font-display text-base font-bold text-slate-900">
+                  {dialFirm || dialPhone}
+                </div>
+              </div>
+              <div className="font-mono-ui text-xl font-bold text-emerald-800">{formatTimer(elapsedSec)}</div>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={toggleMute}
+                className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold ${
+                  isMuted
+                    ? 'border-amber-300 bg-amber-100 text-amber-900'
+                    : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                {isMuted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                {isMuted ? 'Unmute Mic' : 'Mute Mic'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowKeypad(!showKeypad)}
+                className="flex items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                <Hash className="h-4 w-4" />
+                Keypad
+              </button>
+              <button
+                type="button"
+                onClick={hangupCall}
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-red-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-red-700"
+              >
+                <PhoneOff className="h-4 w-4" />
+                Hang Up Now
+              </button>
+            </div>
+          </div>
+        )}
+
+        <form onSubmit={startBrowserCall} className="space-y-3">
           <div>
             <label className="mb-1 block text-xs font-semibold text-slate-600">Select CRM Contact (optional)</label>
             <select
@@ -368,8 +615,8 @@ export function TelnyxPhonePanel({
               }}
               className={`${sel} w-full`}
             >
-              <option value="">-- Choose a deal card or dial directly --</option>
-              {rows.slice(0, 120).map((r) => (
+              <option value="">-- Choose a law firm or dial directly --</option>
+              {rows.slice(0, 200).map((r) => (
                 <option key={r.id} value={r.id}>
                   #{r.id} · {r.firm || r.name} ({(r as any).phone || 'no phone on file'})
                 </option>
@@ -377,7 +624,16 @@ export function TelnyxPhonePanel({
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-xs font-semibold text-slate-600">Destination Phone (+E.164)</label>
+            <div className="mb-1 flex items-center justify-between">
+              <label className="block text-xs font-semibold text-slate-600">Destination Phone (+E.164)</label>
+              <button
+                type="button"
+                onClick={() => setShowKeypad(!showKeypad)}
+                className="text-[11px] font-semibold text-blue-600 hover:underline"
+              >
+                {showKeypad ? 'Hide Keypad' : 'Show Keypad'}
+              </button>
+            </div>
             <input
               required
               value={dialPhone}
@@ -386,37 +642,97 @@ export function TelnyxPhonePanel({
               className={`${sel} w-full font-mono-ui`}
             />
           </div>
+
+          {showKeypad && (
+            <div className="grid grid-cols-3 gap-1.5 rounded-lg border bg-slate-50 p-2.5">
+              {['1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '0', '#'].map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => sendDtmf(d)}
+                  className="rounded border bg-white py-2 font-mono-ui text-sm font-bold text-slate-800 shadow-2xs hover:bg-slate-100"
+                >
+                  {d}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-slate-600">Firm / Contact Name</label>
+              <input
+                value={dialFirm}
+                onChange={(e) => setDialFirm(e.target.value)}
+                placeholder="Fragomen / Apsan Law"
+                className={`${sel} w-full`}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-slate-600">Call Outcome</label>
+              <select value={callOutcome} onChange={(e) => setCallOutcome(e.target.value)} className={`${sel} w-full`}>
+                <option value="connected_interested">Connected — Interested</option>
+                <option value="meeting_booked">Meeting Booked</option>
+                <option value="left_voicemail">Left Voicemail</option>
+                <option value="gatekeeper">Spoke to Receptionist</option>
+                <option value="no_answer">No Answer</option>
+              </select>
+            </div>
+          </div>
+
           <div>
-            <label className="mb-1 block text-xs font-semibold text-slate-600">Firm / Contact Label</label>
-            <input
-              value={dialFirm}
-              onChange={(e) => setDialFirm(e.target.value)}
-              placeholder="Symphorien-Saavedra Law"
+            <label className="mb-1 block text-xs font-semibold text-slate-600">Call Notes (for your team)</label>
+            <textarea
+              rows={3}
+              value={callNotes}
+              onChange={(e) => setCallNotes(e.target.value)}
+              placeholder="Jot notes while talking (e.g. spoke with managing partner, send sample EB-2 NIW letter PDF)..."
               className={`${sel} w-full`}
             />
           </div>
-          <div>
-            <label className="mb-1 block text-xs font-semibold text-slate-600">Call Objective / AI Prompt</label>
-            <textarea rows={3} value={dialGoal} onChange={(e) => setDialGoal(e.target.value)} className={`${sel} w-full`} />
+
+          <div className="flex gap-2">
+            {callState === 'idle' ? (
+              <button
+                type="submit"
+                className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-emerald-600 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-emerald-700"
+              >
+                <PhoneCall className="h-4 w-4" />
+                Call Now (Browser Mic &amp; Speaker)
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={hangupCall}
+                className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-red-600 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-red-700"
+              >
+                <PhoneOff className="h-4 w-4" />
+                End Call ({formatTimer(elapsedSec)})
+              </button>
+            )}
           </div>
-          <button
-            disabled={dialBusy}
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-emerald-700 disabled:opacity-50"
-          >
-            <PhoneCall className="h-4 w-4" />
-            {dialBusy ? 'Dialing...' : 'Dial Now & Record Call'}
-          </button>
-        </div>
-      </form>
+        </form>
+      </div>
 
       <div className="rounded-xl border bg-white p-5 shadow-xs">
-        <h2 className="font-display text-lg font-bold text-slate-900">Call Intelligence &amp; Recordings</h2>
-        <p className="mb-4 text-xs text-slate-500">
-          Every call includes dual-channel MP3 recording, AI Executive Overview, Transcript, and Bullet Action Items / Next Steps.
-        </p>
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h2 className="font-display text-lg font-bold text-slate-900">Call History &amp; Recordings</h2>
+            <p className="text-xs text-slate-500">
+              Outbound calls are automatically recorded in dual-channel MP3 with your call notes and outcome.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={hangupCall}
+            className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100"
+          >
+            Force Hang Up Active Line
+          </button>
+        </div>
         {calls.length === 0 ? (
           <div className="rounded-lg border border-dashed p-6 text-center text-xs text-slate-500">
-            No calls logged yet. Place a call on the left to record and analyze automatically.
+            No calls logged yet. Place a call on the left to talk live through your browser mic and record automatically.
           </div>
         ) : (
           <div className="space-y-4">
@@ -439,7 +755,7 @@ export function TelnyxPhonePanel({
                   </div>
                 </div>
                 <div className="mt-2.5 rounded-lg border bg-white p-3 text-xs">
-                  <div className="font-bold uppercase tracking-wider text-blue-700">AI Call Overview</div>
+                  <div className="font-bold uppercase tracking-wider text-blue-700">Call Summary &amp; Notes</div>
                   <p className="mt-1 text-slate-700">{c.ai_overview}</p>
                   {Array.isArray(c.action_items) && c.action_items.length > 0 && (
                     <div className="mt-2.5">

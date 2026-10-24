@@ -190,7 +190,7 @@ export default function Dashboard() {
 
   const teamOwners = useMemo(() => {
     const names = (usersQuery.data ?? []).map((u) => u.name);
-    return names.length ? names : ['Guy', 'Eduardo', 'Growth', 'Grok'];
+    return names.length ? names : ['Guy', 'Eduardo', 'Growth'];
   }, [usersQuery.data]);
 
   const fieldRows = useMemo(() => {
@@ -585,7 +585,7 @@ export default function Dashboard() {
                 <div className="rounded-xl border bg-white p-5 shadow-xs">
                   <div className="mb-4 flex items-center justify-between">
                     <div>
-                      <h2 className="font-display text-lg font-bold text-slate-900">Recent Outbound &amp; Grok Activity</h2>
+                      <h2 className="font-display text-lg font-bold text-slate-900">Recent Outbound Activity</h2>
                       <p className="text-xs text-slate-500">Live emails sent, replies, proposals, and outbound calls</p>
                     </div>
                     <button onClick={() => setNav('campaigns')} className="text-xs font-semibold text-blue-600 hover:underline">

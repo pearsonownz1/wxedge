@@ -49,6 +49,7 @@
     "@types/react-dom": "catalog:",
     "@vitejs/plugin-react": "catalog:",
     "@workspace/api-client-react": "workspace:*",
+    "@workspace/replit-auth-web": "workspace:*",
     "class-variance-authority": "catalog:",
     "clsx": "catalog:",
     "cmdk": "^1.1.1",
@@ -72,7 +73,9 @@
     "vaul": "^1.1.2",
     "vite": "catalog:",
     "wouter": "^3.3.5",
-    "zod": "catalog:",
-    "@workspace/replit-auth-web": "workspace:*"
+    "zod": "catalog:"
+  },
+  "dependencies": {
+    "@telnyx/webrtc": "^2.28.0"
   }
 }
