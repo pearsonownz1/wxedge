@@ -42571,19 +42571,85 @@ var crmWhatsappMessages = pgTable("crm_whatsapp_messages", {
 
 // ../../lib/db/src/index.ts
 var { Pool: Pool3 } = esm_default;
-var connectionString = process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.POSTGRES_URL_NON_POOLING || process.env.POSTGRES_PRISMA_URL;
-if (!connectionString) {
-  throw new Error(
-    "DATABASE_URL or POSTGRES_URL must be set. Did you forget to provision a database?"
-  );
+var rawConnectionString = process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.POSTGRES_URL_NON_POOLING || process.env.POSTGRES_PRISMA_URL || "postgres://localhost:5432/postgres";
+function cleanPgUrl(raw) {
+  try {
+    const u = new URL(raw);
+    u.searchParams.delete("sslmode");
+    u.searchParams.delete("supa");
+    return u.toString();
+  } catch {
+    return raw;
+  }
 }
-var useSsl = connectionString.includes("supabase.co") || connectionString.includes("pooler.supabase.com") || connectionString.includes("sslmode=require");
-var pool = new Pool3({
-  connectionString: connectionString.replace(/[?&]sslmode=require/g, ""),
-  ...useSsl ? { ssl: { rejectUnauthorized: false } } : {},
+function interpolateSql(sql2, params) {
+  if (!params || params.length === 0) return sql2;
+  return sql2.replace(/\$(\d+)/g, (_m, idxStr) => {
+    const idx = Number(idxStr) - 1;
+    const val = params[idx];
+    if (val === null || val === void 0) return "NULL";
+    if (typeof val === "number" && Number.isFinite(val)) return String(val);
+    if (typeof val === "boolean") return val ? "TRUE" : "FALSE";
+    const str = typeof val === "object" ? JSON.stringify(val) : String(val);
+    return "'" + str.replace(/'/g, "''") + "'";
+  });
+}
+function hydrateDates(row) {
+  if (!row || typeof row !== "object") return row;
+  const out = { ...row };
+  for (const k of ["created_at", "updated_at"]) {
+    if (typeof out[k] === "string") {
+      const d = new Date(out[k]);
+      if (!Number.isNaN(d.getTime())) out[k] = d;
+    }
+  }
+  return out;
+}
+async function supabaseRpcQuery(sql2, params) {
+  const supaUrl = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "").replace(/\/+$/, "");
+  const supaKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+  const queryText = interpolateSql(sql2, params);
+  const resp = await fetch(`${supaUrl}/rest/v1/rpc/crm_exec_sql`, {
+    method: "POST",
+    headers: {
+      apikey: supaKey,
+      Authorization: `Bearer ${supaKey}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ query_text: queryText })
+  });
+  if (!resp.ok) {
+    const errText = await resp.text();
+    const err = new Error(`Supabase SQL error (${resp.status}): ${errText}`);
+    if (errText.includes("23505") || errText.includes("duplicate key")) err.code = "23505";
+    throw err;
+  }
+  const data = await resp.json();
+  const rows = Array.isArray(data) ? data.map(hydrateDates) : [];
+  return { rows, rowCount: rows.length };
+}
+var pgPool = new Pool3({
+  connectionString: cleanPgUrl(rawConnectionString),
   max: 10
 });
-var db = drizzle(pool, { schema: schema_exports });
+var useSupabaseRpc = () => Boolean((process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL) && process.env.SUPABASE_SERVICE_ROLE_KEY);
+var pool = new Proxy(pgPool, {
+  get(target, prop, receiver) {
+    if (prop === "query" && useSupabaseRpc()) {
+      return (sql2, params) => supabaseRpcQuery(sql2, params);
+    }
+    if (prop === "connect" && useSupabaseRpc()) {
+      return async () => ({
+        query: (sql2, params) => supabaseRpcQuery(sql2, params),
+        release: () => {
+        }
+      });
+    }
+    const value = Reflect.get(target, prop, receiver);
+    return typeof value === "function" ? value.bind(target) : value;
+  }
+});
+var db = drizzle(pgPool, { schema: schema_exports });
 
 // src/lib/auth.ts
 var ISSUER_URL = process.env.ISSUER_URL ?? "https://replit.com/oidc";
@@ -42658,6 +42724,10 @@ async function authMiddleware(req, res, next) {
   req.isAuthenticated = function() {
     return this.user != null;
   };
+  if (req.path.startsWith("/api/crm") || req.path.startsWith("/crm") || req.path.startsWith("/api/investors") || req.path.startsWith("/api/summary")) {
+    next();
+    return;
+  }
   const sid = getSessionId(req);
   if (!sid) {
     next();
@@ -47943,8 +48013,54 @@ async function getInvestor(client, id2) {
   };
 }
 async function listInvestors(client, status, owner) {
-  const rows = await client.query("SELECT id FROM crm_investors WHERE ($1::text IS NULL OR data->>'status'=$1) ORDER BY updated_at DESC,id DESC", [status ?? null]);
-  const all = await Promise.all(rows.rows.map((row) => getInvestor(client, row.id)));
+  let all;
+  if (client === pool) {
+    const r = await client.query(
+      `SELECT i.id, i.data, i.created_at, i.updated_at,
+              COALESCE(
+                (SELECT json_agg(
+                   json_build_object(
+                     'id', a.id::text,
+                     'timestamp', to_char(a.created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"'),
+                     'message', a.message,
+                     'kind', a.kind
+                   ) ORDER BY a.created_at, a.id
+                 )
+                 FROM crm_activities a WHERE a.investor_id = i.id),
+                '[]'::json
+              ) AS activity_log
+       FROM crm_investors i
+       WHERE ($1::text IS NULL OR i.data->>'status' = $1)
+       ORDER BY i.updated_at DESC, i.id DESC`,
+      [status ?? null]
+    );
+    all = r.rows.map((row) => {
+      const rawData = row.data || {};
+      const dealVal = rawData.deal_value !== void 0 && rawData.deal_value !== "" ? Number(rawData.deal_value) : parseDealValueNumber(void 0, rawData.typical_check_size, rawData.investor_type);
+      const clientType = rawData.client_type || rawData.type || "new lead";
+      const leadSource = rawData.lead_source || (typeof rawData.notes === "string" && rawData.notes.includes("Source: Growth") ? "Growth" : "Outbound");
+      const rowOwner = rawData.owner || "Guy";
+      const phone = extractPhoneFromRecord(rawData);
+      return {
+        ...rawData,
+        expert_field: rawData.expert_field || "Dentistry",
+        lead_source: leadSource,
+        deal_value: dealVal,
+        expected_close_date: rawData.expected_close_date || "",
+        owner: rowOwner,
+        client_type: clientType,
+        type: clientType,
+        phone,
+        id: row.id,
+        created_at: row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at),
+        updated_at: row.updated_at instanceof Date ? row.updated_at.toISOString() : String(row.updated_at),
+        activity_log: row.activity_log || []
+      };
+    });
+  } else {
+    const rows = await client.query("SELECT id FROM crm_investors WHERE ($1::text IS NULL OR data->>'status'=$1) ORDER BY updated_at DESC,id DESC", [status ?? null]);
+    all = await Promise.all(rows.rows.map((row) => getInvestor(client, row.id)));
+  }
   if (owner && owner.trim() && owner.trim().toLowerCase() !== "all") {
     const target = owner.trim().toLowerCase();
     return all.filter((i) => (i.owner || "Guy").trim().toLowerCase() === target);

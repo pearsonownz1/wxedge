@@ -182,8 +182,56 @@ export async function getInvestor(client: Client, id: number): Promise<Investor>
 }
 
 export async function listInvestors(client: Client, status?: string, owner?: string) {
-  const rows = await client.query("SELECT id FROM crm_investors WHERE ($1::text IS NULL OR data->>'status'=$1) ORDER BY updated_at DESC,id DESC", [status ?? null]);
-  const all = await Promise.all(rows.rows.map(row => getInvestor(client, row.id)));
+  let all: Investor[];
+  if (client === pool) {
+    const r = await client.query(
+      `SELECT i.id, i.data, i.created_at, i.updated_at,
+              COALESCE(
+                (SELECT json_agg(
+                   json_build_object(
+                     'id', a.id::text,
+                     'timestamp', to_char(a.created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"'),
+                     'message', a.message,
+                     'kind', a.kind
+                   ) ORDER BY a.created_at, a.id
+                 )
+                 FROM crm_activities a WHERE a.investor_id = i.id),
+                '[]'::json
+              ) AS activity_log
+       FROM crm_investors i
+       WHERE ($1::text IS NULL OR i.data->>'status' = $1)
+       ORDER BY i.updated_at DESC, i.id DESC`,
+      [status ?? null],
+    );
+    all = r.rows.map(row => {
+      const rawData = row.data || {};
+      const dealVal = rawData.deal_value !== undefined && rawData.deal_value !== ""
+        ? Number(rawData.deal_value)
+        : parseDealValueNumber(undefined, rawData.typical_check_size, rawData.investor_type);
+      const clientType = (rawData.client_type || rawData.type || "new lead") as ClientType;
+      const leadSource = rawData.lead_source || (typeof rawData.notes === "string" && rawData.notes.includes("Source: Growth") ? "Growth" : "Outbound");
+      const rowOwner = rawData.owner || "Guy";
+      const phone = extractPhoneFromRecord(rawData);
+      return {
+        ...rawData,
+        expert_field: rawData.expert_field || "Dentistry",
+        lead_source: leadSource,
+        deal_value: dealVal,
+        expected_close_date: rawData.expected_close_date || "",
+        owner: rowOwner,
+        client_type: clientType,
+        type: clientType,
+        phone,
+        id: row.id,
+        created_at: row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at),
+        updated_at: row.updated_at instanceof Date ? row.updated_at.toISOString() : String(row.updated_at),
+        activity_log: row.activity_log || [],
+      } as Investor;
+    });
+  } else {
+    const rows = await client.query("SELECT id FROM crm_investors WHERE ($1::text IS NULL OR data->>'status'=$1) ORDER BY updated_at DESC,id DESC", [status ?? null]);
+    all = await Promise.all(rows.rows.map(row => getInvestor(client, row.id)));
+  }
   if (owner && owner.trim() && owner.trim().toLowerCase() !== "all") {
     const target = owner.trim().toLowerCase();
     return all.filter(i => (i.owner || "Guy").trim().toLowerCase() === target);
