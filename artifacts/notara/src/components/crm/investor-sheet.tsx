@@ -430,7 +430,7 @@ export function InvestorSheet({
                     <option value="email_sent">Email Sent (→ Contacted)</option>
                     <option value="reply_received">Reply Received (→ Contacted)</option>
                     <option value="proposal_sent">Proposal Sent (→ Proposal sent)</option>
-                    <option value="call_logged">Telnyx Call Logged</option>
+                    <option value="call_logged">Call Logged</option>
                     <option value="whatsapp_sent">WhatsApp Sent</option>
                   </select>
                   <input

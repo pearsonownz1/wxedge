@@ -331,10 +331,10 @@ export function TelnyxPhonePanel({
         }),
       });
       if (!r.ok) throw new Error('Dial failed');
-      toast({ title: `Telnyx Call initiated from +15619031414 → ${dialPhone}` });
+      toast({ title: `Call initiated from +15619031414 → ${dialPhone}` });
       onDialSuccess();
     } catch {
-      toast({ title: 'Failed to place Telnyx call', variant: 'destructive' });
+      toast({ title: 'Failed to place call', variant: 'destructive' });
     } finally {
       setDialBusy(false);
     }
@@ -348,8 +348,8 @@ export function TelnyxPhonePanel({
             <PhoneCall className="h-5 w-5" />
           </div>
           <div>
-            <h2 className="font-display text-lg font-bold text-slate-900">Telnyx CRM Dialer</h2>
-            <p className="text-xs text-slate-500">Caller ID `+15619031414` · App `3077013926030869814`</p>
+            <h2 className="font-display text-lg font-bold text-slate-900">Dialer</h2>
+            <p className="text-xs text-slate-500">Outbound Caller ID +15619031414</p>
           </div>
         </div>
         <div className="space-y-3">
@@ -404,19 +404,19 @@ export function TelnyxPhonePanel({
             className="flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-emerald-700 disabled:opacity-50"
           >
             <PhoneCall className="h-4 w-4" />
-            {dialBusy ? 'Dialing via Telnyx...' : 'Dial Now & Record with Gong AI'}
+            {dialBusy ? 'Dialing...' : 'Dial Now & Record Call'}
           </button>
         </div>
       </form>
 
       <div className="rounded-xl border bg-white p-5 shadow-xs">
-        <h2 className="font-display text-lg font-bold text-slate-900">Gong-Style Call Intelligence &amp; Recordings</h2>
+        <h2 className="font-display text-lg font-bold text-slate-900">Call Intelligence &amp; Recordings</h2>
         <p className="mb-4 text-xs text-slate-500">
           Every call includes dual-channel MP3 recording, AI Executive Overview, Transcript, and Bullet Action Items / Next Steps.
         </p>
         {calls.length === 0 ? (
           <div className="rounded-lg border border-dashed p-6 text-center text-xs text-slate-500">
-            No Telnyx calls logged yet. Place a call on the left or run `telnyx_gong_sync.py`.
+            No calls logged yet. Place a call on the left to record and analyze automatically.
           </div>
         ) : (
           <div className="space-y-4">
@@ -439,7 +439,7 @@ export function TelnyxPhonePanel({
                   </div>
                 </div>
                 <div className="mt-2.5 rounded-lg border bg-white p-3 text-xs">
-                  <div className="font-bold uppercase tracking-wider text-blue-700">Gong AI Overview</div>
+                  <div className="font-bold uppercase tracking-wider text-blue-700">AI Call Overview</div>
                   <p className="mt-1 text-slate-700">{c.ai_overview}</p>
                   {Array.isArray(c.action_items) && c.action_items.length > 0 && (
                     <div className="mt-2.5">

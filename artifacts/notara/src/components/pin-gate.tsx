@@ -75,10 +75,10 @@ export function PinGate({ children }: { children: ReactNode }) {
             <ShieldCheck className="h-8 w-8" />
           </div>
           <h1 className="font-display text-4xl font-semibold leading-tight">
-            Pipeline, Outbound,<br />Telnyx Gong AI &amp; WhatsApp<br />in one workspace.
+            Pipeline, Outbound,<br />Dialer &amp; WhatsApp<br />in one workspace.
           </h1>
           <p className="mt-4 max-w-md text-sm text-slate-300">
-            Sign in with your team account password to access your personal pipeline dashboard, conversion funnel, weighted revenue forecast, and Telnyx call intelligence.
+            Sign in with your team account password to access your personal pipeline dashboard, conversion funnel, weighted revenue forecast, and call intelligence.
           </p>
         </div>
         <p className="font-mono-ui text-xs text-slate-400">SellingHighs CRM · Multi-User Team Workspaces</p>

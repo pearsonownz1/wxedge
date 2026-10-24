@@ -368,7 +368,7 @@ export default function Dashboard() {
     { id: 'deals', label: 'Deals (Kanban)', icon: Kanban, badge: rows.length },
     { id: 'reports', label: 'Reports & Forecast', icon: BarChart3 },
     { id: 'campaigns', label: 'Campaigns', icon: Send, badge: campaignsQuery.data?.length || 3 },
-    { id: 'phone', label: 'Telnyx & Gong AI', icon: PhoneCall, badge: callsQuery.data?.length || 0 },
+    { id: 'phone', label: 'Dialer', icon: PhoneCall, badge: callsQuery.data?.length || 0 },
     { id: 'whatsapp', label: 'WhatsApp', icon: MessageSquare, badge: whatsappQuery.data?.length || 0 },
     { id: 'team', label: 'Team Workspaces', icon: UserCheck, badge: usersQuery.data?.length || 4 },
   ];
@@ -586,7 +586,7 @@ export default function Dashboard() {
                   <div className="mb-4 flex items-center justify-between">
                     <div>
                       <h2 className="font-display text-lg font-bold text-slate-900">Recent Outbound &amp; Grok Activity</h2>
-                      <p className="text-xs text-slate-500">Live emails sent, replies, proposals, and Telnyx calls</p>
+                      <p className="text-xs text-slate-500">Live emails sent, replies, proposals, and outbound calls</p>
                     </div>
                     <button onClick={() => setNav('campaigns')} className="text-xs font-semibold text-blue-600 hover:underline">
                       Log Outbound →

@@ -238,7 +238,7 @@ router.post("/calls", async (req, res) => {
   const fromNumber = String(body.from_number || body.from || TELNYX_FROM_NUMBER).trim();
   const durationSec = Number(body.duration_sec || 0);
   const recordingUrl = String(body.recording_url || "").trim();
-  const aiOverview = String(body.ai_overview || body.overview || "Call completed and analyzed by Telnyx Gong AI.").trim();
+  const aiOverview = String(body.ai_overview || body.overview || "Call completed and analyzed by AI Call Intelligence.").trim();
   const outcome = String(body.outcome || "connected_live").trim();
   const sentiment = String(body.sentiment || "positive").trim();
   const actionItems = Array.isArray(body.action_items) ? body.action_items.map(String) : [];
@@ -273,10 +273,10 @@ router.post("/calls", async (req, res) => {
           email: body.email,
           phone: toNumber,
           event_type: "call_logged",
-          subject: `Telnyx Call (${outcome})`,
+          subject: `Outbound Call (${outcome})`,
           snippet: `${aiOverview}${actionItems.length ? ` | Action Items: ${actionItems.join("; ")}` : ""}`,
           campaign: body.campaign || "telnyx-dialer",
-          actor: body.actor || "Telnyx AI",
+          actor: body.actor || "Dialer AI",
         });
       } catch {
         // Ignore if card lookup did not match an existing card
@@ -329,8 +329,8 @@ router.post("/calls/dial", async (req, res) => {
 
   const firmName = String(body.firm || body.contact_name || toE164);
   const aiOverview = liveDialed
-    ? `Live outbound call initiated via Telnyx Call Control (${TELNYX_CONNECTION_ID}) from ${TELNYX_FROM_NUMBER} to ${firmName} (${toE164}). Goal: ${goal}`
-    : `Outbound call logged via Telnyx (${TELNYX_FROM_NUMBER} → ${toE164}) for ${firmName}. Goal: ${goal}`;
+    ? `Live outbound call initiated from ${TELNYX_FROM_NUMBER} to ${firmName} (${toE164}). Goal: ${goal}`
+    : `Outbound call logged (${TELNYX_FROM_NUMBER} → ${toE164}) for ${firmName}. Goal: ${goal}`;
   const actionItems = [
     `Send follow-up email with EB-2 NIW sample expert opinion letter & volume pricing to ${firmName}`,
     `Schedule 15-minute partner discovery call and update stage to 'Meeting set'`,
@@ -366,7 +366,7 @@ router.post("/calls/dial", async (req, res) => {
       await logOutboundActivity(client, {
         card_id: cardId,
         event_type: "call_logged",
-        subject: `Telnyx Outbound Call to ${toE164}`,
+        subject: `Outbound Call to ${toE164}`,
         snippet: `${aiOverview} | Action Items: ${actionItems.join("; ")}`,
         campaign: body.campaign || "telnyx-outbound",
         actor: body.actor || "Guy",
