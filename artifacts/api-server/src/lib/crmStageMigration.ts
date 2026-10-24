@@ -1,4 +1,4 @@
-import { CrmError, activity, type Client } from "./crmData";
+import { CrmError, activity, deduplicateInvestors, ensureCrmTablesAndDefaults, type Client } from "./crmData";
 import { normalizeStage, STAGES } from "./crmStages";
 
 // Called inside transaction(), which also takes the same lock as every CRM write.
@@ -29,4 +29,11 @@ export async function migratePipelineStages(client: Client) {
     changed++;
   }
   return { total: rows.length, changed, before, after };
+}
+
+export async function bootstrapCrmUpgrades(client: Client) {
+  await ensureCrmTablesAndDefaults(client);
+  const stageReport = await migratePipelineStages(client);
+  const dedupReport = await deduplicateInvestors(client);
+  return { stageReport, dedupReport };
 }

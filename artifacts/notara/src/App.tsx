@@ -17,11 +17,11 @@ const queryClient = new QueryClient();
 
 function Router() {
   return (
-    // Keep a shared shell (sidebar, navbar) outside the boundary so it
-    // survives a page crash.
     <RoutedErrorBoundary>
       <Switch>
         <Route path="/" component={Dashboard} />
+        <Route path="/notara" component={Dashboard} />
+        <Route path="/notara/:rest*" component={Dashboard} />
         <Route component={NotFound} />
       </Switch>
     </RoutedErrorBoundary>

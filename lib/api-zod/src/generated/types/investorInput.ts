@@ -34,5 +34,12 @@ export interface InvestorInput {
      */
   fit_score?: number;
   status?: InvestorInputStatus;
+  lead_source?: string;
+  deal_value?: number | string;
+  expected_close_date?: string;
+  owner?: string;
+  client_type?: 'new lead' | 'cold client' | 'active client' | '';
+  type?: 'new lead' | 'cold client' | 'active client' | '';
+  phone?: string;
   expert_field?: InvestorInputExpertField;
 }

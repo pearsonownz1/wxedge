@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { defaultExpertFieldFor, expertFieldOf, filterExpertField, TEMPLATE_CSV, STATUSES, STATUS_TONE, EXPERT_FIELDS, EXPERT_FIELD_FILTERS } from './crm';
 
 test('All CRM views share exactly six ordered stages', () => {
-  assert.deepEqual(STATUSES, ['New', 'Contacted', 'Followed Up', 'Responded', 'Meeting Set', 'Closed']);
+  assert.deepEqual(STATUSES, ['New', 'Contacted', 'Meeting set', 'Proposal sent', 'Contract review', 'Closed']);
   assert.deepEqual(Object.keys(STATUS_TONE), [...STATUSES]);
 });
 

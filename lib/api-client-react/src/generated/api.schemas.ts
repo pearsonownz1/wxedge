@@ -22,9 +22,19 @@ export interface CrmPinInput {
   pin: string;
 }
 
+export interface CrmUser {
+  id: number;
+  name: string;
+  email: string;
+  role: 'admin' | 'member';
+  workspace_settings?: Record<string, unknown>;
+  created_at?: string;
+}
+
 export interface CrmPinSessionStatus {
   signed_in: boolean;
   configured: boolean;
+  user?: CrmUser | null;
 }
 
 export interface HealthStatus {
@@ -87,9 +97,9 @@ export type InvestorInputStatus = typeof InvestorInputStatus[keyof typeof Invest
 export const InvestorInputStatus = {
   New: 'New',
   Contacted: 'Contacted',
-  Followed_Up: 'Followed Up',
-  Responded: 'Responded',
-  Meeting_Set: 'Meeting Set',
+  Meeting_set: 'Meeting set',
+  Proposal_sent: 'Proposal sent',
+  Contract_review: 'Contract review',
   Closed: 'Closed',
 } as const;
 
@@ -130,6 +140,13 @@ export interface InvestorInput {
   fit_score?: number;
   status?: InvestorInputStatus;
   expert_field?: InvestorInputExpertField;
+  lead_source?: string;
+  deal_value?: number | string;
+  expected_close_date?: string;
+  owner?: string;
+  client_type?: 'new lead' | 'cold client' | 'active client' | '';
+  type?: 'new lead' | 'cold client' | 'active client' | '';
+  phone?: string;
 }
 
 export type InvestorUpdateInvestorType = typeof InvestorUpdateInvestorType[keyof typeof InvestorUpdateInvestorType];
@@ -146,9 +163,9 @@ export type InvestorUpdateStatus = typeof InvestorUpdateStatus[keyof typeof Inve
 export const InvestorUpdateStatus = {
   New: 'New',
   Contacted: 'Contacted',
-  Followed_Up: 'Followed Up',
-  Responded: 'Responded',
-  Meeting_Set: 'Meeting Set',
+  Meeting_set: 'Meeting set',
+  Proposal_sent: 'Proposal sent',
+  Contract_review: 'Contract review',
   Closed: 'Closed',
 } as const;
 
@@ -189,6 +206,13 @@ export interface InvestorUpdate {
   fit_score?: number;
   status?: InvestorUpdateStatus;
   expert_field?: InvestorUpdateExpertField;
+  lead_source?: string;
+  deal_value?: number | string;
+  expected_close_date?: string;
+  owner?: string;
+  client_type?: 'new lead' | 'cold client' | 'active client' | '';
+  type?: 'new lead' | 'cold client' | 'active client' | '';
+  phone?: string;
 }
 
 export interface Activity {
@@ -212,9 +236,9 @@ export type InvestorStatus = typeof InvestorStatus[keyof typeof InvestorStatus];
 export const InvestorStatus = {
   New: 'New',
   Contacted: 'Contacted',
-  Followed_Up: 'Followed Up',
-  Responded: 'Responded',
-  Meeting_Set: 'Meeting Set',
+  Meeting_set: 'Meeting set',
+  Proposal_sent: 'Proposal sent',
+  Contract_review: 'Contract review',
   Closed: 'Closed',
 } as const;
 
@@ -259,6 +283,13 @@ export interface Investor {
   updated_at: string;
   activity_log: Activity[];
   expert_field: InvestorExpertField;
+  lead_source?: string;
+  deal_value?: number;
+  expected_close_date?: string;
+  owner?: string;
+  client_type?: 'new lead' | 'cold client' | 'active client' | '';
+  type?: 'new lead' | 'cold client' | 'active client' | '';
+  phone?: string;
 }
 
 export interface ActivityInput {
@@ -269,6 +300,15 @@ export interface ActivityInput {
 
 export type SummaryCounts = {[key: string]: number};
 
+export interface FunnelStageItem {
+  stage: string;
+  count: number;
+  value: number;
+  probability: number;
+  weighted_value: number;
+  conversion_rate: number;
+}
+
 export interface Summary {
   total: number;
   counts: SummaryCounts;
@@ -277,6 +317,12 @@ export interface Summary {
   response_rate: number;
   meetings_set: number;
   followups_due_today: number;
+  avg_days_to_close?: number;
+  pipeline_forecast?: number;
+  total_pipeline_value?: number;
+  meeting_to_closed_rate?: number;
+  funnel?: FunnelStageItem[];
+  stage_probabilities?: Record<string, number>;
 }
 
 export interface CsvInput {
@@ -321,9 +367,9 @@ export type ListInvestorsStatus = typeof ListInvestorsStatus[keyof typeof ListIn
 export const ListInvestorsStatus = {
   New: 'New',
   Contacted: 'Contacted',
-  Followed_Up: 'Followed Up',
-  Responded: 'Responded',
-  Meeting_Set: 'Meeting Set',
+  Meeting_set: 'Meeting set',
+  Proposal_sent: 'Proposal sent',
+  Contract_review: 'Contract review',
   Closed: 'Closed',
 } as const;
 
@@ -337,17 +383,18 @@ export type BrowserListInvestorsStatus = typeof BrowserListInvestorsStatus[keyof
 export const BrowserListInvestorsStatus = {
   New: 'New',
   Contacted: 'Contacted',
-  Followed_Up: 'Followed Up',
-  Responded: 'Responded',
-  Meeting_Set: 'Meeting Set',
+  Meeting_set: 'Meeting set',
+  Proposal_sent: 'Proposal sent',
+  Contract_review: 'Contract review',
   Closed: 'Closed',
 } as const;
 
 export type GetSummaryParams = {
-/**
- * Restrict summary metrics to this field; records without a field count as Dentistry. Omit for all experts.
- */
 expert_field?: GetSummaryExpertField;
+owner?: string;
+range?: string;
+from?: string;
+to?: string;
 };
 
 export type GetSummaryExpertField = typeof GetSummaryExpertField[keyof typeof GetSummaryExpertField];
@@ -362,10 +409,11 @@ export const GetSummaryExpertField = {
 } as const;
 
 export type BrowserGetSummaryParams = {
-/**
- * Restrict summary metrics to this field; records without a field count as Dentistry. Omit for all experts.
- */
 expert_field?: BrowserGetSummaryExpertField;
+owner?: string;
+range?: string;
+from?: string;
+to?: string;
 };
 
 export type BrowserGetSummaryExpertField = typeof BrowserGetSummaryExpertField[keyof typeof BrowserGetSummaryExpertField];

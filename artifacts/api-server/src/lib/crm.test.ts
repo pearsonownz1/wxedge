@@ -40,7 +40,7 @@ test("upsert, activity, partial updates, conflicts, CSV and summary preserve dat
     const contact = await upsert(client, { status: "Contacted", next_follow_up_date: businessDate() }, first.investor.id);
     assert.equal(contact.investor.last_contacted_date, businessDate());
     assert.ok(contact.investor.activity_log.some(a => a.kind === "status:Contacted"));
-    const responded = await upsert(client, { status: "Responded" }, first.investor.id);
+    const responded = await upsert(client, { status: "Proposal sent" }, first.investor.id);
     const totals = summary([responded.investor]);
     assert.equal(totals.response_rate, 1);
     assert.equal(totals.responses, 1);

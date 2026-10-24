@@ -1,6 +1,7 @@
 import { CrmError, FIELDS, activity, fieldError, upsert, type Client } from "./crmData";
 import { normalizeStage, STAGES } from "./crmStages";
 import type { Investor } from "@workspace/api-zod";
+
 export function parseCsv(text: string): string[][] {
   const rows: string[][] = []; let row: string[] = []; let cell = ""; let quoted = false; let endedQuote = false;
   const malformed = (reason: string) => {
@@ -30,6 +31,7 @@ export function parseCsv(text: string): string[][] {
   row.push(cell); if (row.some(v => v !== "")) rows.push(row);
   return rows;
 }
+
 export function csvExpertField(value: string): "Dentistry" | "Economics" | "Law Firms" | "Chinese Law" | "Indian Law" {
   const field = value.trim().toLowerCase();
   if (!field || field === "dentistry") return "Dentistry";
@@ -39,11 +41,20 @@ export function csvExpertField(value: string): "Dentistry" | "Economics" | "Law 
   if (field === "indian law") return "Indian Law";
   throw fieldError("expert_field", value, "expert_field must be Dentistry, Economics, Law Firms, Chinese Law or Indian Law");
 }
+
 export async function importCsv(client: Client, text: string) {
   const rows = parseCsv(text);
   if (rows.length < 2) throw new CrmError("CSV must contain headers and at least one investor");
   if (rows.length > 5001) throw new CrmError("Import at most 5,000 investors at once");
-  const aliases: Record<string, string> = { linkedin: "linkedin_url", subject: "pitch_subject", body: "pitch_body", personalized_pitch_subject: "pitch_subject", personalized_pitch_body: "pitch_body", activity: "activity_log" };
+  const aliases: Record<string, string> = {
+    linkedin: "linkedin_url",
+    subject: "pitch_subject",
+    body: "pitch_body",
+    personalized_pitch_subject: "pitch_subject",
+    personalized_pitch_body: "pitch_body",
+    activity: "activity_log",
+    type: "client_type",
+  };
   const headers = rows[0].map(v => { const key = v.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, ""); return aliases[key] ?? key; });
   const duplicate = headers.find((header, index) => headers.indexOf(header) !== index);
   if (duplicate !== undefined) throw new CrmError(`CSV row 1: Duplicate CSV header ${JSON.stringify(duplicate)}`, 400, { row: 1, field: duplicate, value: duplicate });
@@ -55,8 +66,16 @@ export async function importCsv(client: Client, text: string) {
     try {
       if (rows[i].length !== headers.length) throw new CrmError(`Column count does not match headers: expected ${headers.length}, got ${rows[i].length}. Quote values containing commas.`);
       const input: Record<string, unknown> = {};
-      headers.forEach((key, j) => { if (FIELDS.includes(key)) input[key] = key === "fit_score" ? Number(rows[i][j]) : rows[i][j]; });
+      headers.forEach((key, j) => {
+        if (FIELDS.includes(key)) {
+          if (key === "fit_score") input[key] = Number(rows[i][j]);
+          else if (key === "deal_value") input[key] = rows[i][j].trim() === "" ? undefined : Number(rows[i][j].replace(/[$,\s]/g, ""));
+          else input[key] = rows[i][j];
+        }
+      });
       if (input.fit_score === 0) delete input.fit_score;
+      if (input.deal_value === undefined) delete input.deal_value;
+      if (input.client_type === "") delete input.client_type;
       const originalStage = input.status;
       if (typeof originalStage === "string") {
         if (!originalStage.trim()) delete input.status;
@@ -97,6 +116,7 @@ export async function importCsv(client: Client, text: string) {
   }
   return { created, updated };
 }
+
 export function exportCsv(investors: Investor[]) {
   const headers = [...FIELDS, "activity_log"];
   const quote = (v: unknown) => {

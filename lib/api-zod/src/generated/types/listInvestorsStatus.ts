@@ -12,8 +12,8 @@ export type ListInvestorsStatus = typeof ListInvestorsStatus[keyof typeof ListIn
 export const ListInvestorsStatus = {
   New: 'New',
   Contacted: 'Contacted',
-  Followed_Up: 'Followed Up',
-  Responded: 'Responded',
-  Meeting_Set: 'Meeting Set',
+  Meeting_set: 'Meeting set',
+  Proposal_sent: 'Proposal sent',
+  Contract_review: 'Contract review',
   Closed: 'Closed',
 } as const;

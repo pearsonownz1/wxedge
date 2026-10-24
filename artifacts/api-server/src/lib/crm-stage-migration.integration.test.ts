@@ -26,15 +26,15 @@ test("Stage migration changes only status, preserves history, is idempotent and 
     await client.query("SAVEPOINT migration_check");
     const report = await migratePipelineStages(client);
     assert.equal(report.total, 10);
-    assert.equal(report.changed, 5);
-    assert.deepEqual(report.after, { New: 4, Contacted: 1, "Followed Up": 1, Responded: 1, "Meeting Set": 1, Closed: 2 });
+    assert.equal(report.changed, 8);
+    assert.deepEqual(report.after, { New: 4, Contacted: 3, "Meeting set": 1, "Proposal sent": 0, "Contract review": 0, Closed: 2 });
     const after = (await client.query("SELECT * FROM crm_investors ORDER BY id")).rows;
     for (let index = 0; index < after.length; index++) {
       assert.deepEqual({ ...after[index], data: { ...after[index].data, status: before[index].data.status } }, before[index]);
     }
     assert.deepEqual((await client.query("SELECT * FROM crm_activities WHERE id <= 10 ORDER BY id")).rows, history);
     assert.equal((await migratePipelineStages(client)).changed, 0);
-    assert.equal((await client.query("SELECT count(*)::int AS n FROM crm_activities")).rows[0].n, 15);
+    assert.equal((await client.query("SELECT count(*)::int AS n FROM crm_activities")).rows[0].n, 18);
     await client.query("ROLLBACK TO SAVEPOINT migration_check");
 
     let updates = 0;

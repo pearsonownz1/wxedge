@@ -144,7 +144,7 @@ export const ExchangeMobileAuthorizationCodeResponse = zod.object({
 
 
 export const ListInvestorsQueryParams = zod.object({
-  "status": zod.enum(['New', 'Contacted', 'Followed Up', 'Responded', 'Meeting Set', 'Closed']).optional()
+  "status": zod.enum(['New', 'Contacted', 'Meeting set', 'Proposal sent', 'Contract review', 'Closed']).optional()
 })
 
 export const listInvestorsResponseFitScoreMax = 5;
@@ -171,7 +171,7 @@ export const ListInvestorsResponseItem = zod.object({
   "notes": zod.string(),
   "investor_type": zod.enum(['STANDARD', 'PREMIUM']),
   "fit_score": zod.number().min(1).max(listInvestorsResponseFitScoreMax),
-  "status": zod.enum(['New', 'Contacted', 'Followed Up', 'Responded', 'Meeting Set', 'Closed']),
+  "status": zod.enum(['New', 'Contacted', 'Meeting set', 'Proposal sent', 'Contract review', 'Closed']),
   "id": zod.number(),
   "created_at": zod.string(),
   "updated_at": zod.string(),
@@ -181,7 +181,14 @@ export const ListInvestorsResponseItem = zod.object({
   "message": zod.string(),
   "kind": zod.string()
 })),
-  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law', 'Indian Law'])
+  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law', 'Indian Law']),
+  "lead_source": zod.string().optional(),
+  "deal_value": zod.union([zod.number(), zod.string()]).optional(),
+  "expected_close_date": zod.string().optional(),
+  "owner": zod.string().optional(),
+  "client_type": zod.enum(['new lead', 'cold client', 'active client', '']).optional(),
+  "type": zod.enum(['new lead', 'cold client', 'active client', '']).optional(),
+  "phone": zod.string().optional()
 })
 export const ListInvestorsResponse = zod.array(ListInvestorsResponseItem)
 
@@ -210,8 +217,15 @@ export const UpsertInvestorBody = zod.object({
   "notes": zod.string().optional(),
   "investor_type": zod.enum(['STANDARD', 'PREMIUM']).optional(),
   "fit_score": zod.number().min(1).max(upsertInvestorBodyFitScoreMax).optional(),
-  "status": zod.enum(['New', 'Contacted', 'Followed Up', 'Responded', 'Meeting Set', 'Closed']).optional(),
-  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law', 'Indian Law']).optional()
+  "status": zod.enum(['New', 'Contacted', 'Meeting set', 'Proposal sent', 'Contract review', 'Closed']).optional(),
+  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law', 'Indian Law']).optional(),
+  "lead_source": zod.string().optional(),
+  "deal_value": zod.union([zod.number(), zod.string()]).optional(),
+  "expected_close_date": zod.string().optional(),
+  "owner": zod.string().optional(),
+  "client_type": zod.enum(['new lead', 'cold client', 'active client', '']).optional(),
+  "type": zod.enum(['new lead', 'cold client', 'active client', '']).optional(),
+  "phone": zod.string().optional()
 })
 
 export const upsertInvestorResponseFitScoreMax = 5;
@@ -238,7 +252,7 @@ export const UpsertInvestorResponse = zod.object({
   "notes": zod.string(),
   "investor_type": zod.enum(['STANDARD', 'PREMIUM']),
   "fit_score": zod.number().min(1).max(upsertInvestorResponseFitScoreMax),
-  "status": zod.enum(['New', 'Contacted', 'Followed Up', 'Responded', 'Meeting Set', 'Closed']),
+  "status": zod.enum(['New', 'Contacted', 'Meeting set', 'Proposal sent', 'Contract review', 'Closed']),
   "id": zod.number(),
   "created_at": zod.string(),
   "updated_at": zod.string(),
@@ -248,12 +262,19 @@ export const UpsertInvestorResponse = zod.object({
   "message": zod.string(),
   "kind": zod.string()
 })),
-  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law', 'Indian Law'])
+  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law', 'Indian Law']),
+  "lead_source": zod.string().optional(),
+  "deal_value": zod.union([zod.number(), zod.string()]).optional(),
+  "expected_close_date": zod.string().optional(),
+  "owner": zod.string().optional(),
+  "client_type": zod.enum(['new lead', 'cold client', 'active client', '']).optional(),
+  "type": zod.enum(['new lead', 'cold client', 'active client', '']).optional(),
+  "phone": zod.string().optional()
 })
 
 
 export const BrowserListInvestorsQueryParams = zod.object({
-  "status": zod.enum(['New', 'Contacted', 'Followed Up', 'Responded', 'Meeting Set', 'Closed']).optional()
+  "status": zod.enum(['New', 'Contacted', 'Meeting set', 'Proposal sent', 'Contract review', 'Closed']).optional()
 })
 
 export const browserListInvestorsResponseFitScoreMax = 5;
@@ -280,7 +301,7 @@ export const BrowserListInvestorsResponseItem = zod.object({
   "notes": zod.string(),
   "investor_type": zod.enum(['STANDARD', 'PREMIUM']),
   "fit_score": zod.number().min(1).max(browserListInvestorsResponseFitScoreMax),
-  "status": zod.enum(['New', 'Contacted', 'Followed Up', 'Responded', 'Meeting Set', 'Closed']),
+  "status": zod.enum(['New', 'Contacted', 'Meeting set', 'Proposal sent', 'Contract review', 'Closed']),
   "id": zod.number(),
   "created_at": zod.string(),
   "updated_at": zod.string(),
@@ -290,7 +311,14 @@ export const BrowserListInvestorsResponseItem = zod.object({
   "message": zod.string(),
   "kind": zod.string()
 })),
-  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law', 'Indian Law'])
+  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law', 'Indian Law']),
+  "lead_source": zod.string().optional(),
+  "deal_value": zod.union([zod.number(), zod.string()]).optional(),
+  "expected_close_date": zod.string().optional(),
+  "owner": zod.string().optional(),
+  "client_type": zod.enum(['new lead', 'cold client', 'active client', '']).optional(),
+  "type": zod.enum(['new lead', 'cold client', 'active client', '']).optional(),
+  "phone": zod.string().optional()
 })
 export const BrowserListInvestorsResponse = zod.array(BrowserListInvestorsResponseItem)
 
@@ -319,8 +347,15 @@ export const BrowserUpsertInvestorBody = zod.object({
   "notes": zod.string().optional(),
   "investor_type": zod.enum(['STANDARD', 'PREMIUM']).optional(),
   "fit_score": zod.number().min(1).max(browserUpsertInvestorBodyFitScoreMax).optional(),
-  "status": zod.enum(['New', 'Contacted', 'Followed Up', 'Responded', 'Meeting Set', 'Closed']).optional(),
-  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law', 'Indian Law']).optional()
+  "status": zod.enum(['New', 'Contacted', 'Meeting set', 'Proposal sent', 'Contract review', 'Closed']).optional(),
+  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law', 'Indian Law']).optional(),
+  "lead_source": zod.string().optional(),
+  "deal_value": zod.union([zod.number(), zod.string()]).optional(),
+  "expected_close_date": zod.string().optional(),
+  "owner": zod.string().optional(),
+  "client_type": zod.enum(['new lead', 'cold client', 'active client', '']).optional(),
+  "type": zod.enum(['new lead', 'cold client', 'active client', '']).optional(),
+  "phone": zod.string().optional()
 })
 
 export const browserUpsertInvestorResponseFitScoreMax = 5;
@@ -347,7 +382,7 @@ export const BrowserUpsertInvestorResponse = zod.object({
   "notes": zod.string(),
   "investor_type": zod.enum(['STANDARD', 'PREMIUM']),
   "fit_score": zod.number().min(1).max(browserUpsertInvestorResponseFitScoreMax),
-  "status": zod.enum(['New', 'Contacted', 'Followed Up', 'Responded', 'Meeting Set', 'Closed']),
+  "status": zod.enum(['New', 'Contacted', 'Meeting set', 'Proposal sent', 'Contract review', 'Closed']),
   "id": zod.number(),
   "created_at": zod.string(),
   "updated_at": zod.string(),
@@ -357,7 +392,14 @@ export const BrowserUpsertInvestorResponse = zod.object({
   "message": zod.string(),
   "kind": zod.string()
 })),
-  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law', 'Indian Law'])
+  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law', 'Indian Law']),
+  "lead_source": zod.string().optional(),
+  "deal_value": zod.union([zod.number(), zod.string()]).optional(),
+  "expected_close_date": zod.string().optional(),
+  "owner": zod.string().optional(),
+  "client_type": zod.enum(['new lead', 'cold client', 'active client', '']).optional(),
+  "type": zod.enum(['new lead', 'cold client', 'active client', '']).optional(),
+  "phone": zod.string().optional()
 })
 
 
@@ -389,7 +431,7 @@ export const GetInvestorResponse = zod.object({
   "notes": zod.string(),
   "investor_type": zod.enum(['STANDARD', 'PREMIUM']),
   "fit_score": zod.number().min(1).max(getInvestorResponseFitScoreMax),
-  "status": zod.enum(['New', 'Contacted', 'Followed Up', 'Responded', 'Meeting Set', 'Closed']),
+  "status": zod.enum(['New', 'Contacted', 'Meeting set', 'Proposal sent', 'Contract review', 'Closed']),
   "id": zod.number(),
   "created_at": zod.string(),
   "updated_at": zod.string(),
@@ -399,7 +441,14 @@ export const GetInvestorResponse = zod.object({
   "message": zod.string(),
   "kind": zod.string()
 })),
-  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law', 'Indian Law'])
+  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law', 'Indian Law']),
+  "lead_source": zod.string().optional(),
+  "deal_value": zod.union([zod.number(), zod.string()]).optional(),
+  "expected_close_date": zod.string().optional(),
+  "owner": zod.string().optional(),
+  "client_type": zod.enum(['new lead', 'cold client', 'active client', '']).optional(),
+  "type": zod.enum(['new lead', 'cold client', 'active client', '']).optional(),
+  "phone": zod.string().optional()
 })
 
 
@@ -431,8 +480,15 @@ export const UpdateInvestorBody = zod.object({
   "notes": zod.string().optional(),
   "investor_type": zod.enum(['STANDARD', 'PREMIUM']).optional(),
   "fit_score": zod.number().min(1).max(updateInvestorBodyFitScoreMax).optional(),
-  "status": zod.enum(['New', 'Contacted', 'Followed Up', 'Responded', 'Meeting Set', 'Closed']).optional(),
-  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law', 'Indian Law']).optional()
+  "status": zod.enum(['New', 'Contacted', 'Meeting set', 'Proposal sent', 'Contract review', 'Closed']).optional(),
+  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law', 'Indian Law']).optional(),
+  "lead_source": zod.string().optional(),
+  "deal_value": zod.union([zod.number(), zod.string()]).optional(),
+  "expected_close_date": zod.string().optional(),
+  "owner": zod.string().optional(),
+  "client_type": zod.enum(['new lead', 'cold client', 'active client', '']).optional(),
+  "type": zod.enum(['new lead', 'cold client', 'active client', '']).optional(),
+  "phone": zod.string().optional()
 })
 
 export const updateInvestorResponseFitScoreMax = 5;
@@ -459,7 +515,7 @@ export const UpdateInvestorResponse = zod.object({
   "notes": zod.string(),
   "investor_type": zod.enum(['STANDARD', 'PREMIUM']),
   "fit_score": zod.number().min(1).max(updateInvestorResponseFitScoreMax),
-  "status": zod.enum(['New', 'Contacted', 'Followed Up', 'Responded', 'Meeting Set', 'Closed']),
+  "status": zod.enum(['New', 'Contacted', 'Meeting set', 'Proposal sent', 'Contract review', 'Closed']),
   "id": zod.number(),
   "created_at": zod.string(),
   "updated_at": zod.string(),
@@ -469,7 +525,14 @@ export const UpdateInvestorResponse = zod.object({
   "message": zod.string(),
   "kind": zod.string()
 })),
-  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law', 'Indian Law'])
+  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law', 'Indian Law']),
+  "lead_source": zod.string().optional(),
+  "deal_value": zod.union([zod.number(), zod.string()]).optional(),
+  "expected_close_date": zod.string().optional(),
+  "owner": zod.string().optional(),
+  "client_type": zod.enum(['new lead', 'cold client', 'active client', '']).optional(),
+  "type": zod.enum(['new lead', 'cold client', 'active client', '']).optional(),
+  "phone": zod.string().optional()
 })
 
 
@@ -501,7 +564,7 @@ export const BrowserGetInvestorResponse = zod.object({
   "notes": zod.string(),
   "investor_type": zod.enum(['STANDARD', 'PREMIUM']),
   "fit_score": zod.number().min(1).max(browserGetInvestorResponseFitScoreMax),
-  "status": zod.enum(['New', 'Contacted', 'Followed Up', 'Responded', 'Meeting Set', 'Closed']),
+  "status": zod.enum(['New', 'Contacted', 'Meeting set', 'Proposal sent', 'Contract review', 'Closed']),
   "id": zod.number(),
   "created_at": zod.string(),
   "updated_at": zod.string(),
@@ -511,7 +574,14 @@ export const BrowserGetInvestorResponse = zod.object({
   "message": zod.string(),
   "kind": zod.string()
 })),
-  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law', 'Indian Law'])
+  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law', 'Indian Law']),
+  "lead_source": zod.string().optional(),
+  "deal_value": zod.union([zod.number(), zod.string()]).optional(),
+  "expected_close_date": zod.string().optional(),
+  "owner": zod.string().optional(),
+  "client_type": zod.enum(['new lead', 'cold client', 'active client', '']).optional(),
+  "type": zod.enum(['new lead', 'cold client', 'active client', '']).optional(),
+  "phone": zod.string().optional()
 })
 
 
@@ -543,8 +613,15 @@ export const BrowserUpdateInvestorBody = zod.object({
   "notes": zod.string().optional(),
   "investor_type": zod.enum(['STANDARD', 'PREMIUM']).optional(),
   "fit_score": zod.number().min(1).max(browserUpdateInvestorBodyFitScoreMax).optional(),
-  "status": zod.enum(['New', 'Contacted', 'Followed Up', 'Responded', 'Meeting Set', 'Closed']).optional(),
-  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law', 'Indian Law']).optional()
+  "status": zod.enum(['New', 'Contacted', 'Meeting set', 'Proposal sent', 'Contract review', 'Closed']).optional(),
+  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law', 'Indian Law']).optional(),
+  "lead_source": zod.string().optional(),
+  "deal_value": zod.union([zod.number(), zod.string()]).optional(),
+  "expected_close_date": zod.string().optional(),
+  "owner": zod.string().optional(),
+  "client_type": zod.enum(['new lead', 'cold client', 'active client', '']).optional(),
+  "type": zod.enum(['new lead', 'cold client', 'active client', '']).optional(),
+  "phone": zod.string().optional()
 })
 
 export const browserUpdateInvestorResponseFitScoreMax = 5;
@@ -571,7 +648,7 @@ export const BrowserUpdateInvestorResponse = zod.object({
   "notes": zod.string(),
   "investor_type": zod.enum(['STANDARD', 'PREMIUM']),
   "fit_score": zod.number().min(1).max(browserUpdateInvestorResponseFitScoreMax),
-  "status": zod.enum(['New', 'Contacted', 'Followed Up', 'Responded', 'Meeting Set', 'Closed']),
+  "status": zod.enum(['New', 'Contacted', 'Meeting set', 'Proposal sent', 'Contract review', 'Closed']),
   "id": zod.number(),
   "created_at": zod.string(),
   "updated_at": zod.string(),
@@ -581,7 +658,14 @@ export const BrowserUpdateInvestorResponse = zod.object({
   "message": zod.string(),
   "kind": zod.string()
 })),
-  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law', 'Indian Law'])
+  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law', 'Indian Law']),
+  "lead_source": zod.string().optional(),
+  "deal_value": zod.union([zod.number(), zod.string()]).optional(),
+  "expected_close_date": zod.string().optional(),
+  "owner": zod.string().optional(),
+  "client_type": zod.enum(['new lead', 'cold client', 'active client', '']).optional(),
+  "type": zod.enum(['new lead', 'cold client', 'active client', '']).optional(),
+  "phone": zod.string().optional()
 })
 
 
@@ -621,7 +705,7 @@ export const AppendActivityResponse = zod.object({
   "notes": zod.string(),
   "investor_type": zod.enum(['STANDARD', 'PREMIUM']),
   "fit_score": zod.number().min(1).max(appendActivityResponseFitScoreMax),
-  "status": zod.enum(['New', 'Contacted', 'Followed Up', 'Responded', 'Meeting Set', 'Closed']),
+  "status": zod.enum(['New', 'Contacted', 'Meeting set', 'Proposal sent', 'Contract review', 'Closed']),
   "id": zod.number(),
   "created_at": zod.string(),
   "updated_at": zod.string(),
@@ -631,7 +715,14 @@ export const AppendActivityResponse = zod.object({
   "message": zod.string(),
   "kind": zod.string()
 })),
-  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law', 'Indian Law'])
+  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law', 'Indian Law']),
+  "lead_source": zod.string().optional(),
+  "deal_value": zod.union([zod.number(), zod.string()]).optional(),
+  "expected_close_date": zod.string().optional(),
+  "owner": zod.string().optional(),
+  "client_type": zod.enum(['new lead', 'cold client', 'active client', '']).optional(),
+  "type": zod.enum(['new lead', 'cold client', 'active client', '']).optional(),
+  "phone": zod.string().optional()
 })
 
 
@@ -671,7 +762,7 @@ export const BrowserAppendActivityResponse = zod.object({
   "notes": zod.string(),
   "investor_type": zod.enum(['STANDARD', 'PREMIUM']),
   "fit_score": zod.number().min(1).max(browserAppendActivityResponseFitScoreMax),
-  "status": zod.enum(['New', 'Contacted', 'Followed Up', 'Responded', 'Meeting Set', 'Closed']),
+  "status": zod.enum(['New', 'Contacted', 'Meeting set', 'Proposal sent', 'Contract review', 'Closed']),
   "id": zod.number(),
   "created_at": zod.string(),
   "updated_at": zod.string(),
@@ -681,7 +772,14 @@ export const BrowserAppendActivityResponse = zod.object({
   "message": zod.string(),
   "kind": zod.string()
 })),
-  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law', 'Indian Law'])
+  "expert_field": zod.enum(['Dentistry', 'Economics', 'Law Firms', 'Chinese Law', 'Indian Law']),
+  "lead_source": zod.string().optional(),
+  "deal_value": zod.union([zod.number(), zod.string()]).optional(),
+  "expected_close_date": zod.string().optional(),
+  "owner": zod.string().optional(),
+  "client_type": zod.enum(['new lead', 'cold client', 'active client', '']).optional(),
+  "type": zod.enum(['new lead', 'cold client', 'active client', '']).optional(),
+  "phone": zod.string().optional()
 })
 
 

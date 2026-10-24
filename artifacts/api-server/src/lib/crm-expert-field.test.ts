@@ -75,7 +75,7 @@ test("CSV field is optional, case-insensitive, defaults blanks, rejects invalid 
 test("CSV matches shuffled headers including expert_field, without modifying unrelated records", async () => {
   const existing = { id: 1, data: { name: "Existing", notes: "Keep" }, created_at: now, updated_at: now };
   const headers = ["expert_field", "notes", "email", "fit_score", "status", "name", "investor_type"];
-  const values = ["lAw FiRmS", "A note, with commas", "law@example.test", "4", "Meeting Set", "Law example", "PREMIUM"];
+  const values = ["lAw FiRmS", "A note, with commas", "law@example.test", "4", "Meeting set", "Law example", "PREMIUM"];
   for (let offset = 0; offset < headers.length; offset++) {
     const row = { ...existing, data: { ...existing.data } };
     const memory = memoryClient([row]);
@@ -88,7 +88,7 @@ test("CSV matches shuffled headers including expert_field, without modifying unr
     assert.equal(imported.name, "Law example");
     assert.equal(imported.email, "law@example.test");
     assert.equal(imported.fit_score, 4);
-    assert.equal(imported.status, "Meeting Set");
+    assert.equal(imported.status, "Meeting set");
     assert.equal(imported.notes, "A note, with commas");
     assert.equal(imported.investor_type, "PREMIUM");
     assert.equal(JSON.stringify(row), before);
@@ -98,9 +98,9 @@ test("CSV matches shuffled headers including expert_field, without modifying unr
 test("CSV accepts legacy stage names across all expert categories and exports only canonical stages", async () => {
   const mappings: [string, string][] = [
     ["New", "New"], ["Enriched", "New"], ["Pitch Drafted", "New"], ["Approved to Send", "New"],
-    ["Sent", "Contacted"], ["Contacted", "Contacted"], ["Follow-up", "Followed Up"],
-    ["Follow-up 2", "Followed Up"], ["Followed Up", "Followed Up"], ["Replied", "Responded"],
-    ["Responded", "Responded"], ["Meeting", "Meeting Set"], ["Meeting Set", "Meeting Set"],
+    ["Sent", "Contacted"], ["Contacted", "Contacted"], ["Follow-up", "Contacted"],
+    ["Follow-up 2", "Contacted"], ["Followed Up", "Contacted"], ["Replied", "Contacted"],
+    ["Responded", "Contacted"], ["Meeting", "Meeting set"], ["Meeting set", "Meeting set"],
     ["Won", "Closed"], ["Lost", "Closed"], ["Closed", "Closed"], ["Passed", "Closed"], ["Committed", "Closed"],
   ];
   const memory = memoryClient();
@@ -199,7 +199,7 @@ test("Indian Law supports creation, editing, CSV import and scoped counts withou
   const result = summary(experts, now, "Indian Law");
   assert.equal(result.total, 2);
   assert.equal(result.counts.New, 1);
-  assert.equal(result.counts["Meeting Set"], 1);
+  assert.equal(result.counts["Meeting set"], 1);
   assert.equal(summary(experts, now, "Chinese Law").total, 1);
   assert.equal(JSON.stringify(original), before);
   const [headers, ...rows] = parseCsv(exportCsv(experts));
@@ -222,7 +222,7 @@ test("Chinese Law supports creation, editing, CSV import and scoped counts witho
   const result = summary(experts, now, "Chinese Law");
   assert.equal(result.total, 2);
   assert.equal(result.counts.New, 1);
-  assert.equal(result.counts["Meeting Set"], 1);
+  assert.equal(result.counts["Meeting set"], 1);
   assert.equal(summary(experts, now, "Law Firms").total, 1);
   assert.equal(JSON.stringify(original), before);
   const [headers, ...rows] = parseCsv(exportCsv(experts));
@@ -262,8 +262,8 @@ test("Every summary metric and status count uses the selected field, including l
   };
   const records = [
     make(1, undefined, {}),
-    make(2, "Dentistry", { status: "Responded", last_contacted_date: "2026-10-06", next_follow_up_date: "2026-10-07" }),
-    make(3, "Economics", { status: "Meeting Set", last_contacted_date: "2026-10-05" }),
+    make(2, "Dentistry", { status: "Proposal sent", last_contacted_date: "2026-10-06", next_follow_up_date: "2026-10-07" }),
+    make(3, "Economics", { status: "Meeting set", last_contacted_date: "2026-10-05" }),
   ];
   const dentists = summary(records, now, "Dentistry");
   const economists = summary(records, now, "Economics");
@@ -272,9 +272,9 @@ test("Every summary metric and status count uses the selected field, including l
   assert.deepEqual([economists.total, economists.contacted_this_week, economists.responses, economists.response_rate, economists.meetings_set, economists.followups_due_today], [1, 1, 1, 1, 1, 0]);
   assert.deepEqual([all.total, all.contacted_this_week, all.responses, all.meetings_set, all.followups_due_today], [3, 2, 2, 1, 1]);
   assert.equal(dentists.counts.New, 1);
-  assert.equal(dentists.counts["Meeting Set"], 0);
+  assert.equal(dentists.counts["Meeting set"], 0);
   assert.equal(economists.counts.New, 0);
-  assert.equal(economists.counts["Meeting Set"], 1);
+  assert.equal(economists.counts["Meeting set"], 1);
   assert.equal(all.counts.New, 1);
-  assert.equal(all.counts["Meeting Set"], 1);
+  assert.equal(all.counts["Meeting set"], 1);
 });

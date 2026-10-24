@@ -8,14 +8,16 @@ import type { Investor } from "@workspace/api-zod";
 const mappings: [string, string][] = [
   ["New", "New"], ["Enriched", "New"], ["Pitch Drafted", "New"], ["Approved to Send", "New"],
   ["Contacted", "Contacted"], ["Sent", "Contacted"], ["Email Sent", "Contacted"],
-  ["Followed Up", "Followed Up"], ["Follow-up", "Followed Up"], ["Follow-up 2", "Followed Up"],
-  ["Responded", "Responded"], ["Replied", "Responded"],
-  ["Meeting Set", "Meeting Set"], ["Meeting", "Meeting Set"],
+  ["Followed Up", "Contacted"], ["Follow-up", "Contacted"], ["Follow-up 2", "Contacted"],
+  ["Responded", "Contacted"], ["Replied", "Contacted"],
+  ["Meeting Set", "Meeting set"], ["Meeting set", "Meeting set"], ["Meeting", "Meeting set"],
+  ["Proposal sent", "Proposal sent"], ["Proposal", "Proposal sent"],
+  ["Contract review", "Contract review"], ["Contract", "Contract review"],
   ["Passed", "Closed"], ["Committed", "Closed"], ["Won", "Closed"], ["Lost", "Closed"],
   ["Closed Won", "Closed"], ["Closed Lost", "Closed"], ["Closed", "Closed"],
 ];
 test("API offers exactly six stages; legacy aliases normalize consistently", () => {
-  assert.deepEqual(STAGES, ["New", "Contacted", "Followed Up", "Responded", "Meeting Set", "Closed"]);
+  assert.deepEqual(STAGES, ["New", "Contacted", "Meeting set", "Proposal sent", "Contract review", "Closed"]);
   assert.deepEqual(STATUSES, STAGES);
   for (const [old, expected] of mappings) {
     assert.equal(normalizeStage(old), expected);
@@ -44,7 +46,7 @@ test("Production-shaped migration plans preserve 180 records and change only 169
   } } as unknown as Client;
   const report = await migratePipelineStages(client);
   assert.deepEqual(report.before, { New: 11, Enriched: 20, "Pitch Drafted": 149 });
-  assert.deepEqual(report.after, { New: 180, Contacted: 0, "Followed Up": 0, Responded: 0, "Meeting Set": 0, Closed: 0 });
+  assert.deepEqual(report.after, { New: 180, Contacted: 0, "Meeting set": 0, "Proposal sent": 0, "Contract review": 0, Closed: 0 });
   assert.equal(report.changed, 169);
   assert.equal(report.total, 180);
   assert.equal(activities.length, 169);

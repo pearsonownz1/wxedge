@@ -117,6 +117,18 @@ globalThis.__dirname = __bannerPath.dirname(globalThis.__filename);
     `,
     },
   });
+
+  await esbuild({
+    entryPoints: [path.resolve(artifactDir, "src/app.ts")],
+    platform: "node",
+    bundle: true,
+    format: "cjs",
+    outfile: path.resolve(artifactDir, "../../api/index.js"),
+    footer: { js: "if (module.exports && module.exports.default) { module.exports = module.exports.default; }" },
+    logLevel: "info",
+    external: ["pg-native"],
+    
+  });
 }
 
 buildAll().catch((err) => {
