@@ -15,7 +15,7 @@ test("Stage migration changes only status, preserves history, is idempotent and 
     const originals = ["New", "Enriched", "Pitch Drafted", "Approved to Send", "Contacted", "Followed Up", "Responded", "Meeting Set", "Passed", "Committed"];
     for (let index = 0; index < originals.length; index++) {
       await client.query("INSERT INTO crm_investors(id,data) VALUES($1,$2::jsonb)", [index + 1, JSON.stringify({
-        name: `Temporary sample ${index}`, expert_field: ["Dentistry", "Economics", "Law Firms"][index % 3],
+        name: `Temporary sample ${index}`, expert_field: ["Law Firms", "Chinese Law", "Indian Law"][index % 3],
         status: originals[index], pitch_body: "Preserved text", notes: "Preserved note",
         last_contacted_date: "2026-09-01", next_follow_up_date: "2026-10-09", custom: { preserved: true },
       })]);

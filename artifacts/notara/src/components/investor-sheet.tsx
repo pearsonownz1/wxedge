@@ -12,7 +12,6 @@ import { useToast } from '@/hooks/use-toast';
 import { Copy, Trash2, PhoneCall, MessageSquare, Send } from 'lucide-react';
 import {
   STATUSES,
-  TYPES,
   CLIENT_TYPES,
   FIELDS,
   EXPERT_FIELDS,
@@ -22,11 +21,10 @@ import {
 } from '@/lib/crm';
 
 type F = Record<string, string>;
-const empty = (expertField: ExpertField = 'Dentistry', defaultOwner = 'Guy'): F => ({
+const empty = (expertField: ExpertField = 'Law Firms', defaultOwner = 'Guy'): F => ({
   ...Object.fromEntries(FIELDS.map((k) => [k, ''])),
   status: 'New',
   fit_score: '3',
-  investor_type: 'STANDARD',
   expert_field: expertField,
   lead_source: 'Outbound',
   deal_value: '2500',
@@ -36,10 +34,10 @@ const empty = (expertField: ExpertField = 'Dentistry', defaultOwner = 'Guy'): F 
   phone: '',
 });
 
-const LONG = ['thesis_notes', 'pitch_body', 'notes', 'warm_intro_path'];
+const LONG = ['pitch_body', 'notes'];
 const DATES = ['last_contacted_date', 'next_follow_up_date', 'expected_close_date'];
 const lbl = (k: string) => {
-  if (k === 'investor_type') return 'tier';
+  if (k === 'expert_field') return 'MARKET / REGION';
   if (k === 'client_type') return 'type (lead / client)';
   if (k === 'deal_value') return 'deal value ($ USD)';
   return k.replace(/_/g, ' ');
@@ -50,7 +48,7 @@ export function InvestorSheet({
   id,
   open,
   onClose,
-  defaultExpertField = 'Dentistry',
+  defaultExpertField = 'Law Firms',
   teamOwners = ['Guy', 'Growth', 'Grok'],
   onDialContact,
   onOpenWhatsApp,
@@ -73,7 +71,7 @@ export function InvestorSheet({
   const [f, setF] = useState<F>(() => empty(defaultExpertField));
   const [msg, setMsg] = useState('');
   const [eventType, setEventType] = useState<'note' | 'email_sent' | 'reply_received' | 'proposal_sent' | 'call_logged' | 'whatsapp_sent'>('note');
-  const [campaignTag, setCampaignTag] = useState('outbound-q4');
+  const [campaignTag, setCampaignTag] = useState('law-firms-niw-q4');
   const [deleting, setDeleting] = useState(false);
   const [loggingAct, setLoggingAct] = useState(false);
   const dirty = useRef(false);
@@ -132,7 +130,6 @@ export function InvestorSheet({
     FIELDS.forEach((k) => {
       if (k === 'fit_score') o[k] = Math.min(5, Math.max(1, parseInt(f[k]) || 3));
       else if (k === 'deal_value') o[k] = Math.max(0, Number(String(f[k] || '0').replace(/[$,\s]/g, '')) || 0);
-      else if (k === 'investor_type' && !f[k]) return;
       else o[k] = f[k];
     });
     return o;
@@ -213,12 +210,6 @@ export function InvestorSheet({
             <option key={s}>{s}</option>
           ))}
         </select>
-      ) : k === 'investor_type' ? (
-        <select data-testid="select-type" className={inp} value={f[k]} onChange={(e) => set(k, e.target.value)}>
-          {TYPES.map((s) => (
-            <option key={s}>{s}</option>
-          ))}
-        </select>
       ) : k === 'client_type' ? (
         <select data-testid="select-client-type" className={inp} value={f[k] || 'new lead'} onChange={(e) => set(k, e.target.value)}>
           {CLIENT_TYPES.map((s) => (
@@ -288,7 +279,7 @@ export function InvestorSheet({
                 {isNew ? 'New Deal / Contact' : f.name || 'Deal Record'}
               </SheetTitle>
               <SheetDescription className="text-slate-600">
-                {isNew ? 'Add a new contact or deal card to SellingHighs CRM.' : [f.title, f.firm].filter(Boolean).join(' · ') || `Card #${numId}`}
+                {isNew ? 'Add a new law firm deal card to SellingHighs CRM.' : [f.title, f.firm].filter(Boolean).join(' · ') || `Card #${numId}`}
               </SheetDescription>
             </div>
             {!isNew && (
@@ -365,7 +356,7 @@ export function InvestorSheet({
 
             <div className="rounded-xl border bg-white p-4 shadow-sm">
               <div className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-600">
-                Contact &amp; Organization Details
+                Contact &amp; Law Firm Details
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 {FIELDS.filter(
@@ -380,10 +371,8 @@ export function InvestorSheet({
                       'pitch_subject',
                       'pitch_body',
                       'notes',
-                      'thesis_notes',
                     ].includes(k),
                 ).map(field)}
-                {field('thesis_notes')}
                 {field('notes')}
               </div>
             </div>

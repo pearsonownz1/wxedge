@@ -34,7 +34,6 @@ import {
 } from 'lucide-react';
 import {
   STATUSES,
-  TYPES,
   CLIENT_TYPES,
   STAGE_PROBABILITIES,
   STATUS_TONE,
@@ -170,7 +169,6 @@ export default function Dashboard() {
   const [view, setView] = useState<'board' | 'table'>('board');
   const [q, setQ] = useState('');
   const [fs, setFs] = useState('');
-  const [ft, setFt] = useState('');
   const [fct, setFct] = useState('');
   const [ff, setFf] = useState('');
   const [sort, setSort] = useState<{ k: keyof Investor; d: 1 | -1 }>({ k: 'updated_at', d: -1 });
@@ -209,7 +207,6 @@ export default function Dashboard() {
     const r = fieldRows.filter(
       (i) =>
         (!fs || i.status === fs) &&
-        (!ft || i.investor_type === ft) &&
         (!fct || ((i as any).client_type || 'new lead') === fct) &&
         (!ff || i.fit_score === +ff) &&
         (!s ||
@@ -218,8 +215,6 @@ export default function Dashboard() {
             i.firm,
             i.email,
             i.location,
-            i.thesis_notes,
-            i.stage_focus,
             (i as any).lead_source,
             (i as any).owner,
           ]
@@ -232,11 +227,11 @@ export default function Dashboard() {
       const y = b[sort.k] as any;
       return (typeof x === 'number' ? x - y : String(x ?? '').localeCompare(String(y ?? ''))) * sort.d;
     });
-  }, [fieldRows, q, fs, ft, fct, ff, sort]);
+  }, [fieldRows, q, fs, fct, ff, sort]);
 
   const kpiMetrics = useMemo(() => {
     const s = sum.data;
-    const valOf = (i: Investor) => Number((i as any).deal_value) || (i.investor_type === 'PREMIUM' ? 4500 : 2500);
+    const valOf = (i: Investor) => Number((i as any).deal_value) || 2500;
     const totalPipelineVal = s?.total_pipeline_value ?? rows.reduce((acc, i) => acc + valOf(i), 0);
     const weightedForecast =
       s?.pipeline_forecast ??
@@ -372,7 +367,7 @@ export default function Dashboard() {
     { id: 'contacts', label: 'Contacts', icon: Users, badge: fieldRows.length },
     { id: 'deals', label: 'Deals (Kanban)', icon: Kanban, badge: rows.length },
     { id: 'reports', label: 'Reports & Forecast', icon: BarChart3 },
-    { id: 'campaigns', label: 'Campaigns', icon: Send, badge: campaignsQuery.data?.length || 5 },
+    { id: 'campaigns', label: 'Campaigns', icon: Send, badge: campaignsQuery.data?.length || 3 },
     { id: 'phone', label: 'Telnyx & Gong AI', icon: PhoneCall, badge: callsQuery.data?.length || 0 },
     { id: 'whatsapp', label: 'WhatsApp', icon: MessageSquare, badge: whatsappQuery.data?.length || 0 },
     { id: 'team', label: 'Team Workspaces', icon: UserCheck, badge: usersQuery.data?.length || 4 },
@@ -457,7 +452,7 @@ export default function Dashboard() {
             </select>
           </div>
 
-          <div role="group" aria-label="Expert field filter" className="flex rounded-lg border bg-slate-100 p-0.5">
+          <div className="flex items-center gap-2"><span className="text-xs font-semibold uppercase tracking-wider text-slate-500">MARKET / REGION:</span><div role="group" aria-label="MARKET / REGION" className="flex rounded-lg border bg-slate-100 p-0.5">
             {EXPERT_FIELD_FILTERS.map(({ value, label }) => (
               <button
                 key={value}
@@ -471,7 +466,7 @@ export default function Dashboard() {
                 {label}
               </button>
             ))}
-          </div>
+          </div></div>
 
           <div className="ml-auto flex flex-wrap items-center gap-2">
             <button
@@ -642,12 +637,6 @@ export default function Dashboard() {
                     <option key={x} value={x}>
                       {x}
                     </option>
-                  ))}
-                </select>
-                <select data-testid="filter-type" className={sel} value={ft} onChange={(e) => setFt(e.target.value)}>
-                  <option value="">All tiers</option>
-                  {TYPES.map((x) => (
-                    <option key={x}>{x}</option>
                   ))}
                 </select>
                 <select data-testid="filter-fit" className={sel} value={ff} onChange={(e) => setFf(e.target.value)}>

@@ -107,8 +107,6 @@ export type InvestorInputExpertField = typeof InvestorInputExpertField[keyof typ
 
 
 export const InvestorInputExpertField = {
-  Dentistry: 'Dentistry',
-  Economics: 'Economics',
   Law_Firms: 'Law Firms',
   Chinese_Law: 'Chinese Law',
   Indian_Law: 'Indian Law',
@@ -173,8 +171,6 @@ export type InvestorUpdateExpertField = typeof InvestorUpdateExpertField[keyof t
 
 
 export const InvestorUpdateExpertField = {
-  Dentistry: 'Dentistry',
-  Economics: 'Economics',
   Law_Firms: 'Law Firms',
   Chinese_Law: 'Chinese Law',
   Indian_Law: 'Indian Law',
@@ -246,8 +242,6 @@ export type InvestorExpertField = typeof InvestorExpertField[keyof typeof Invest
 
 
 export const InvestorExpertField = {
-  Dentistry: 'Dentistry',
-  Economics: 'Economics',
   Law_Firms: 'Law Firms',
   Chinese_Law: 'Chinese Law',
   Indian_Law: 'Indian Law',
@@ -401,8 +395,6 @@ export type GetSummaryExpertField = typeof GetSummaryExpertField[keyof typeof Ge
 
 
 export const GetSummaryExpertField = {
-  Dentistry: 'Dentistry',
-  Economics: 'Economics',
   Law_Firms: 'Law Firms',
   Chinese_Law: 'Chinese Law',
   Indian_Law: 'Indian Law',
@@ -420,8 +412,6 @@ export type BrowserGetSummaryExpertField = typeof BrowserGetSummaryExpertField[k
 
 
 export const BrowserGetSummaryExpertField = {
-  Dentistry: 'Dentistry',
-  Economics: 'Economics',
   Law_Firms: 'Law Firms',
   Chinese_Law: 'Chinese Law',
   Indian_Law: 'Indian Law',

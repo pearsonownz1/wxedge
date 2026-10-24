@@ -10,8 +10,6 @@ export type InvestorExpertField = typeof InvestorExpertField[keyof typeof Invest
 
 
 export const InvestorExpertField = {
-  Dentistry: 'Dentistry',
-  Economics: 'Economics',
   Law_Firms: 'Law Firms',
   Chinese_Law: 'Chinese Law',
   Indian_Law: 'Indian Law',

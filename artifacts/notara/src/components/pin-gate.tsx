@@ -67,7 +67,7 @@ export function PinGate({ children }: { children: ReactNode }) {
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600 font-bold text-white shadow">SH</div>
           <div>
             <div className="font-display text-xl font-bold tracking-tight">SellingHighs CRM</div>
-            <div className="text-[11px] text-blue-200/80">Revenue & Outbound Intelligence</div>
+            <div className="text-[11px] text-blue-200/80">SellingHighs CRM — Law Firm Pipeline</div>
           </div>
         </div>
         <div>

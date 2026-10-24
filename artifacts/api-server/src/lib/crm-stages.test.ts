@@ -61,7 +61,7 @@ test("Production-shaped migration plans preserve 180 records and change only 169
 
 test("Closed stages exclude follow-ups without inventing successful responses; old won history remains", () => {
   const experts = [1, 2].map(id => ({
-    id, name: `Example ${id}`, status: "Closed", expert_field: "Dentistry",
+    id, name: `Example ${id}`, status: "Closed", expert_field: "Law Firms",
     next_follow_up_date: "2026-10-09", last_contacted_date: "", activity_log: id === 1
       ? [{ id: "1", timestamp: "2026-10-09T12:00:00Z", message: "Preserved history", kind: "stage_migration:Committed" }]
       : [],

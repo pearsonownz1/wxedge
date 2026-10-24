@@ -23,6 +23,13 @@ import { logger } from "../lib/logger";
 
 const TELNYX_CONNECTION_ID = process.env.TELNYX_CONNECTION_ID || "3077013926030869814";
 const TELNYX_FROM_NUMBER = process.env.TELNYX_FROM_NUMBER || "+15619031414";
+export const EXPERT_FIELDS = ["Law Firms", "Chinese Law", "Indian Law"] as const;
+export const EXPERT_FIELD_FILTERS = [
+  { value: "Law Firms", label: "Law Firms" },
+  { value: "Chinese Law", label: "Chinese Law" },
+  { value: "Indian Law", label: "Indian Law" },
+  { value: "All", label: "All" },
+] as const;
 
 const router = Router();
 
@@ -36,8 +43,6 @@ router.get("/summary", async (req, res) => {
   const expertField = req.query.expert_field;
   if (
     expertField !== undefined &&
-    expertField !== "Dentistry" &&
-    expertField !== "Economics" &&
     expertField !== "Law Firms" &&
     expertField !== "Chinese Law" &&
     expertField !== "Indian Law"
@@ -388,7 +393,7 @@ router.get("/whatsapp", async (req, res) => {
   res.json(r.rows);
 });
 
-router.post("/whatsapp", async (req, res) => {
+const handleWhatsAppSend = async (req: import("express").Request, res: import("express").Response) => {
   const body = req.body || {};
   const text = String(body.body || body.message || "").trim();
   const phone = String(body.phone || body.to || "").trim();
@@ -417,7 +422,9 @@ router.post("/whatsapp", async (req, res) => {
     return ins.rows[0];
   });
   res.status(201).json(created);
-});
+};
+router.post("/whatsapp", handleWhatsAppSend);
+router.post("/whatsapp/send", handleWhatsAppSend);
 
 // Outbound Campaigns Summary API
 router.get("/campaigns", async (_req, res) => {
@@ -443,8 +450,6 @@ router.get("/campaigns", async (_req, res) => {
     { name: "law-firms-niw-q4", field: "Law Firms" },
     { name: "indian-law-eb2-partner", field: "Indian Law" },
     { name: "chinese-law-niw-outreach", field: "Chinese Law" },
-    { name: "dentistry-faculty-experts", field: "Dentistry" },
-    { name: "economics-phd-reviewers", field: "Economics" },
   ];
   for (const d of defaults) {
     const matching = investors.filter(i => i.expert_field === d.field);

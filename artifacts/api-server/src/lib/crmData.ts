@@ -6,6 +6,14 @@ import { nextStageForEvent, normalizeStage, STAGE_PROBABILITIES, STAGES, type St
 export const STATUSES: string[] = [...STAGES];
 export const CLIENT_TYPES = ["new lead", "cold client", "active client"] as const;
 export type ClientType = typeof CLIENT_TYPES[number];
+export const EXPERT_FIELDS = ["Law Firms", "Chinese Law", "Indian Law"] as const;
+export type ExpertField = typeof EXPERT_FIELDS[number];
+export const EXPERT_FIELD_FILTERS = [
+  { value: "Law Firms", label: "Law Firms" },
+  { value: "Chinese Law", label: "Chinese Law" },
+  { value: "Indian Law", label: "Indian Law" },
+  { value: "All", label: "All" },
+] as const;
 
 export const FIELDS = [
   "name", "firm", "title", "email", "linkedin_url", "website", "location",
@@ -166,7 +174,7 @@ export async function getInvestor(client: Client, id: number): Promise<Investor>
   const phone = extractPhoneFromRecord(rawData);
   return {
     ...rawData,
-    expert_field: rawData.expert_field || "Dentistry",
+    expert_field: rawData.expert_field || "Law Firms",
     lead_source: leadSource,
     deal_value: dealVal,
     expected_close_date: rawData.expected_close_date || "",
@@ -214,7 +222,7 @@ export async function listInvestors(client: Client, status?: string, owner?: str
       const phone = extractPhoneFromRecord(rawData);
       return {
         ...rawData,
-        expert_field: rawData.expert_field || "Dentistry",
+        expert_field: rawData.expert_field || "Law Firms",
         lead_source: leadSource,
         deal_value: dealVal,
         expected_close_date: rawData.expected_close_date || "",
@@ -251,6 +259,22 @@ export async function deleteInvestor(client: Client, id: number) {
 
 export async function deduplicateInvestors(client: Client) {
   const deletedIds: number[] = [];
+  // 0. Purge any non-law-firm rows (e.g. legacy Dentistry / Economics) and campaigns
+  try {
+    const legacyRows = await client.query(
+      "SELECT id FROM crm_investors WHERE coalesce(data->>'expert_field', '') NOT IN ('Law Firms', 'Chinese Law', 'Indian Law') ORDER BY id"
+    );
+    if (legacyRows.rows.length > 0) {
+      await client.query("DELETE FROM crm_activities WHERE investor_id IN (SELECT id FROM crm_investors WHERE coalesce(data->>'expert_field', '') NOT IN ('Law Firms', 'Chinese Law', 'Indian Law'))");
+      try { await client.query("DELETE FROM crm_calls WHERE investor_id IN (SELECT id FROM crm_investors WHERE coalesce(data->>'expert_field', '') NOT IN ('Law Firms', 'Chinese Law', 'Indian Law'))"); } catch {}
+      try { await client.query("DELETE FROM crm_whatsapp_messages WHERE investor_id IN (SELECT id FROM crm_investors WHERE coalesce(data->>'expert_field', '') NOT IN ('Law Firms', 'Chinese Law', 'Indian Law'))"); } catch {}
+      await client.query("DELETE FROM crm_investors WHERE coalesce(data->>'expert_field', '') NOT IN ('Law Firms', 'Chinese Law', 'Indian Law')");
+      for (const r of legacyRows.rows) deletedIds.push(Number(r.id));
+    }
+    await client.query("DELETE FROM crm_campaigns WHERE field NOT IN ('Law Firms', 'Chinese Law', 'Indian Law', 'All')");
+  } catch {
+    // Ignore in unit test mocks
+  }
   // 1. Purge the 6 known duplicate Law Firms rows (347..352) when their original (293, 300, 301, 302, 303, 346) exists
   for (const [keepId, dupId] of KNOWN_DUPLICATE_PAIRS) {
     const check = await client.query("SELECT id, data FROM crm_investors WHERE id IN ($1, $2) ORDER BY id", [keepId, dupId]);
@@ -267,7 +291,7 @@ export async function deduplicateInvestors(client: Client) {
     const d = (r.data || {}) as Record<string, unknown>;
     const firm = String(d.firm || "").trim().toLowerCase();
     const name = String(d.name || "").trim().toLowerCase();
-    const field = String(d.expert_field || "Dentistry").trim().toLowerCase();
+    const field = String(d.expert_field || "Law Firms").trim().toLowerCase();
     if (!firm || !name) continue;
     const key = `${field}::${firm}::${name}`;
     if (seen.has(key)) {
@@ -294,12 +318,12 @@ export async function upsert(client: Client, raw: unknown, id?: number) {
 
   // Also prevent duplicate creation on (expert_field, lower(firm), lower(name)) when both firm and name are provided
   if (id === undefined && input.firm?.trim() && input.name?.trim()) {
-    const targetField = input.expert_field || "Dentistry";
+    const targetField = input.expert_field || "Law Firms";
     const targetFirm = input.firm.trim().toLowerCase();
     const targetName = input.name.trim().toLowerCase();
     try {
       const dupCheck = await client.query(
-        "SELECT id,data FROM crm_investors WHERE coalesce(data->>'expert_field','Dentistry')=$1 AND lower(trim(coalesce(data->>'firm','')))=$2 AND lower(trim(coalesce(data->>'name','')))=$3 ORDER BY id LIMIT 1",
+        "SELECT id,data FROM crm_investors WHERE coalesce(data->>'expert_field','Law Firms')=$1 AND lower(trim(coalesce(data->>'firm','')))=$2 AND lower(trim(coalesce(data->>'name','')))=$3 ORDER BY id LIMIT 1",
         [targetField, targetFirm, targetName],
       );
       if (dupCheck.rows[0]) id = dupCheck.rows[0].id;
@@ -313,7 +337,7 @@ export async function upsert(client: Client, raw: unknown, id?: number) {
   const defaults = {
     ...Object.fromEntries(FIELDS.map(key => [key, ""])),
     investor_type: "STANDARD",
-    expert_field: "Dentistry",
+    expert_field: "Law Firms",
     fit_score: 3,
     status: "New",
     lead_source: "Outbound",
@@ -462,7 +486,7 @@ export function summary(
   expertField?: Investor["expert_field"],
   filters?: { owner?: string; range?: string; from?: string; to?: string },
 ) {
-  if (expertField) investors = investors.filter(i => (i.expert_field || "Dentistry") === expertField);
+  if (expertField) investors = investors.filter(i => (i.expert_field || "Law Firms") === expertField);
   if (filters?.owner && filters.owner.trim() && filters.owner.trim().toLowerCase() !== "all") {
     const targetOwner = filters.owner.trim().toLowerCase();
     investors = investors.filter(i => (i.owner || "Guy").trim().toLowerCase() === targetOwner);

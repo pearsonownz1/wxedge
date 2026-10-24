@@ -36,40 +36,40 @@ function memoryClient(rows: Row[] = []) {
 test("Legacy reads return Dentistry without updating or backfilling stored data", async () => {
   const memory = memoryClient([{ id: 1, data: { name: "Legacy", notes: "Keep" }, created_at: now, updated_at: now }]);
   const before = JSON.stringify(memory.rows);
-  assert.equal((await getInvestor(memory.client, 1)).expert_field, "Dentistry");
+  assert.equal((await getInvestor(memory.client, 1)).expert_field, "Law Firms");
   assert.equal(JSON.stringify(memory.rows), before);
   assert.ok(memory.calls.every(sql => sql.startsWith("SELECT")));
 });
 
 test("API persists field choices, defaults new records to Dentistry, and preserves Economics on unrelated edits", async () => {
   const memory = memoryClient();
-  assert.equal((await upsert(memory.client, { name: "Dentist" })).investor.expert_field, "Dentistry");
-  const created = await upsert(memory.client, { name: "Economist", expert_field: "Economics" });
-  assert.equal(created.investor.expert_field, "Economics");
+  assert.equal((await upsert(memory.client, { name: "Dentist" })).investor.expert_field, "Law Firms");
+  const created = await upsert(memory.client, { name: "Economist", expert_field: "Chinese Law" });
+  assert.equal(created.investor.expert_field, "Chinese Law");
   const edited = await upsert(memory.client, { notes: "Changed note" }, created.investor.id);
-  assert.equal(edited.investor.expert_field, "Economics");
+  assert.equal(edited.investor.expert_field, "Chinese Law");
   assert.equal(edited.investor.notes, "Changed note");
-  assert.equal((await upsert(memory.client, { expert_field: "Dentistry" }, created.investor.id)).investor.expert_field, "Dentistry");
+  assert.equal((await upsert(memory.client, { expert_field: "Law Firms" }, created.investor.id)).investor.expert_field, "Law Firms");
   assert.equal(validateInput({ notes: "No field change" }).expert_field, undefined);
   assert.throws(() => validateInput({ expert_field: "Medicine" }), /expert_field/);
 });
 
 test("CSV field is optional, case-insensitive, defaults blanks, rejects invalid values, and round-trips", async () => {
-  assert.equal(csvExpertField(" DENTISTRY "), "Dentistry");
-  assert.equal(csvExpertField(" eConOMics "), "Economics");
-  assert.equal(csvExpertField("  "), "Dentistry");
+  assert.equal(csvExpertField(" LAW FIRMS "), "Law Firms");
+  assert.equal(csvExpertField(" cHiNeSe LaW "), "Chinese Law");
+  assert.equal(csvExpertField("  "), "Law Firms");
   const memory = memoryClient();
-  await importCsv(memory.client, "name,email,expert_field\nEconomist,e@example.test,eCONOMics\nDentist,d@example.test,\n");
+  await importCsv(memory.client, "name,email,expert_field\nEconomist,e@example.test,cHiNeSe LaW\nDentist,d@example.test,\n");
   await importCsv(memory.client, "name,email\nRenamed,e@example.test\nLegacy CSV,l@example.test");
-  assert.equal(memory.rows[0].data.expert_field, "Economics");
-  assert.equal(memory.rows[1].data.expert_field, "Dentistry");
-  assert.equal(memory.rows[2].data.expert_field, "Dentistry");
+  assert.equal(memory.rows[0].data.expert_field, "Chinese Law");
+  assert.equal(memory.rows[1].data.expert_field, "Law Firms");
+  assert.equal(memory.rows[2].data.expert_field, "Law Firms");
   const before = JSON.stringify(memory.rows);
   await assert.rejects(importCsv(memory.client, "name,expert_field\nInvalid,Medicine"), /CSV row 2.*expert_field/);
   assert.equal(JSON.stringify(memory.rows), before);
   const experts = await Promise.all(memory.rows.map(r => getInvestor(memory.client, r.id)));
   const [headers, ...values] = parseCsv(exportCsv(experts));
-  assert.deepEqual(values.map(row => row[headers.indexOf("expert_field")]), ["Economics", "Dentistry", "Dentistry"]);
+  assert.deepEqual(values.map(row => row[headers.indexOf("expert_field")]), ["Chinese Law", "Law Firms", "Law Firms"]);
 });
 
 test("CSV matches shuffled headers including expert_field, without modifying unrelated records", async () => {
@@ -104,7 +104,7 @@ test("CSV accepts legacy stage names across all expert categories and exports on
     ["Won", "Closed"], ["Lost", "Closed"], ["Closed", "Closed"], ["Passed", "Closed"], ["Committed", "Closed"],
   ];
   const memory = memoryClient();
-  for (const category of ["Dentistry", "Economics", "Law Firms", "Chinese Law", "Indian Law"]) {
+  for (const category of ["Law Firms", "Chinese Law", "Law Firms", "Chinese Law", "Indian Law"]) {
     const csv = "expert_field,status,name\n" + mappings.map(([stage], index) => `${category},${stage},Sample ${index}`).join("\n");
     await importCsv(memory.client, csv);
   }
@@ -116,7 +116,7 @@ test("CSV accepts legacy stage names across all expert categories and exports on
 
 test("CSV errors identify the row, field and original rejected value", async () => {
   const cases = [
-    ["expert_field", "Law_Firms", /Dentistry, Economics, Law Firms, Chinese Law or Indian Law/],
+    ["expert_field", "Law_Firms", /Law Firms, Chinese Law or Indian Law/],
     ["investor_type", "Law Firms", /STANDARD/],
     ["fit_score", "excellent", /number/],
     ["fit_score", "6", /5/],
@@ -243,8 +243,8 @@ test("Law Firms starts empty, accepts creation and CSV import, and preserves exi
   const experts = await Promise.all(memory.rows.map(r => getInvestor(memory.client, r.id)));
   assert.equal(summary(experts, now, "Law Firms").total, 2);
   assert.equal(summary(experts, now, "Law Firms").counts.New, 2);
-  assert.equal(summary(experts, now, "Dentistry").total, 1);
-  assert.equal(summary(experts, now, "Economics").total, 0);
+  assert.equal(summary(experts, now, "Law Firms").total, 1);
+  assert.equal(summary(experts, now, "Chinese Law").total, 0);
   assert.equal(summary(experts, now).total, 3);
   assert.equal(JSON.stringify(existing), before);
 });
@@ -262,11 +262,11 @@ test("Every summary metric and status count uses the selected field, including l
   };
   const records = [
     make(1, undefined, {}),
-    make(2, "Dentistry", { status: "Proposal sent", last_contacted_date: "2026-10-06", next_follow_up_date: "2026-10-07" }),
-    make(3, "Economics", { status: "Meeting set", last_contacted_date: "2026-10-05" }),
+    make(2, "Law Firms", { status: "Proposal sent", last_contacted_date: "2026-10-06", next_follow_up_date: "2026-10-07" }),
+    make(3, "Chinese Law", { status: "Meeting set", last_contacted_date: "2026-10-05" }),
   ];
-  const dentists = summary(records, now, "Dentistry");
-  const economists = summary(records, now, "Economics");
+  const dentists = summary(records, now, "Law Firms");
+  const economists = summary(records, now, "Chinese Law");
   const all = summary(records, now);
   assert.deepEqual([dentists.total, dentists.contacted_this_week, dentists.responses, dentists.response_rate, dentists.meetings_set, dentists.followups_due_today], [2, 1, 1, 1, 0, 1]);
   assert.deepEqual([economists.total, economists.contacted_this_week, economists.responses, economists.response_rate, economists.meetings_set, economists.followups_due_today], [1, 1, 1, 1, 1, 0]);
