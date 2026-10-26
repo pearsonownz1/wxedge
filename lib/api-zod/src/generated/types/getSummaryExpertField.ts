@@ -10,6 +10,8 @@ export type GetSummaryExpertField = typeof GetSummaryExpertField[keyof typeof Ge
 
 
 export const GetSummaryExpertField = {
+  Dentistry: 'Dentistry',
+  Economics: 'Economics',
   Law_Firms: 'Law Firms',
   Chinese_Law: 'Chinese Law',
   Indian_Law: 'Indian Law',

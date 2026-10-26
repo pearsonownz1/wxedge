@@ -230,7 +230,7 @@ test("Chinese Law supports creation, editing, CSV import and scoped counts witho
 });
 
 test("Law Firms starts empty, accepts creation and CSV import, and preserves existing records", async () => {
-  const existing = { id: 1, data: { name: "Existing dentist", notes: "Keep" }, created_at: now, updated_at: now };
+  const existing = { id: 1, data: { name: "Existing dentist", expert_field: "Dentistry", notes: "Keep" }, created_at: now, updated_at: now };
   const memory = memoryClient([existing]);
   const before = JSON.stringify(existing);
   const original = await getInvestor(memory.client, 1);
@@ -243,7 +243,7 @@ test("Law Firms starts empty, accepts creation and CSV import, and preserves exi
   const experts = await Promise.all(memory.rows.map(r => getInvestor(memory.client, r.id)));
   assert.equal(summary(experts, now, "Law Firms").total, 2);
   assert.equal(summary(experts, now, "Law Firms").counts.New, 2);
-  assert.equal(summary(experts, now, "Law Firms").total, 1);
+  assert.equal(summary(experts, now, "Dentistry").total, 1);
   assert.equal(summary(experts, now, "Chinese Law").total, 0);
   assert.equal(summary(experts, now).total, 3);
   assert.equal(JSON.stringify(existing), before);

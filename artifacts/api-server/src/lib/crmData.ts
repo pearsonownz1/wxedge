@@ -6,12 +6,14 @@ import { nextStageForEvent, normalizeStage, STAGE_PROBABILITIES, STAGES, type St
 export const STATUSES: string[] = [...STAGES];
 export const CLIENT_TYPES = ["new lead", "cold client", "active client"] as const;
 export type ClientType = typeof CLIENT_TYPES[number];
-export const EXPERT_FIELDS = ["Law Firms", "Chinese Law", "Indian Law"] as const;
+export const EXPERT_FIELDS = ["Law Firms", "Chinese Law", "Indian Law", "Dentistry", "Economics"] as const;
 export type ExpertField = typeof EXPERT_FIELDS[number];
 export const EXPERT_FIELD_FILTERS = [
   { value: "Law Firms", label: "Law Firms" },
   { value: "Chinese Law", label: "Chinese Law" },
   { value: "Indian Law", label: "Indian Law" },
+  { value: "Dentistry", label: "Dentists" },
+  { value: "Economics", label: "Economists" },
   { value: "All", label: "All" },
 ] as const;
 
@@ -259,22 +261,7 @@ export async function deleteInvestor(client: Client, id: number) {
 
 export async function deduplicateInvestors(client: Client) {
   const deletedIds: number[] = [];
-  // 0. Purge any non-law-firm rows (e.g. legacy Dentistry / Economics) and campaigns
-  try {
-    const legacyRows = await client.query(
-      "SELECT id FROM crm_investors WHERE coalesce(data->>'expert_field', '') NOT IN ('Law Firms', 'Chinese Law', 'Indian Law') ORDER BY id"
-    );
-    if (legacyRows.rows.length > 0) {
-      await client.query("DELETE FROM crm_activities WHERE investor_id IN (SELECT id FROM crm_investors WHERE coalesce(data->>'expert_field', '') NOT IN ('Law Firms', 'Chinese Law', 'Indian Law'))");
-      try { await client.query("DELETE FROM crm_calls WHERE investor_id IN (SELECT id FROM crm_investors WHERE coalesce(data->>'expert_field', '') NOT IN ('Law Firms', 'Chinese Law', 'Indian Law'))"); } catch {}
-      try { await client.query("DELETE FROM crm_whatsapp_messages WHERE investor_id IN (SELECT id FROM crm_investors WHERE coalesce(data->>'expert_field', '') NOT IN ('Law Firms', 'Chinese Law', 'Indian Law'))"); } catch {}
-      await client.query("DELETE FROM crm_investors WHERE coalesce(data->>'expert_field', '') NOT IN ('Law Firms', 'Chinese Law', 'Indian Law')");
-      for (const r of legacyRows.rows) deletedIds.push(Number(r.id));
-    }
-    await client.query("DELETE FROM crm_campaigns WHERE field NOT IN ('Law Firms', 'Chinese Law', 'Indian Law', 'All')");
-  } catch {
-    // Ignore in unit test mocks
-  }
+  // Keep both Sales (Law Firms, Chinese Law, Indian Law) and Experts (Dentistry, Economics) workspaces intact
   // 1. Purge the 6 known duplicate Law Firms rows (347..352) when their original (293, 300, 301, 302, 303, 346) exists
   for (const [keepId, dupId] of KNOWN_DUPLICATE_PAIRS) {
     const check = await client.query("SELECT id, data FROM crm_investors WHERE id IN ($1, $2) ORDER BY id", [keepId, dupId]);
@@ -484,8 +471,13 @@ export function summary(
   investors: Awaited<ReturnType<typeof listInvestors>>,
   now = new Date(),
   expertField?: Investor["expert_field"],
-  filters?: { owner?: string; range?: string; from?: string; to?: string },
+  filters?: { owner?: string; range?: string; from?: string; to?: string; workspace?: string },
 ) {
+  if (filters?.workspace === "sales") {
+    investors = investors.filter(i => ["Law Firms", "Chinese Law", "Indian Law"].includes(i.expert_field || "Law Firms"));
+  } else if (filters?.workspace === "experts") {
+    investors = investors.filter(i => ["Dentistry", "Economics"].includes(i.expert_field || ""));
+  }
   if (expertField) investors = investors.filter(i => (i.expert_field || "Law Firms") === expertField);
   if (filters?.owner && filters.owner.trim() && filters.owner.trim().toLowerCase() !== "all") {
     const targetOwner = filters.owner.trim().toLowerCase();

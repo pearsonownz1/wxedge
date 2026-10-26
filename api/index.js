@@ -46744,7 +46744,7 @@ var ListInvestorsResponseItem = objectType({
     "message": stringType(),
     "kind": stringType()
   })),
-  "expert_field": enumType(["Law Firms", "Chinese Law", "Indian Law"]),
+  "expert_field": enumType(["Dentistry", "Economics", "Law Firms", "Chinese Law", "Indian Law"]),
   "lead_source": stringType().optional(),
   "deal_value": unionType([numberType(), stringType()]).optional(),
   "expected_close_date": stringType().optional(),
@@ -46776,7 +46776,7 @@ var UpsertInvestorBody = objectType({
   "investor_type": enumType(["STANDARD", "PREMIUM"]).optional(),
   "fit_score": numberType().min(1).max(upsertInvestorBodyFitScoreMax).optional(),
   "status": enumType(["New", "Contacted", "Meeting set", "Proposal sent", "Contract review", "Closed"]).optional(),
-  "expert_field": enumType(["Law Firms", "Chinese Law", "Indian Law"]).optional(),
+  "expert_field": enumType(["Dentistry", "Economics", "Law Firms", "Chinese Law", "Indian Law"]).optional(),
   "lead_source": stringType().optional(),
   "deal_value": unionType([numberType(), stringType()]).optional(),
   "expected_close_date": stringType().optional(),
@@ -46816,7 +46816,7 @@ var UpsertInvestorResponse = objectType({
     "message": stringType(),
     "kind": stringType()
   })),
-  "expert_field": enumType(["Law Firms", "Chinese Law", "Indian Law"]),
+  "expert_field": enumType(["Dentistry", "Economics", "Law Firms", "Chinese Law", "Indian Law"]),
   "lead_source": stringType().optional(),
   "deal_value": unionType([numberType(), stringType()]).optional(),
   "expected_close_date": stringType().optional(),
@@ -46859,7 +46859,7 @@ var BrowserListInvestorsResponseItem = objectType({
     "message": stringType(),
     "kind": stringType()
   })),
-  "expert_field": enumType(["Law Firms", "Chinese Law", "Indian Law"]),
+  "expert_field": enumType(["Dentistry", "Economics", "Law Firms", "Chinese Law", "Indian Law"]),
   "lead_source": stringType().optional(),
   "deal_value": unionType([numberType(), stringType()]).optional(),
   "expected_close_date": stringType().optional(),
@@ -46891,7 +46891,7 @@ var BrowserUpsertInvestorBody = objectType({
   "investor_type": enumType(["STANDARD", "PREMIUM"]).optional(),
   "fit_score": numberType().min(1).max(browserUpsertInvestorBodyFitScoreMax).optional(),
   "status": enumType(["New", "Contacted", "Meeting set", "Proposal sent", "Contract review", "Closed"]).optional(),
-  "expert_field": enumType(["Law Firms", "Chinese Law", "Indian Law"]).optional(),
+  "expert_field": enumType(["Dentistry", "Economics", "Law Firms", "Chinese Law", "Indian Law"]).optional(),
   "lead_source": stringType().optional(),
   "deal_value": unionType([numberType(), stringType()]).optional(),
   "expected_close_date": stringType().optional(),
@@ -46931,7 +46931,7 @@ var BrowserUpsertInvestorResponse = objectType({
     "message": stringType(),
     "kind": stringType()
   })),
-  "expert_field": enumType(["Law Firms", "Chinese Law", "Indian Law"]),
+  "expert_field": enumType(["Dentistry", "Economics", "Law Firms", "Chinese Law", "Indian Law"]),
   "lead_source": stringType().optional(),
   "deal_value": unionType([numberType(), stringType()]).optional(),
   "expected_close_date": stringType().optional(),
@@ -46974,7 +46974,7 @@ var GetInvestorResponse = objectType({
     "message": stringType(),
     "kind": stringType()
   })),
-  "expert_field": enumType(["Law Firms", "Chinese Law", "Indian Law"]),
+  "expert_field": enumType(["Dentistry", "Economics", "Law Firms", "Chinese Law", "Indian Law"]),
   "lead_source": stringType().optional(),
   "deal_value": unionType([numberType(), stringType()]).optional(),
   "expected_close_date": stringType().optional(),
@@ -47008,7 +47008,7 @@ var UpdateInvestorBody = objectType({
   "investor_type": enumType(["STANDARD", "PREMIUM"]).optional(),
   "fit_score": numberType().min(1).max(updateInvestorBodyFitScoreMax).optional(),
   "status": enumType(["New", "Contacted", "Meeting set", "Proposal sent", "Contract review", "Closed"]).optional(),
-  "expert_field": enumType(["Law Firms", "Chinese Law", "Indian Law"]).optional(),
+  "expert_field": enumType(["Dentistry", "Economics", "Law Firms", "Chinese Law", "Indian Law"]).optional(),
   "lead_source": stringType().optional(),
   "deal_value": unionType([numberType(), stringType()]).optional(),
   "expected_close_date": stringType().optional(),
@@ -47048,7 +47048,7 @@ var UpdateInvestorResponse = objectType({
     "message": stringType(),
     "kind": stringType()
   })),
-  "expert_field": enumType(["Law Firms", "Chinese Law", "Indian Law"]),
+  "expert_field": enumType(["Dentistry", "Economics", "Law Firms", "Chinese Law", "Indian Law"]),
   "lead_source": stringType().optional(),
   "deal_value": unionType([numberType(), stringType()]).optional(),
   "expected_close_date": stringType().optional(),
@@ -47091,7 +47091,7 @@ var BrowserGetInvestorResponse = objectType({
     "message": stringType(),
     "kind": stringType()
   })),
-  "expert_field": enumType(["Law Firms", "Chinese Law", "Indian Law"]),
+  "expert_field": enumType(["Dentistry", "Economics", "Law Firms", "Chinese Law", "Indian Law"]),
   "lead_source": stringType().optional(),
   "deal_value": unionType([numberType(), stringType()]).optional(),
   "expected_close_date": stringType().optional(),
@@ -47125,7 +47125,7 @@ var BrowserUpdateInvestorBody = objectType({
   "investor_type": enumType(["STANDARD", "PREMIUM"]).optional(),
   "fit_score": numberType().min(1).max(browserUpdateInvestorBodyFitScoreMax).optional(),
   "status": enumType(["New", "Contacted", "Meeting set", "Proposal sent", "Contract review", "Closed"]).optional(),
-  "expert_field": enumType(["Law Firms", "Chinese Law", "Indian Law"]).optional(),
+  "expert_field": enumType(["Dentistry", "Economics", "Law Firms", "Chinese Law", "Indian Law"]).optional(),
   "lead_source": stringType().optional(),
   "deal_value": unionType([numberType(), stringType()]).optional(),
   "expected_close_date": stringType().optional(),
@@ -47165,7 +47165,7 @@ var BrowserUpdateInvestorResponse = objectType({
     "message": stringType(),
     "kind": stringType()
   })),
-  "expert_field": enumType(["Law Firms", "Chinese Law", "Indian Law"]),
+  "expert_field": enumType(["Dentistry", "Economics", "Law Firms", "Chinese Law", "Indian Law"]),
   "lead_source": stringType().optional(),
   "deal_value": unionType([numberType(), stringType()]).optional(),
   "expected_close_date": stringType().optional(),
@@ -47212,7 +47212,7 @@ var AppendActivityResponse = objectType({
     "message": stringType(),
     "kind": stringType()
   })),
-  "expert_field": enumType(["Law Firms", "Chinese Law", "Indian Law"]),
+  "expert_field": enumType(["Dentistry", "Economics", "Law Firms", "Chinese Law", "Indian Law"]),
   "lead_source": stringType().optional(),
   "deal_value": unionType([numberType(), stringType()]).optional(),
   "expected_close_date": stringType().optional(),
@@ -47259,7 +47259,7 @@ var BrowserAppendActivityResponse = objectType({
     "message": stringType(),
     "kind": stringType()
   })),
-  "expert_field": enumType(["Law Firms", "Chinese Law", "Indian Law"]),
+  "expert_field": enumType(["Dentistry", "Economics", "Law Firms", "Chinese Law", "Indian Law"]),
   "lead_source": stringType().optional(),
   "deal_value": unionType([numberType(), stringType()]).optional(),
   "expected_close_date": stringType().optional(),
@@ -47269,7 +47269,7 @@ var BrowserAppendActivityResponse = objectType({
   "phone": stringType().optional()
 });
 var GetSummaryQueryParams = objectType({
-  "expert_field": enumType(["Law Firms", "Chinese Law", "Indian Law"]).optional().describe("Restrict summary metrics to this field; records without a field count as Dentistry. Omit for all experts.")
+  "expert_field": enumType(["Dentistry", "Economics", "Law Firms", "Chinese Law", "Indian Law"]).optional().describe("Restrict summary metrics to this field; records without a field count as Dentistry. Omit for all experts.")
 });
 var GetSummaryResponse = objectType({
   "total": numberType(),
@@ -47281,7 +47281,7 @@ var GetSummaryResponse = objectType({
   "followups_due_today": numberType()
 });
 var BrowserGetSummaryQueryParams = objectType({
-  "expert_field": enumType(["Law Firms", "Chinese Law", "Indian Law"]).optional().describe("Restrict summary metrics to this field; records without a field count as Dentistry. Omit for all experts.")
+  "expert_field": enumType(["Dentistry", "Economics", "Law Firms", "Chinese Law", "Indian Law"]).optional().describe("Restrict summary metrics to this field; records without a field count as Dentistry. Omit for all experts.")
 });
 var BrowserGetSummaryResponse = objectType({
   "total": numberType(),
@@ -48084,26 +48084,6 @@ async function deleteInvestor(client, id2) {
 }
 async function deduplicateInvestors(client) {
   const deletedIds = [];
-  try {
-    const legacyRows = await client.query(
-      "SELECT id FROM crm_investors WHERE coalesce(data->>'expert_field', '') NOT IN ('Law Firms', 'Chinese Law', 'Indian Law') ORDER BY id"
-    );
-    if (legacyRows.rows.length > 0) {
-      await client.query("DELETE FROM crm_activities WHERE investor_id IN (SELECT id FROM crm_investors WHERE coalesce(data->>'expert_field', '') NOT IN ('Law Firms', 'Chinese Law', 'Indian Law'))");
-      try {
-        await client.query("DELETE FROM crm_calls WHERE investor_id IN (SELECT id FROM crm_investors WHERE coalesce(data->>'expert_field', '') NOT IN ('Law Firms', 'Chinese Law', 'Indian Law'))");
-      } catch {
-      }
-      try {
-        await client.query("DELETE FROM crm_whatsapp_messages WHERE investor_id IN (SELECT id FROM crm_investors WHERE coalesce(data->>'expert_field', '') NOT IN ('Law Firms', 'Chinese Law', 'Indian Law'))");
-      } catch {
-      }
-      await client.query("DELETE FROM crm_investors WHERE coalesce(data->>'expert_field', '') NOT IN ('Law Firms', 'Chinese Law', 'Indian Law')");
-      for (const r of legacyRows.rows) deletedIds.push(Number(r.id));
-    }
-    await client.query("DELETE FROM crm_campaigns WHERE field NOT IN ('Law Firms', 'Chinese Law', 'Indian Law', 'All')");
-  } catch {
-  }
   for (const [keepId, dupId] of KNOWN_DUPLICATE_PAIRS) {
     const check = await client.query("SELECT id, data FROM crm_investors WHERE id IN ($1, $2) ORDER BY id", [keepId, dupId]);
     if (check.rows.length === 2) {
@@ -48259,6 +48239,11 @@ async function logOutboundActivity(client, raw) {
   return getInvestor(client, investorId);
 }
 function summary(investors, now = /* @__PURE__ */ new Date(), expertField, filters) {
+  if (filters?.workspace === "sales") {
+    investors = investors.filter((i) => ["Law Firms", "Chinese Law", "Indian Law"].includes(i.expert_field || "Law Firms"));
+  } else if (filters?.workspace === "experts") {
+    investors = investors.filter((i) => ["Dentistry", "Economics"].includes(i.expert_field || ""));
+  }
   if (expertField) investors = investors.filter((i) => (i.expert_field || "Law Firms") === expertField);
   if (filters?.owner && filters.owner.trim() && filters.owner.trim().toLowerCase() !== "all") {
     const targetOwner = filters.owner.trim().toLowerCase();
@@ -48479,9 +48464,11 @@ function parseCsv(text2) {
 function csvExpertField(value) {
   const field = value.trim().toLowerCase();
   if (!field || field === "law firms") return "Law Firms";
+  if (field === "dentistry" || field === "dentists") return "Dentistry";
+  if (field === "economics" || field === "economists") return "Economics";
   if (field === "chinese law") return "Chinese Law";
   if (field === "indian law") return "Indian Law";
-  throw fieldError("expert_field", value, "expert_field must be Law Firms, Chinese Law or Indian Law");
+  throw fieldError("expert_field", value, "expert_field must be Dentistry, Economics, Law Firms, Chinese Law or Indian Law");
 }
 async function importCsv(client, text2) {
   const rows = parseCsv(text2);
@@ -48592,14 +48579,15 @@ function id(value) {
 }
 router3.get("/summary", async (req, res) => {
   const expertField = req.query.expert_field;
-  if (expertField !== void 0 && expertField !== "Law Firms" && expertField !== "Chinese Law" && expertField !== "Indian Law") {
+  if (expertField !== void 0 && expertField !== "Dentistry" && expertField !== "Economics" && expertField !== "Law Firms" && expertField !== "Chinese Law" && expertField !== "Indian Law") {
     throw new CrmError("Invalid expert field");
   }
   const owner = typeof req.query.owner === "string" ? req.query.owner : void 0;
   const range = typeof req.query.range === "string" ? req.query.range : void 0;
   const from = typeof req.query.from === "string" ? req.query.from : void 0;
   const to = typeof req.query.to === "string" ? req.query.to : void 0;
-  res.json(summary(await listInvestors(pool), /* @__PURE__ */ new Date(), expertField, { owner, range, from, to }));
+  const workspace = typeof req.query.workspace === "string" ? req.query.workspace : void 0;
+  res.json(summary(await listInvestors(pool), /* @__PURE__ */ new Date(), expertField, { owner, range, from, to, workspace }));
 });
 router3.get("/investors", async (req, res) => {
   const status = req.query.status;
@@ -49008,7 +48996,9 @@ router3.get("/campaigns", async (_req, res) => {
   const defaults2 = [
     { name: "law-firms-niw-q4", field: "Law Firms" },
     { name: "indian-law-eb2-partner", field: "Indian Law" },
-    { name: "chinese-law-niw-outreach", field: "Chinese Law" }
+    { name: "chinese-law-niw-outreach", field: "Chinese Law" },
+    { name: "dentistry-faculty-experts", field: "Dentistry" },
+    { name: "economics-phd-reviewers", field: "Economics" }
   ];
   for (const d of defaults2) {
     const matching = investors.filter((i) => i.expert_field === d.field);

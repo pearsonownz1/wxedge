@@ -13,33 +13,43 @@ import { Copy, Trash2, PhoneCall, MessageSquare, Send } from 'lucide-react';
 import {
   STATUSES,
   CLIENT_TYPES,
+  TYPES,
   FIELDS,
   EXPERT_FIELDS,
   expertFieldOf,
+  workspaceOfRecord,
   type ExpertField,
+  type WorkspaceMode,
   fmtTs,
 } from '@/lib/crm';
 
 type F = Record<string, string>;
-const empty = (expertField: ExpertField = 'Law Firms', defaultOwner = 'Guy'): F => ({
+const empty = (expertField: ExpertField = 'Law Firms', defaultOwner = 'Guy', workspaceMode: WorkspaceMode = 'sales'): F => ({
   ...Object.fromEntries(FIELDS.map((k) => [k, ''])),
   status: 'New',
   fit_score: '3',
+  investor_type: 'STANDARD',
+  typical_check_size: workspaceMode === 'experts' ? '$200 per letter' : '',
   expert_field: expertField,
-  lead_source: 'Outbound',
-  deal_value: '2500',
+  lead_source: workspaceMode === 'experts' ? 'University Directory' : 'Outbound',
+  deal_value: workspaceMode === 'experts' ? '200' : '2500',
   expected_close_date: '',
   owner: defaultOwner,
   client_type: 'new lead',
   phone: '',
 });
 
-const LONG = ['pitch_body', 'notes'];
+const LONG = ['pitch_body', 'notes', 'thesis_notes'];
 const DATES = ['last_contacted_date', 'next_follow_up_date', 'expected_close_date'];
-const lbl = (k: string) => {
-  if (k === 'expert_field') return 'MARKET / REGION';
+const lbl = (k: string, isExperts: boolean) => {
+  if (k === 'expert_field') return isExperts ? 'DISCIPLINE / FIELD' : 'MARKET / REGION';
+  if (k === 'firm') return isExperts ? 'university / institution' : 'firm';
+  if (k === 'investor_type') return isExperts ? 'academic tier (standard / premium)' : 'tier';
+  if (k === 'typical_check_size') return isExperts ? 'honorarium rate ($ / letter)' : 'typical check size';
+  if (k === 'stage_focus') return isExperts ? 'research focus / specialty' : 'stage focus';
+  if (k === 'thesis_notes') return isExperts ? 'credentials & bio summary' : 'thesis notes';
   if (k === 'client_type') return 'type (lead / client)';
-  if (k === 'deal_value') return 'deal value ($ USD)';
+  if (k === 'deal_value') return isExperts ? 'honorarium value ($ USD)' : 'deal value ($ USD)';
   return k.replace(/_/g, ' ');
 };
 const inp = 'w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-900 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20';
@@ -49,6 +59,7 @@ export function InvestorSheet({
   open,
   onClose,
   defaultExpertField = 'Law Firms',
+  workspaceMode = 'sales',
   teamOwners = ['Guy', 'Eduardo', 'Growth'],
   onDialContact,
   onOpenWhatsApp,
@@ -57,6 +68,7 @@ export function InvestorSheet({
   open: boolean;
   onClose: () => void;
   defaultExpertField?: ExpertField;
+  workspaceMode?: WorkspaceMode;
   teamOwners?: string[];
   onDialContact?: (cardId: number, phone: string, firm: string) => void;
   onOpenWhatsApp?: (cardId: number, phone: string, firm: string) => void;
@@ -68,13 +80,17 @@ export function InvestorSheet({
   const { data, isLoading, isError, refetch } = useBrowserGetInvestor(numId, {
     query: { enabled: !!numId && open, queryKey: getBrowserGetInvestorQueryKey(numId) },
   });
-  const [f, setF] = useState<F>(() => empty(defaultExpertField));
+  const [f, setF] = useState<F>(() => empty(defaultExpertField, 'Guy', workspaceMode));
   const [msg, setMsg] = useState('');
   const [eventType, setEventType] = useState<'note' | 'email_sent' | 'reply_received' | 'proposal_sent' | 'call_logged' | 'whatsapp_sent'>('note');
-  const [campaignTag, setCampaignTag] = useState('law-firms-niw-q4');
+  const [campaignTag, setCampaignTag] = useState(workspaceMode === 'experts' ? 'dentistry-faculty-experts' : 'law-firms-niw-q4');
   const [deleting, setDeleting] = useState(false);
   const [loggingAct, setLoggingAct] = useState(false);
   const dirty = useRef(false);
+
+  const isExpertsRecord = isNew
+    ? workspaceMode === 'experts'
+    : workspaceOfRecord({ expert_field: f.expert_field || data?.expert_field }) === 'experts';
 
   useEffect(() => {
     dirty.current = false;
@@ -85,8 +101,11 @@ export function InvestorSheet({
   const update = useBrowserUpdateInvestor();
 
   useEffect(() => {
-    if (isNew && open) setF(empty(defaultExpertField));
-  }, [isNew, open, defaultExpertField]);
+    if (isNew && open) {
+      setF(empty(defaultExpertField, 'Guy', workspaceMode));
+      setCampaignTag(workspaceMode === 'experts' ? 'dentistry-faculty-experts' : 'law-firms-niw-q4');
+    }
+  }, [isNew, open, defaultExpertField, workspaceMode]);
 
   useEffect(() => {
     if (!dirty.current && data && data.id === numId) {
@@ -100,11 +119,13 @@ export function InvestorSheet({
                 ? String((data as any).deal_value ?? 2500)
                 : k === 'client_type'
                   ? String((data as any).client_type || (data as any).type || 'new lead')
-                  : k === 'owner'
-                    ? String((data as any).owner || 'Guy')
-                    : k === 'lead_source'
-                      ? String((data as any).lead_source || 'Outbound')
-                      : String((data as any)[k] ?? ''),
+                  : k === 'investor_type'
+                    ? String((data as any).investor_type || 'STANDARD')
+                    : k === 'owner'
+                      ? String((data as any).owner || 'Guy')
+                      : k === 'lead_source'
+                        ? String((data as any).lead_source || 'Outbound')
+                        : String((data as any)[k] ?? ''),
           ]),
         ),
       );
@@ -130,6 +151,7 @@ export function InvestorSheet({
     FIELDS.forEach((k) => {
       if (k === 'fit_score') o[k] = Math.min(5, Math.max(1, parseInt(f[k]) || 3));
       else if (k === 'deal_value') o[k] = Math.max(0, Number(String(f[k] || '0').replace(/[$,\s]/g, '')) || 0);
+      else if (k === 'investor_type') o[k] = f[k] === 'PREMIUM' ? 'PREMIUM' : 'STANDARD';
       else o[k] = f[k];
     });
     return o;
@@ -142,7 +164,7 @@ export function InvestorSheet({
     }
     const done = {
       onSuccess: () => {
-        toast({ title: 'Deal card saved' });
+        toast({ title: isExpertsRecord ? 'Expert profile saved' : 'Deal card saved' });
         refresh();
         if (isNew) onClose();
       },
@@ -203,11 +225,21 @@ export function InvestorSheet({
   const pending = create.isPending || update.isPending;
   const field = (k: string) => (
     <label key={k} className={`block ${LONG.includes(k) ? 'sm:col-span-2' : ''}`}>
-      <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">{lbl(k)}</span>
+      <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+        {lbl(k, isExpertsRecord)}
+      </span>
       {k === 'status' ? (
         <select data-testid="select-status" className={inp} value={f[k]} onChange={(e) => set(k, e.target.value)}>
           {STATUSES.map((s) => (
             <option key={s}>{s}</option>
+          ))}
+        </select>
+      ) : k === 'investor_type' ? (
+        <select data-testid="select-type" className={inp} value={f[k] || 'STANDARD'} onChange={(e) => set(k, e.target.value)}>
+          {TYPES.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
           ))}
         </select>
       ) : k === 'client_type' ? (
@@ -230,7 +262,9 @@ export function InvestorSheet({
       ) : k === 'expert_field' ? (
         <select data-testid="select-expert-field" className={inp} value={f[k]} onChange={(e) => set(k, e.target.value)}>
           {EXPERT_FIELDS.map((s) => (
-            <option key={s}>{s}</option>
+            <option key={s} value={s}>
+              {s}
+            </option>
           ))}
         </select>
       ) : k === 'fit_score' ? (
@@ -244,7 +278,7 @@ export function InvestorSheet({
           data-testid="input-deal_value"
           type="number"
           min="0"
-          step="100"
+          step="50"
           className={inp}
           value={f[k]}
           onChange={(e) => set(k, e.target.value)}
@@ -276,10 +310,18 @@ export function InvestorSheet({
           <div className="flex items-start justify-between gap-2 pr-6">
             <div>
               <SheetTitle className="font-display text-2xl font-bold text-slate-900">
-                {isNew ? 'New Deal / Contact' : f.name || 'Deal Record'}
+                {isNew
+                  ? isExpertsRecord
+                    ? 'New Expert / Professor'
+                    : 'New Deal / Contact'
+                  : f.name || (isExpertsRecord ? 'Expert Record' : 'Deal Record')}
               </SheetTitle>
               <SheetDescription className="text-slate-600">
-                {isNew ? 'Add a new law firm deal card to SellingHighs CRM.' : [f.title, f.firm].filter(Boolean).join(' · ') || `Card #${numId}`}
+                {isNew
+                  ? isExpertsRecord
+                    ? 'Add a university professor or expert reviewer to SellingHighs Experts Workspace.'
+                    : 'Add a new law firm deal card to SellingHighs Sales Workspace.'
+                  : [f.title, f.firm].filter(Boolean).join(' · ') || `Card #${numId}`}
               </SheetDescription>
             </div>
             {!isNew && (
@@ -340,23 +382,40 @@ export function InvestorSheet({
 
         {(isNew || data) && (
           <div className="mt-5 space-y-6 pb-8">
-            <div className="rounded-xl border bg-white p-4 shadow-sm">
-              <div className="mb-3 text-xs font-bold uppercase tracking-wider text-blue-700">
-                Deal &amp; Pipeline Fields
+            {isExpertsRecord ? (
+              <div className="rounded-xl border border-purple-200 bg-white p-4 shadow-sm">
+                <div className="mb-3 text-xs font-bold uppercase tracking-wider text-purple-700">
+                  Expert Network &amp; Honorarium Details
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {field('status')}
+                  {field('expert_field')}
+                  {field('investor_type')}
+                  {field('typical_check_size')}
+                  {field('stage_focus')}
+                  {field('owner')}
+                  {field('thesis_notes')}
+                </div>
               </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                {field('status')}
-                {field('deal_value')}
-                {field('expected_close_date')}
-                {field('owner')}
-                {field('lead_source')}
-                {field('client_type')}
+            ) : (
+              <div className="rounded-xl border bg-white p-4 shadow-sm">
+                <div className="mb-3 text-xs font-bold uppercase tracking-wider text-blue-700">
+                  Deal &amp; Pipeline Fields
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {field('status')}
+                  {field('deal_value')}
+                  {field('expected_close_date')}
+                  {field('owner')}
+                  {field('lead_source')}
+                  {field('client_type')}
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="rounded-xl border bg-white p-4 shadow-sm">
               <div className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-600">
-                Contact &amp; Law Firm Details
+                {isExpertsRecord ? 'Professor & University Profile' : 'Contact & Law Firm Details'}
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 {FIELDS.filter(
@@ -368,9 +427,15 @@ export function InvestorSheet({
                       'owner',
                       'lead_source',
                       'client_type',
+                      'investor_type',
+                      'typical_check_size',
+                      'stage_focus',
+                      'thesis_notes',
+                      'warm_intro_path',
                       'pitch_subject',
                       'pitch_body',
                       'notes',
+                      ...(isExpertsRecord ? ['expert_field'] : []),
                     ].includes(k),
                 ).map(field)}
                 {field('notes')}
@@ -378,7 +443,9 @@ export function InvestorSheet({
             </div>
 
             <section className="rounded-xl border bg-white p-4 shadow-sm">
-              <h3 className="font-display text-base font-bold text-slate-900">Outbound Pitch / Proposal Template</h3>
+              <h3 className="font-display text-base font-bold text-slate-900">
+                {isExpertsRecord ? 'Expert Outreach & Invitation Email' : 'Outbound Pitch / Proposal Template'}
+              </h3>
               <p className="mb-3 text-xs text-slate-500">
                 Synced automatically when an email_sent or proposal_sent event is logged.
               </p>
@@ -412,7 +479,7 @@ export function InvestorSheet({
               onClick={save}
               className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 disabled:opacity-60"
             >
-              {pending ? 'Saving...' : isNew ? 'Create Deal Card' : 'Save Deal Changes'}
+              {pending ? 'Saving...' : isNew ? (isExpertsRecord ? 'Create Expert Card' : 'Create Deal Card') : isExpertsRecord ? 'Save Expert Changes' : 'Save Deal Changes'}
             </button>
 
             {!isNew && (

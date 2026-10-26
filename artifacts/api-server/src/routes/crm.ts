@@ -23,11 +23,13 @@ import { logger } from "../lib/logger";
 
 const TELNYX_CONNECTION_ID = process.env.TELNYX_CONNECTION_ID || "3077013926030869814";
 const TELNYX_FROM_NUMBER = process.env.TELNYX_FROM_NUMBER || "+15619031414";
-export const EXPERT_FIELDS = ["Law Firms", "Chinese Law", "Indian Law"] as const;
+export const EXPERT_FIELDS = ["Law Firms", "Chinese Law", "Indian Law", "Dentistry", "Economics"] as const;
 export const EXPERT_FIELD_FILTERS = [
   { value: "Law Firms", label: "Law Firms" },
   { value: "Chinese Law", label: "Chinese Law" },
   { value: "Indian Law", label: "Indian Law" },
+  { value: "Dentistry", label: "Dentists" },
+  { value: "Economics", label: "Economists" },
   { value: "All", label: "All" },
 ] as const;
 
@@ -43,6 +45,8 @@ router.get("/summary", async (req, res) => {
   const expertField = req.query.expert_field;
   if (
     expertField !== undefined &&
+    expertField !== "Dentistry" &&
+    expertField !== "Economics" &&
     expertField !== "Law Firms" &&
     expertField !== "Chinese Law" &&
     expertField !== "Indian Law"
@@ -53,7 +57,8 @@ router.get("/summary", async (req, res) => {
   const range = typeof req.query.range === "string" ? req.query.range : undefined;
   const from = typeof req.query.from === "string" ? req.query.from : undefined;
   const to = typeof req.query.to === "string" ? req.query.to : undefined;
-  res.json(summary(await listInvestors(pool), new Date(), expertField, { owner, range, from, to }));
+  const workspace = typeof req.query.workspace === "string" ? req.query.workspace : undefined;
+  res.json(summary(await listInvestors(pool), new Date(), expertField, { owner, range, from, to, workspace }));
 });
 
 router.get("/investors", async (req, res) => {
@@ -537,6 +542,8 @@ router.get("/campaigns", async (_req, res) => {
     { name: "law-firms-niw-q4", field: "Law Firms" },
     { name: "indian-law-eb2-partner", field: "Indian Law" },
     { name: "chinese-law-niw-outreach", field: "Chinese Law" },
+    { name: "dentistry-faculty-experts", field: "Dentistry" },
+    { name: "economics-phd-reviewers", field: "Economics" },
   ];
   for (const d of defaults) {
     const matching = investors.filter(i => i.expert_field === d.field);
