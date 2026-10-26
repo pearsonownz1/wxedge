@@ -1,0 +1,27 @@
+kind = "web"
+previewPath = "/"
+title = "Notara Entrance"
+version = "1.0.0"
+id = "artifacts/wx-edge"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 19384
+
+[services.development]
+run = "pnpm --filter @workspace/wx-edge run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/wx-edge", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/wx-edge/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "19384"
+BASE_PATH = "/"

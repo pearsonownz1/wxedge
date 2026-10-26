@@ -1,0 +1,36 @@
+modules = ["nodejs-24", "python-base-3.13", "postgresql-16"]
+
+[deployment]
+router = "application"
+deploymentTarget = "cloudrun"
+
+[deployment.postBuild]
+args = ["pnpm", "store", "prune"]
+env = { "CI" = "true" }
+
+[workflows]
+runButton = "Project"
+
+[agent]
+stack = "PNPM_WORKSPACE"
+expertMode = true
+
+[postMerge]
+path = "scripts/post-merge.sh"
+timeoutMs = 20000
+
+[userenv]
+
+[userenv.development]
+
+[userenv.production]
+POLLING_ENABLED = "false"
+KALSHI_CONFIRMED_REJECTED_SUBMISSIONS = '[{"orderId":4839,"approvalId":17788,"ticker":"KXHIGHAUS-26OCT04-B82.5","side":"YES","priceCents":11,"contracts":10,"tsPlaced":"2026-10-04T06:06:15.498961Z","httpStatus":400,"responseBody":"{\"error\":{\"code\":\"insufficient_balance\",\"message\":\"insufficient balance\"}}"}]'
+
+[userenv.shared]
+APPROVER = "disabled"
+KALSHI_LIVE_ORDERS = "false"
+CRM_OWNER_ID = "47521717"
+
+[nix]
+channel = "stable-25_05"

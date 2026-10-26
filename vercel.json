@@ -1,0 +1,28 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "pnpm run build",
+  "outputDirectory": "artifacts/notara/dist/public",
+  "functions": {
+    "api/index.js": {
+      "maxDuration": 60
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api"
+    },
+    {
+      "source": "/notara/(.*)",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/notara",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/((?!api/|assets/|favicon|robots).*)",
+      "destination": "/index.html"
+    }
+  ]
+}

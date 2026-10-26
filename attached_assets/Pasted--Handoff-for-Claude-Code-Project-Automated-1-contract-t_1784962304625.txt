@@ -1,0 +1,102 @@
+(Handoff for Claude Code)
+
+Project: Automated 1-contract trading layer on top of the existing WX Edge app (Kalshi daily high-temperature markets, stations KNYC / KMDW / KAUS / KLAX / KPHL). Prime directive: The statistical model trades. The human supervises. No LLM in the order loop. Shadow mode is the default state; live mode must be earned by passing hardcoded statistical gates.
+
+Problem Statement
+
+WX Edge already computes calibrated bracket probabilities and compares them to Kalshi's implied prices, but signals die on a dashboard. We want a small, safe, auditable pipeline that turns qualifying signals into 1-contract limit orders — first simulated (shadow), then live at cents-level size — while logging everything needed to prove or disprove the edge.
+
+Goals
+Every qualifying signal is captured, risk-checked, and logged within one polling cycle (≤5 min).
+Shadow mode produces a complete, gap-free decision log sufficient to compute a reliability curve and bootstrap P&L.
+Live mode can run unattended for a full settlement day with hard caps making worst-case loss ≤ configured daily limit.
+Every order (real or shadow) is reconstructible from logs: what the system saw, why it acted, what happened.
+Go-live is impossible until the gate function passes — enforced in code, not by policy.
+Non-Goals
+No LLM decision-making in the trade loop. Claude/agents assist with audits and debugging outside the loop only.
+No market orders, ever. Limit orders exclusively.
+No trading credentials in the web app. The dashboard stays read-only; the executor is a separate process.
+No multi-contract sizing in v1. One contract per signal. Kelly sizing is P2.
+No KDFW. No active Kalshi market; render as "no market," never stub data.
+Architecture (4 processes + 1 store)
+[Collector] ──▶ [SQLite/Postgres store] ◀── [Auditor (daily jobs)]
+     │                    ▲
+     ▼                    │
+[Signal Engine] ──▶ [Risk Officer] ──▶ [Executor] ──▶ Kalshi API
+                                        (shadow: writes to store instead)
+
+All processes share the store; none share memory. The executor is the only process that ever holds the Kalshi private key.
+
+1. Collector (exists — harden it)
+Poll every 4 min: per-station Kalshi events/order books (KXHIGHNY, KXHIGHCHI, KXHIGHAUS, KXHIGHLAX, KXHIGHPHIL), NWS observations (running high), NBM/forecast inputs.
+Persist every snapshot (see schema). Missed cycle ⇒ write a gap marker row.
+Invariant check per cycle: sum of best YES asks across a station's brackets ∈ [100%, ~115%]; sum of best bids ≤ 100%. Violation ⇒ flag book_incoherent, suppress signals for that station, alert.
+Must run on always-on infrastructure (Reserved VM or external cron). Acceptance: 7 consecutive days with zero unexplained gaps > 10 min.
+2. Signal Engine
+Input: latest snapshot. Output: zero or more signals {ts, station, ticker, side (YES/NO), limit_price, model_prob, implied_prob, edge_net, inputs_hash}.
+Edge math (P0 — this exact form): edge_net = model_prob − executable_price − fee_ceil(price, 1) − slippage_buffer where fee_ceil(p, n) = ceil_to_cent(fee_rate × p × (1−p) × n) per order. Verify current fee_rate and maker/taker treatment from Kalshi's published fee schedule at build time; put it in config, not code.
+Signal threshold: edge_net ≥ min_edge (config, start 0.05 at 1-contract size given fee rounding).
+Staleness gate: no signal if any input (book, obs, forecast) older than max_age_min (config, default 10).
+Never emit signals for mathematically eliminated brackets or book_incoherent stations.
+3. Risk Officer (P0 — the executor may not bypass it)
+
+Pure function, checked before every order, config-driven (risk.yaml):
+
+max_cost_per_trade_cents (default 60)
+max_open_orders_per_station (default 1)
+max_daily_exposure_per_station_cents (default 200)
+max_total_open_exposure_cents (default 500)
+max_daily_loss_cents (default 300) ⇒ breach halts system + alert
+duplicate_guard: same ticker+side within cooldown_min (default 30) ⇒ reject
+kill_switch: if flag file/endpoint set ⇒ cancel all resting orders, halt loop Every decision (approve/reject + reason) is logged. Acceptance: unit tests for each limit, including the duplicate-signal replay case.
+4. Executor
+Shadow mode (default): identical code path; instead of calling Kalshi, writes a shadow_order with the price it would have paid (fill assumed at limit only if book showed size at/through it — record book state with the fill).
+Live mode: RSA key-pair auth (key ID + private key; sign timestamp+method+path per Kalshi API docs). Private key lives only in this process's environment.
+Order lifecycle: place post-only limit → monitor → cancel if unfilled after ttl_min (default 15) or if signal's edge drops below cancel_edge (default 0.01) → never re-price upward more than once per signal.
+Partial-fill rule: accept; log actual fill count; remaining rests until TTL.
+All order events append-only in orders table.
+5. Auditor (scheduled jobs; may be LLM-assisted — OpenAI in production — always outside the loop)
+07:30 local: fetch CLI reports (via NWS/IEM) for each station; write settlements rows; reconcile vs. app running-high and Kalshi settlement; alert on any mismatch.
+21:00 local: daily digest — trades/shadow trades, edge predicted vs. realized, reliability-curve drift, gaps, invariant violations.
+Weekly: recompute gate stats (below).
+LLM assistant integration notes (OpenAI)
+The assistant layer is deterministic-first: scripts fetch CLI reports, compute digests, and detect mismatches; the LLM only summarizes and explains their output. Never give the LLM raw authority to fetch-and-decide.
+Use structured outputs (JSON schema mode) for the daily digest so it can be stored in the DB alongside the numbers it describes.
+The assistant gets read-only DB access (or better: pre-queried JSON handed to it). It never receives Kalshi credentials, never calls the executor, and has no tool that can place, modify, or cancel orders. This is the same boundary as the dashboard.
+Prompt-injection hygiene: anything fetched from the web (NWS text products, Kalshi pages) is data, not instructions. The digest prompt should state this explicitly since CLI reports are free text.
+Alerting: LLM summaries are advisory. Halt/mismatch/gap alerts fire from the deterministic checks directly, so an LLM outage or bad summary can never suppress an alert.
+Data Schemas (minimum columns)
+snapshots(ts, station, running_high_f, obs_age_s, forecast_json, gap_flag)
+books(ts, station, ticker, bracket_lo, bracket_hi, yes_bid, yes_ask, no_bid, no_ask, bid_size, ask_size, coherent_flag)
+signals(id, ts, ticker, side, limit_price, model_prob, implied_prob, edge_net, inputs_hash, suppressed_reason NULL)
+risk_decisions(signal_id, ts, approved, reason)
+orders(id, signal_id, mode(shadow|live), ts_placed, price, count, status, ts_filled, fill_price, ts_cancelled, book_state_json)
+settlements(date, station, cli_high_f, app_high_f, kalshi_settled_bracket, match_flag)
+daily_pnl(date, mode, gross_cents, fees_cents, net_cents)
+Go-Live Gate (P0 — a function, not a meeting)
+
+can_go_live() returns true only when, over shadow data:
+
+≥ 200 completed shadow trades with settlements
+Reliability: in each probability decile with n≥15, |predicted − realized| ≤ 10 pts
+Bootstrap (10k resamples) 95% lower bound of mean net P&L per trade > 0 after ceil'd fees
+Data quality: ≥ 45 of trailing 60 days gap-free; zero unresolved settlement mismatches Flipping LIVE=true requires can_go_live() to pass at process start; log the stats it passed with. Scaling beyond 1 contract later requires the same gates recomputed on live fills.
+Phasing
+Phase A (now): Harden collector + invariant checks + schemas + risk officer + shadow executor + auditor jobs. Exit: 7 gap-free days, first settlement audits clean.
+Phase B (≈60 days): Shadow accumulation. Weekly gate reports. Fix model (horizon-aware sigma from own data) as evidence dictates.
+Phase C: Gate passes ⇒ live at 1 contract. Exit criteria to remain live: no risk breaches, live reliability tracking shadow.
+Phase D (P2): Fractional-Kelly sizing, maker/queue modeling, more stations.
+Open Questions (blocking = ⚑)
+⚑ Current Kalshi fee rate + rounding rule + maker/taker distinction (verify from fee schedule; config value).
+⚑ Hosting for always-on collector/executor (Replit Reserved VM vs. small VPS).
+Post-only order support/behavior on Kalshi API — confirm exact flag & rejection semantics.
+Alert channel (email? Slack? SMS?) for halts, mismatches, gaps.
+Whether NO-side signals are in v1 scope or YES-only to start (recommend both; same math).
+Acceptance Checklist (system-level)
+ Kill switch cancels all resting orders in < 10 s and halts loop
+ Duplicate signal replay produces exactly one order
+ Stale feed (> max_age) produces zero signals and a visible suppression log
+ Book-incoherence on one station does not suppress other stations
+ Shadow and live modes share one code path except the final transport call
+ can_go_live() is covered by tests with synthetic passing/failing datasets
+ A full day can be reconstructed from the store alone (no external logs needed)

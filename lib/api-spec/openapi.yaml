@@ -1,0 +1,1489 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Api",
+    "version": "1.0.0",
+    "description": "Notara private fundraising CRM"
+  },
+  "servers": [
+    {
+      "url": "/api"
+    }
+  ],
+  "paths": {
+    "/crm/session": {
+      "get": {
+        "operationId": "getCrmPinSession",
+        "summary": "Check browser PIN session",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Session status",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CrmPinSessionStatus"}}}
+          }
+        }
+      },
+      "post": {
+        "operationId": "loginCrmPin",
+        "summary": "Sign in with the server-side PIN",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CrmPinInput"}}}
+        },
+        "responses": {
+          "200": {
+            "description": "Persistent HttpOnly session cookie set",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CrmPinSessionStatus"}}}
+          },
+          "401": {"description": "Incorrect PIN"},
+          "403": {"description": "Same-origin request required"},
+          "429": {"description": "Too many PIN attempts"},
+          "503": {"description": "PIN login is not configured"}
+        }
+      },
+      "delete": {
+        "operationId": "logoutCrmPin",
+        "summary": "Clear this browser's PIN session",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Signed out",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CrmPinSessionStatus"}}}
+          },
+          "403": {"description": "Same-origin request required"}
+        }
+      }
+    },
+    "/healthz": {
+      "get": {
+        "description": "Returns server health status",
+        "operationId": "healthCheck",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthStatus"
+                }
+              }
+            },
+            "description": "Healthy"
+          }
+        },
+        "summary": "Health check",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/auth/user": {
+      "get": {
+        "operationId": "getCurrentAuthUser",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AuthorizationSessionHeader"
+          },
+          {
+            "$ref": "#/components/parameters/SessionCookie"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthUserEnvelope"
+                }
+              }
+            },
+            "description": "Auth status resolved successfully."
+          }
+        },
+        "summary": "Get the currently authenticated user",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/callback": {
+      "get": {
+        "operationId": "handleBrowserLoginCallback",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "code",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "iss",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Redirect to the `returnTo` path on success (defaults to `/`) or `/api/login` on failure."
+          }
+        },
+        "summary": "Complete the browser OIDC login flow",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/login": {
+      "get": {
+        "operationId": "beginBrowserLogin",
+        "parameters": [
+          {
+            "description": "Relative path to redirect to after login (must start with `/`). Defaults to `/`.",
+            "in": "query",
+            "name": "returnTo",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Redirect to the OIDC authorization endpoint."
+          }
+        },
+        "summary": "Start the browser OIDC login flow",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/logout": {
+      "get": {
+        "operationId": "logoutBrowserSession",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AuthorizationSessionHeader"
+          },
+          {
+            "$ref": "#/components/parameters/SessionCookie"
+          },
+          {
+            "in": "query",
+            "name": "returnTo",
+            "required": false,
+            "schema": {
+              "default": "/",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Redirect to the OIDC provider logout URL with a post-logout redirect back to the validated `returnTo` path."
+          }
+        },
+        "summary": "Clear the session and begin OIDC logout",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/mobile-auth/logout": {
+      "post": {
+        "operationId": "logoutMobileSession",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AuthorizationSessionHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LogoutSuccess"
+                }
+              }
+            },
+            "description": "Logout processed."
+          }
+        },
+        "summary": "Delete a mobile session token",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/mobile-auth/token-exchange": {
+      "post": {
+        "operationId": "exchangeMobileAuthorizationCode",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MobileTokenExchangeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MobileTokenExchangeSuccess"
+                }
+              }
+            },
+            "description": "Session created successfully."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Missing or invalid required fields."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Token did not contain usable claims."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Token exchange failed."
+          }
+        },
+        "summary": "Exchange a mobile OIDC code for a session token",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/investors": {
+      "get": {
+        "operationId": "listInvestors",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Investor"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Owner only"
+          }
+        },
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "New",
+                "Contacted",
+                "Followed Up",
+                "Responded",
+                "Meeting Set",
+                "Closed"
+              ]
+            }
+          }
+        ],
+        "security": [{"CrmPinSession": []}]
+      },
+      "post": {
+        "operationId": "upsertInvestor",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Investor"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Owner only"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvestorInput"
+              }
+            }
+          }
+        },
+        "security": [{"CrmPinSession": []}]
+      }
+    },
+    "/crm/investors": {
+      "get": {
+        "operationId": "browserListInvestors",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Investor"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Owner only"
+          }
+        },
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "New",
+                "Contacted",
+                "Followed Up",
+                "Responded",
+                "Meeting Set",
+                "Closed"
+              ]
+            }
+          }
+        ],
+        "security": [{"CrmPinSession": []}]
+      },
+      "post": {
+        "operationId": "browserUpsertInvestor",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Investor"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Owner only"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvestorInput"
+              }
+            }
+          }
+        },
+        "security": [{"CrmPinSession": []}]
+      }
+    },
+    "/investors/{id}": {
+      "get": {
+        "operationId": "getInvestor",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Investor"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Owner only"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "security": [{"CrmPinSession": []}]
+      },
+      "patch": {
+        "operationId": "updateInvestor",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Investor"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Owner only"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvestorUpdate"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "security": [{"CrmPinSession": []}]
+      }
+    },
+    "/crm/investors/{id}": {
+      "get": {
+        "operationId": "browserGetInvestor",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Investor"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Owner only"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "security": [{"CrmPinSession": []}]
+      },
+      "patch": {
+        "operationId": "browserUpdateInvestor",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Investor"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Owner only"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvestorUpdate"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "security": [{"CrmPinSession": []}]
+      }
+    },
+    "/investors/{id}/activity": {
+      "post": {
+        "operationId": "appendActivity",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Investor"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Owner only"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActivityInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "security": [
+          {
+            "CrmPinSession": []
+          }
+        ]
+      }
+    },
+    "/crm/investors/{id}/activity": {
+      "post": {
+        "operationId": "browserAppendActivity",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Investor"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Owner only"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActivityInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "security": [
+          {
+            "CrmPinSession": []
+          }
+        ]
+      }
+    },
+    "/summary": {
+      "get": {
+        "operationId": "getSummary",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Summary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Owner only"
+          }
+        },
+        "security": [{"CrmPinSession": []}],
+        "parameters": [
+          {
+            "name": "expert_field",
+            "in": "query",
+            "required": false,
+            "description": "Restrict summary metrics to this field; records without a field count as Dentistry. Omit for all experts.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Dentistry",
+                "Economics",
+                "Law Firms",
+                "Chinese Law",
+                "Indian Law"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "/crm/summary": {
+      "get": {
+        "operationId": "browserGetSummary",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Summary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Owner only"
+          }
+        },
+        "security": [{"CrmPinSession": []}],
+        "parameters": [
+          {
+            "name": "expert_field",
+            "in": "query",
+            "required": false,
+            "description": "Restrict summary metrics to this field; records without a field count as Dentistry. Omit for all experts.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Dentistry",
+                "Economics",
+                "Law Firms",
+                "Chinese Law",
+                "Indian Law"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "/investors/import": {
+      "post": {
+        "operationId": "importInvestors",
+        "responses": {
+          "400": {
+            "description": "Invalid CSV; row, field and rejected value are returned when identifiable",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CrmValidationError"}}}
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Owner only"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CsvInput"
+              }
+            }
+          }
+        },
+        "security": [{"CrmPinSession": []}]
+      }
+    },
+    "/crm/investors/import": {
+      "post": {
+        "operationId": "browserImportInvestors",
+        "responses": {
+          "400": {
+            "description": "Invalid CSV; row, field and rejected value are returned when identifiable",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CrmValidationError"}}}
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Owner only"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CsvInput"
+              }
+            }
+          }
+        },
+        "security": [{"CrmPinSession": []}]
+      }
+    },
+    "/investors/export": {
+      "get": {
+        "operationId": "exportInvestors",
+        "responses": {
+          "200": {
+            "description": "CSV",
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [{"CrmPinSession": []}]
+      }
+    },
+    "/crm/investors/export": {
+      "get": {
+        "operationId": "browserExportInvestors",
+        "responses": {
+          "200": {
+            "description": "CSV",
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [{"CrmPinSession": []}]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CrmValidationError": {
+        "type": "object",
+        "required": ["error"],
+        "properties": {
+          "error": {"type": "string"},
+          "row": {"type": "integer", "description": "CSV record number including the header as row 1"},
+          "field": {"type": "string"},
+          "value": {},
+          "reason": {"type": "string"}
+        }
+      },
+      "CrmPinInput": {
+        "type": "object",
+        "required": ["pin"],
+        "properties": {"pin": {"type": "string", "minLength": 1, "maxLength": 128}}
+      },
+      "CrmPinSessionStatus": {
+        "type": "object",
+        "required": ["signed_in", "configured"],
+        "properties": {"signed_in": {"type": "boolean"}, "configured": {"type": "boolean"}}
+      },
+      "HealthStatus": {
+        "properties": {
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "type": "object"
+      },
+      "AuthUser": {
+        "properties": {
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "firstName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "lastName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "profileImageUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "firstName",
+          "lastName",
+          "profileImageUrl"
+        ],
+        "type": "object"
+      },
+      "AuthUserEnvelope": {
+        "properties": {
+          "user": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AuthUser"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "user"
+        ],
+        "type": "object"
+      },
+      "ErrorEnvelope": {
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "type": "object"
+      },
+      "LogoutSuccess": {
+        "properties": {
+          "success": {
+            "const": true,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "success"
+        ],
+        "type": "object"
+      },
+      "MobileTokenExchangeRequest": {
+        "properties": {
+          "code": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "code_verifier": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "nonce": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "redirect_uri": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "state": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "code_verifier",
+          "redirect_uri",
+          "state"
+        ],
+        "type": "object"
+      },
+      "MobileTokenExchangeSuccess": {
+        "properties": {
+          "token": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "token"
+        ],
+        "type": "object"
+      },
+      "InvestorInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "firm": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "linkedin_url": {
+            "type": "string"
+          },
+          "website": {
+            "type": "string"
+          },
+          "location": {
+            "type": "string"
+          },
+          "typical_check_size": {
+            "type": "string"
+          },
+          "stage_focus": {
+            "type": "string"
+          },
+          "thesis_notes": {
+            "type": "string"
+          },
+          "warm_intro_path": {
+            "type": "string"
+          },
+          "source_url": {
+            "type": "string"
+          },
+          "pitch_subject": {
+            "type": "string"
+          },
+          "pitch_body": {
+            "type": "string"
+          },
+          "last_contacted_date": {
+            "type": "string"
+          },
+          "next_follow_up_date": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "investor_type": {
+            "type": "string",
+            "enum": [
+              "STANDARD",
+              "PREMIUM"
+            ]
+          },
+          "fit_score": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "New",
+              "Contacted",
+              "Followed Up",
+              "Responded",
+              "Meeting Set",
+              "Closed"
+            ]
+          },
+          "expert_field": {
+            "type": "string",
+            "enum": [
+              "Dentistry",
+              "Economics",
+              "Law Firms",
+              "Chinese Law",
+              "Indian Law"
+            ]
+          }
+        }
+      },
+      "InvestorUpdate": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "firm": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "linkedin_url": {
+            "type": "string"
+          },
+          "website": {
+            "type": "string"
+          },
+          "location": {
+            "type": "string"
+          },
+          "typical_check_size": {
+            "type": "string"
+          },
+          "stage_focus": {
+            "type": "string"
+          },
+          "thesis_notes": {
+            "type": "string"
+          },
+          "warm_intro_path": {
+            "type": "string"
+          },
+          "source_url": {
+            "type": "string"
+          },
+          "pitch_subject": {
+            "type": "string"
+          },
+          "pitch_body": {
+            "type": "string"
+          },
+          "last_contacted_date": {
+            "type": "string"
+          },
+          "next_follow_up_date": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "investor_type": {
+            "type": "string",
+            "enum": [
+              "STANDARD",
+              "PREMIUM"
+            ]
+          },
+          "fit_score": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "New",
+              "Contacted",
+              "Followed Up",
+              "Responded",
+              "Meeting Set",
+              "Closed"
+            ]
+          },
+          "expert_field": {
+            "type": "string",
+            "enum": [
+              "Dentistry",
+              "Economics",
+              "Law Firms",
+              "Chinese Law",
+              "Indian Law"
+            ]
+          }
+        }
+      },
+      "Activity": {
+        "type": "object",
+        "required": [
+          "id",
+          "timestamp",
+          "message",
+          "kind"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          }
+        }
+      },
+      "Investor": {
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "updated_at",
+          "activity_log",
+          "name",
+          "firm",
+          "title",
+          "email",
+          "linkedin_url",
+          "website",
+          "location",
+          "typical_check_size",
+          "stage_focus",
+          "thesis_notes",
+          "warm_intro_path",
+          "source_url",
+          "pitch_subject",
+          "pitch_body",
+          "last_contacted_date",
+          "next_follow_up_date",
+          "notes",
+          "investor_type",
+          "fit_score",
+          "status",
+          "expert_field"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "firm": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "linkedin_url": {
+            "type": "string"
+          },
+          "website": {
+            "type": "string"
+          },
+          "location": {
+            "type": "string"
+          },
+          "typical_check_size": {
+            "type": "string"
+          },
+          "stage_focus": {
+            "type": "string"
+          },
+          "thesis_notes": {
+            "type": "string"
+          },
+          "warm_intro_path": {
+            "type": "string"
+          },
+          "source_url": {
+            "type": "string"
+          },
+          "pitch_subject": {
+            "type": "string"
+          },
+          "pitch_body": {
+            "type": "string"
+          },
+          "last_contacted_date": {
+            "type": "string"
+          },
+          "next_follow_up_date": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "investor_type": {
+            "type": "string",
+            "enum": [
+              "STANDARD",
+              "PREMIUM"
+            ]
+          },
+          "fit_score": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "New",
+              "Contacted",
+              "Followed Up",
+              "Responded",
+              "Meeting Set",
+              "Closed"
+            ]
+          },
+          "id": {
+            "type": "integer"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          },
+          "activity_log": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Activity"
+            }
+          },
+          "expert_field": {
+            "type": "string",
+            "enum": [
+              "Dentistry",
+              "Economics",
+              "Law Firms",
+              "Chinese Law",
+              "Indian Law"
+            ]
+          }
+        }
+      },
+      "ActivityInput": {
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "properties": {
+          "message": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "type": "string"
+          }
+        }
+      },
+      "Summary": {
+        "type": "object",
+        "required": [
+          "total",
+          "counts",
+          "contacted_this_week",
+          "responses",
+          "response_rate",
+          "meetings_set",
+          "followups_due_today"
+        ],
+        "properties": {
+          "total": {
+            "type": "integer"
+          },
+          "counts": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer"
+            }
+          },
+          "contacted_this_week": {
+            "type": "integer"
+          },
+          "responses": {
+            "type": "integer"
+          },
+          "response_rate": {
+            "type": "number"
+          },
+          "meetings_set": {
+            "type": "integer"
+          },
+          "followups_due_today": {
+            "type": "integer"
+          }
+        }
+      },
+      "CsvInput": {
+        "type": "object",
+        "required": [
+          "csv"
+        ],
+        "properties": {
+          "csv": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "ImportResult": {
+        "type": "object",
+        "required": [
+          "created",
+          "updated"
+        ],
+        "properties": {
+          "created": {
+            "type": "integer"
+          },
+          "updated": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    "parameters": {
+      "AuthorizationSessionHeader": {
+        "description": "Opaque session token — `Bearer <sid>`.",
+        "in": "header",
+        "name": "Authorization",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "SessionCookie": {
+        "description": "Browser session cookie.",
+        "in": "cookie",
+        "name": "sid",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      }
+    },
+    "securitySchemes": {
+      "CrmPinSession": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "crm_pin_session",
+        "description": "Persistent PIN session required for all CRM reads and writes"
+      }
+    }
+  }
+}
