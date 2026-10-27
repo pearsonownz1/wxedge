@@ -10,6 +10,8 @@ import {
   deleteInvestor,
   deleteUser,
   getInvestor,
+  addCustomExpertType,
+  listExpertTypes,
   listInvestors,
   listUsers,
   logOutboundActivity,
@@ -41,16 +43,19 @@ function id(value: string | string[]) {
   return n;
 }
 
+router.get("/expert-types", async (_req, res) => {
+  res.json(await listExpertTypes(pool));
+});
+
+router.post("/expert-types", async (req, res) => {
+  const name = req.body?.name ?? req.body?.expert_field;
+  const result = await transaction(client => addCustomExpertType(client, name));
+  res.status(201).json(result);
+});
+
 router.get("/summary", async (req, res) => {
-  const expertField = req.query.expert_field;
-  if (
-    expertField !== undefined &&
-    expertField !== "Dentistry" &&
-    expertField !== "Economics" &&
-    expertField !== "Law Firms" &&
-    expertField !== "Chinese Law" &&
-    expertField !== "Indian Law"
-  ) {
+  const expertField = typeof req.query.expert_field === "string" ? req.query.expert_field.trim() : undefined;
+  if (expertField !== undefined && (!expertField || expertField.length > 120)) {
     throw new CrmError("Invalid expert field");
   }
   const owner = typeof req.query.owner === "string" ? req.query.owner : undefined;
@@ -75,7 +80,7 @@ router.get("/investors/export", async (_req, res) => {
 router.post("/investors/import", async (req, res) => {
   const input = BrowserImportInvestorsBody.safeParse(req.body);
   if (!input.success) throw new CrmError("CSV text required");
-  res.json(await transaction(client => importCsv(client, input.data.csv)));
+  res.json(await transaction(client => importCsv(client, input.data.csv, input.data.default_expert_field)));
 });
 
 router.post("/investors/deduplicate", async (_req, res) => {
@@ -550,7 +555,7 @@ router.get("/campaigns", async (_req, res) => {
     const contacted = matching.filter(i => i.status !== "New").length;
     const meetings = matching.filter(i => ["Meeting set", "Proposal sent", "Contract review", "Closed"].includes(i.status)).length;
     const proposals = matching.filter(i => ["Proposal sent", "Contract review", "Closed"].includes(i.status)).length;
-    const val = matching.reduce((acc, i) => acc + (Number(i.deal_value) || 2500), 0);
+    const val = matching.reduce((acc, i) => acc + (Number.isFinite(Number(i.deal_value)) && Number(i.deal_value) >= 0 ? Number(i.deal_value) : 0), 0);
     campaignMap.set(d.name, {
       name: d.name,
       field: d.field,

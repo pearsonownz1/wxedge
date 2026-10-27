@@ -51,7 +51,8 @@ test("API persists field choices, defaults new records to Dentistry, and preserv
   assert.equal(edited.investor.notes, "Changed note");
   assert.equal((await upsert(memory.client, { expert_field: "Law Firms" }, created.investor.id)).investor.expert_field, "Law Firms");
   assert.equal(validateInput({ notes: "No field change" }).expert_field, undefined);
-  assert.throws(() => validateInput({ expert_field: "Medicine" }), /expert_field/);
+  assert.equal(validateInput({ expert_field: "Medicine" }).expert_field, "Medicine");
+  assert.throws(() => validateInput({ expert_field: "Law_Firms" }), /expert_field/);
 });
 
 test("CSV field is optional, case-insensitive, defaults blanks, rejects invalid values, and round-trips", async () => {
@@ -65,7 +66,7 @@ test("CSV field is optional, case-insensitive, defaults blanks, rejects invalid 
   assert.equal(memory.rows[1].data.expert_field, "Law Firms");
   assert.equal(memory.rows[2].data.expert_field, "Law Firms");
   const before = JSON.stringify(memory.rows);
-  await assert.rejects(importCsv(memory.client, "name,expert_field\nInvalid,Medicine"), /CSV row 2.*expert_field/);
+  await assert.rejects(importCsv(memory.client, "name,expert_field\nInvalid,Law_Firms"), /CSV row 2.*expert_field/);
   assert.equal(JSON.stringify(memory.rows), before);
   const experts = await Promise.all(memory.rows.map(r => getInvestor(memory.client, r.id)));
   const [headers, ...values] = parseCsv(exportCsv(experts));
@@ -277,4 +278,27 @@ test("Every summary metric and status count uses the selected field, including l
   assert.equal(economists.counts["Meeting set"], 1);
   assert.equal(all.counts.New, 1);
   assert.equal(all.counts["Meeting set"], 1);
+});
+
+test("Custom expert types, $0 deal size, and editable card creation date (created_at) work end-to-end", async () => {
+  const memory = memoryClient();
+  const created = await upsert(memory.client, {
+    name: "Dr. Jane Custom",
+    expert_field: "Civil Engineering",
+    deal_value: 0,
+    created_at: "2026-09-15",
+    status: "Closed",
+  });
+  assert.equal(created.investor.expert_field, "Civil Engineering");
+  assert.equal(created.investor.deal_value, 0);
+  assert.equal(created.investor.created_at.slice(0, 10), "2026-09-15");
+
+  const updated = await upsert(memory.client, { created_at: "2026-09-27", deal_value: 0 }, created.investor.id);
+  assert.equal(updated.investor.created_at.slice(0, 10), "2026-09-27");
+  assert.equal(updated.investor.deal_value, 0);
+
+  const s = summary([updated.investor], now, undefined, { workspace: "experts" });
+  assert.equal(s.total, 1);
+  assert.equal(s.total_pipeline_value, 0);
+  assert.equal(s.avg_days_to_close, 10);
 });

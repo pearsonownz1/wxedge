@@ -46744,7 +46744,7 @@ var ListInvestorsResponseItem = objectType({
     "message": stringType(),
     "kind": stringType()
   })),
-  "expert_field": enumType(["Dentistry", "Economics", "Law Firms", "Chinese Law", "Indian Law"]),
+  "expert_field": stringType().min(1).max(120),
   "lead_source": stringType().optional(),
   "deal_value": unionType([numberType(), stringType()]).optional(),
   "expected_close_date": stringType().optional(),
@@ -46776,14 +46776,15 @@ var UpsertInvestorBody = objectType({
   "investor_type": enumType(["STANDARD", "PREMIUM"]).optional(),
   "fit_score": numberType().min(1).max(upsertInvestorBodyFitScoreMax).optional(),
   "status": enumType(["New", "Contacted", "Meeting set", "Proposal sent", "Contract review", "Closed"]).optional(),
-  "expert_field": enumType(["Dentistry", "Economics", "Law Firms", "Chinese Law", "Indian Law"]).optional(),
+  "expert_field": stringType().min(1).max(120).optional(),
   "lead_source": stringType().optional(),
   "deal_value": unionType([numberType(), stringType()]).optional(),
   "expected_close_date": stringType().optional(),
   "owner": stringType().optional(),
   "client_type": enumType(["new lead", "cold client", "active client", ""]).optional(),
   "type": enumType(["new lead", "cold client", "active client", ""]).optional(),
-  "phone": stringType().optional()
+  "phone": stringType().optional(),
+  "created_at": stringType().optional()
 });
 var upsertInvestorResponseFitScoreMax = 5;
 var UpsertInvestorResponse = objectType({
@@ -46816,7 +46817,7 @@ var UpsertInvestorResponse = objectType({
     "message": stringType(),
     "kind": stringType()
   })),
-  "expert_field": enumType(["Dentistry", "Economics", "Law Firms", "Chinese Law", "Indian Law"]),
+  "expert_field": stringType().min(1).max(120),
   "lead_source": stringType().optional(),
   "deal_value": unionType([numberType(), stringType()]).optional(),
   "expected_close_date": stringType().optional(),
@@ -46859,7 +46860,7 @@ var BrowserListInvestorsResponseItem = objectType({
     "message": stringType(),
     "kind": stringType()
   })),
-  "expert_field": enumType(["Dentistry", "Economics", "Law Firms", "Chinese Law", "Indian Law"]),
+  "expert_field": stringType().min(1).max(120),
   "lead_source": stringType().optional(),
   "deal_value": unionType([numberType(), stringType()]).optional(),
   "expected_close_date": stringType().optional(),
@@ -46891,14 +46892,15 @@ var BrowserUpsertInvestorBody = objectType({
   "investor_type": enumType(["STANDARD", "PREMIUM"]).optional(),
   "fit_score": numberType().min(1).max(browserUpsertInvestorBodyFitScoreMax).optional(),
   "status": enumType(["New", "Contacted", "Meeting set", "Proposal sent", "Contract review", "Closed"]).optional(),
-  "expert_field": enumType(["Dentistry", "Economics", "Law Firms", "Chinese Law", "Indian Law"]).optional(),
+  "expert_field": stringType().min(1).max(120).optional(),
   "lead_source": stringType().optional(),
   "deal_value": unionType([numberType(), stringType()]).optional(),
   "expected_close_date": stringType().optional(),
   "owner": stringType().optional(),
   "client_type": enumType(["new lead", "cold client", "active client", ""]).optional(),
   "type": enumType(["new lead", "cold client", "active client", ""]).optional(),
-  "phone": stringType().optional()
+  "phone": stringType().optional(),
+  "created_at": stringType().optional()
 });
 var browserUpsertInvestorResponseFitScoreMax = 5;
 var BrowserUpsertInvestorResponse = objectType({
@@ -46931,7 +46933,7 @@ var BrowserUpsertInvestorResponse = objectType({
     "message": stringType(),
     "kind": stringType()
   })),
-  "expert_field": enumType(["Dentistry", "Economics", "Law Firms", "Chinese Law", "Indian Law"]),
+  "expert_field": stringType().min(1).max(120),
   "lead_source": stringType().optional(),
   "deal_value": unionType([numberType(), stringType()]).optional(),
   "expected_close_date": stringType().optional(),
@@ -46974,7 +46976,7 @@ var GetInvestorResponse = objectType({
     "message": stringType(),
     "kind": stringType()
   })),
-  "expert_field": enumType(["Dentistry", "Economics", "Law Firms", "Chinese Law", "Indian Law"]),
+  "expert_field": stringType().min(1).max(120),
   "lead_source": stringType().optional(),
   "deal_value": unionType([numberType(), stringType()]).optional(),
   "expected_close_date": stringType().optional(),
@@ -47008,14 +47010,15 @@ var UpdateInvestorBody = objectType({
   "investor_type": enumType(["STANDARD", "PREMIUM"]).optional(),
   "fit_score": numberType().min(1).max(updateInvestorBodyFitScoreMax).optional(),
   "status": enumType(["New", "Contacted", "Meeting set", "Proposal sent", "Contract review", "Closed"]).optional(),
-  "expert_field": enumType(["Dentistry", "Economics", "Law Firms", "Chinese Law", "Indian Law"]).optional(),
+  "expert_field": stringType().min(1).max(120).optional(),
   "lead_source": stringType().optional(),
   "deal_value": unionType([numberType(), stringType()]).optional(),
   "expected_close_date": stringType().optional(),
   "owner": stringType().optional(),
   "client_type": enumType(["new lead", "cold client", "active client", ""]).optional(),
   "type": enumType(["new lead", "cold client", "active client", ""]).optional(),
-  "phone": stringType().optional()
+  "phone": stringType().optional(),
+  "created_at": stringType().optional()
 });
 var updateInvestorResponseFitScoreMax = 5;
 var UpdateInvestorResponse = objectType({
@@ -47048,7 +47051,7 @@ var UpdateInvestorResponse = objectType({
     "message": stringType(),
     "kind": stringType()
   })),
-  "expert_field": enumType(["Dentistry", "Economics", "Law Firms", "Chinese Law", "Indian Law"]),
+  "expert_field": stringType().min(1).max(120),
   "lead_source": stringType().optional(),
   "deal_value": unionType([numberType(), stringType()]).optional(),
   "expected_close_date": stringType().optional(),
@@ -47091,7 +47094,7 @@ var BrowserGetInvestorResponse = objectType({
     "message": stringType(),
     "kind": stringType()
   })),
-  "expert_field": enumType(["Dentistry", "Economics", "Law Firms", "Chinese Law", "Indian Law"]),
+  "expert_field": stringType().min(1).max(120),
   "lead_source": stringType().optional(),
   "deal_value": unionType([numberType(), stringType()]).optional(),
   "expected_close_date": stringType().optional(),
@@ -47125,14 +47128,15 @@ var BrowserUpdateInvestorBody = objectType({
   "investor_type": enumType(["STANDARD", "PREMIUM"]).optional(),
   "fit_score": numberType().min(1).max(browserUpdateInvestorBodyFitScoreMax).optional(),
   "status": enumType(["New", "Contacted", "Meeting set", "Proposal sent", "Contract review", "Closed"]).optional(),
-  "expert_field": enumType(["Dentistry", "Economics", "Law Firms", "Chinese Law", "Indian Law"]).optional(),
+  "expert_field": stringType().min(1).max(120).optional(),
   "lead_source": stringType().optional(),
   "deal_value": unionType([numberType(), stringType()]).optional(),
   "expected_close_date": stringType().optional(),
   "owner": stringType().optional(),
   "client_type": enumType(["new lead", "cold client", "active client", ""]).optional(),
   "type": enumType(["new lead", "cold client", "active client", ""]).optional(),
-  "phone": stringType().optional()
+  "phone": stringType().optional(),
+  "created_at": stringType().optional()
 });
 var browserUpdateInvestorResponseFitScoreMax = 5;
 var BrowserUpdateInvestorResponse = objectType({
@@ -47165,7 +47169,7 @@ var BrowserUpdateInvestorResponse = objectType({
     "message": stringType(),
     "kind": stringType()
   })),
-  "expert_field": enumType(["Dentistry", "Economics", "Law Firms", "Chinese Law", "Indian Law"]),
+  "expert_field": stringType().min(1).max(120),
   "lead_source": stringType().optional(),
   "deal_value": unionType([numberType(), stringType()]).optional(),
   "expected_close_date": stringType().optional(),
@@ -47212,7 +47216,7 @@ var AppendActivityResponse = objectType({
     "message": stringType(),
     "kind": stringType()
   })),
-  "expert_field": enumType(["Dentistry", "Economics", "Law Firms", "Chinese Law", "Indian Law"]),
+  "expert_field": stringType().min(1).max(120),
   "lead_source": stringType().optional(),
   "deal_value": unionType([numberType(), stringType()]).optional(),
   "expected_close_date": stringType().optional(),
@@ -47259,7 +47263,7 @@ var BrowserAppendActivityResponse = objectType({
     "message": stringType(),
     "kind": stringType()
   })),
-  "expert_field": enumType(["Dentistry", "Economics", "Law Firms", "Chinese Law", "Indian Law"]),
+  "expert_field": stringType().min(1).max(120),
   "lead_source": stringType().optional(),
   "deal_value": unionType([numberType(), stringType()]).optional(),
   "expected_close_date": stringType().optional(),
@@ -47269,7 +47273,7 @@ var BrowserAppendActivityResponse = objectType({
   "phone": stringType().optional()
 });
 var GetSummaryQueryParams = objectType({
-  "expert_field": enumType(["Dentistry", "Economics", "Law Firms", "Chinese Law", "Indian Law"]).optional().describe("Restrict summary metrics to this field; records without a field count as Dentistry. Omit for all experts.")
+  "expert_field": stringType().min(1).max(120).optional().describe("Restrict summary metrics to this field; records without a field count as Dentistry. Omit for all experts.")
 });
 var GetSummaryResponse = objectType({
   "total": numberType(),
@@ -47281,7 +47285,7 @@ var GetSummaryResponse = objectType({
   "followups_due_today": numberType()
 });
 var BrowserGetSummaryQueryParams = objectType({
-  "expert_field": enumType(["Dentistry", "Economics", "Law Firms", "Chinese Law", "Indian Law"]).optional().describe("Restrict summary metrics to this field; records without a field count as Dentistry. Omit for all experts.")
+  "expert_field": stringType().min(1).max(120).optional().describe("Restrict summary metrics to this field; records without a field count as Dentistry. Omit for all experts.")
 });
 var BrowserGetSummaryResponse = objectType({
   "total": numberType(),
@@ -47293,14 +47297,16 @@ var BrowserGetSummaryResponse = objectType({
   "followups_due_today": numberType()
 });
 var ImportInvestorsBody = objectType({
-  "csv": stringType().min(1)
+  "csv": stringType().min(1),
+  "default_expert_field": stringType().optional()
 });
 var ImportInvestorsResponse = objectType({
   "created": numberType(),
   "updated": numberType()
 });
 var BrowserImportInvestorsBody = objectType({
-  "csv": stringType().min(1)
+  "csv": stringType().min(1),
+  "default_expert_field": stringType().optional()
 });
 var BrowserImportInvestorsResponse = objectType({
   "created": numberType(),
@@ -47827,6 +47833,43 @@ function nextStageForEvent(currentStage, eventType) {
 // src/lib/crmData.ts
 var STATUSES = [...STAGES];
 var CLIENT_TYPES = ["new lead", "cold client", "active client"];
+var SALES_FIELDS = ["Law Firms", "Chinese Law", "Indian Law"];
+var DEFAULT_EXPERT_DISCIPLINES = [
+  "Dentistry",
+  "Economics",
+  "Computer Science & AI",
+  "Medicine & Healthcare",
+  "Biotechnology & Life Sciences",
+  "Engineering",
+  "Finance & Business",
+  "Data Science & Analytics",
+  "Cybersecurity",
+  "Public Health",
+  "Education",
+  "Law & Policy"
+];
+function isSalesField(field) {
+  const f = (field || "Law Firms").trim();
+  return SALES_FIELDS.includes(f);
+}
+function normalizeExpertFieldValue(value) {
+  const raw = typeof value === "string" ? value.trim() : "";
+  if (!raw || raw.length > 120) {
+    throw fieldError("expert_field", value, "expert_field must be Law Firms, Chinese Law, Indian Law, Dentistry, Economics, or a valid discipline name");
+  }
+  const lower = raw.toLowerCase();
+  if (lower === "law_firms" || lower === "brazilian law" || lower === "brazil") {
+    throw fieldError("expert_field", value, "expert_field must be Dentistry, Economics, Law Firms, Chinese Law or Indian Law");
+  }
+  if (lower === "law firms") return "Law Firms";
+  if (lower === "chinese law") return "Chinese Law";
+  if (lower === "indian law") return "Indian Law";
+  if (lower === "dentistry" || lower === "dentists") return "Dentistry";
+  if (lower === "economics" || lower === "economists") return "Economics";
+  const matchedBuiltIn = DEFAULT_EXPERT_DISCIPLINES.find((d) => d.toLowerCase() === lower);
+  if (matchedBuiltIn) return matchedBuiltIn;
+  return raw;
+}
 var FIELDS = [
   "name",
   "firm",
@@ -47891,9 +47934,10 @@ function normalizeLinkedIn(value) {
   if (!["https:", "http:"].includes(url.protocol) || !/^(www\.)?linkedin\.com$/i.test(url.hostname) || !url.pathname.replace(/\/+$/, "")) throw fieldError("linkedin_url", value, "Use a linkedin.com profile URL");
   return `https://www.linkedin.com${url.pathname.toLowerCase().replace(/\/+$/, "")}`;
 }
-function parseDealValueNumber(raw, fallbackCheckSize, investorType) {
+function parseDealValueNumber(raw, fallbackCheckSize, _investorType) {
+  if (raw === 0 || raw === "0") return 0;
   if (typeof raw === "number" && Number.isFinite(raw) && raw >= 0) return raw;
-  if (typeof raw === "string" && raw.trim()) {
+  if (typeof raw === "string" && raw.trim() !== "") {
     const cleaned = raw.replace(/[$,\s]/g, "");
     const n = Number(cleaned);
     if (Number.isFinite(n) && n >= 0) return n;
@@ -47902,10 +47946,10 @@ function parseDealValueNumber(raw, fallbackCheckSize, investorType) {
     const m = fallbackCheckSize.replace(/,/g, "").match(/\d+(?:\.\d+)?/);
     if (m) {
       const n = Number(m[0]);
-      if (Number.isFinite(n) && n > 0) return n;
+      if (Number.isFinite(n) && n >= 0) return n;
     }
   }
-  return investorType === "PREMIUM" ? 4500 : 2500;
+  return 0;
 }
 function extractPhoneFromRecord(data) {
   if (typeof data.phone === "string" && data.phone.trim()) return data.phone.trim();
@@ -47940,9 +47984,24 @@ function validateInput(raw) {
       }
     }
   }
+  if (data.expert_field !== void 0) {
+    data.expert_field = normalizeExpertFieldValue(data.expert_field);
+  }
   for (const key of ["last_contacted_date", "next_follow_up_date", "expected_close_date"]) {
     const date2 = data[key];
     if (date2 && (!/^\d{4}-\d{2}-\d{2}$/.test(date2) || Number.isNaN(Date.parse(date2)) || new Date(date2).toISOString().slice(0, 10) !== date2)) throw fieldError(key, date2, `${key} must be YYYY-MM-DD`);
+  }
+  if (data.created_at !== void 0) {
+    const rawCreated = String(data.created_at).trim();
+    if (!rawCreated) {
+      delete data.created_at;
+    } else {
+      const datePart = rawCreated.slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(datePart) || Number.isNaN(Date.parse(datePart)) || (/* @__PURE__ */ new Date(`${datePart}T00:00:00.000Z`)).toISOString().slice(0, 10) !== datePart) {
+        throw fieldError("created_at", data.created_at, "created_at must be YYYY-MM-DD");
+      }
+      data.created_at = datePart;
+    }
   }
   if (data.type !== void 0 && data.client_type === void 0) {
     data.client_type = data.type;
@@ -48007,8 +48066,8 @@ async function getInvestor(client, id2) {
     type: clientType,
     phone,
     id: row.id,
-    created_at: row.created_at.toISOString(),
-    updated_at: row.updated_at.toISOString(),
+    created_at: typeof rawData.created_at === "string" && /^\d{4}-\d{2}-\d{2}/.test(rawData.created_at.trim()) ? `${rawData.created_at.trim().slice(0, 10)}T12:00:00.000Z` : row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at),
+    updated_at: row.updated_at instanceof Date ? row.updated_at.toISOString() : String(row.updated_at),
     activity_log: a.rows
   };
 }
@@ -48052,7 +48111,7 @@ async function listInvestors(client, status, owner) {
         type: clientType,
         phone,
         id: row.id,
-        created_at: row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at),
+        created_at: typeof rawData.created_at === "string" && /^\d{4}-\d{2}-\d{2}/.test(rawData.created_at.trim()) ? `${rawData.created_at.trim().slice(0, 10)}T12:00:00.000Z` : row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at),
         updated_at: row.updated_at instanceof Date ? row.updated_at.toISOString() : String(row.updated_at),
         activity_log: row.activity_log || []
       };
@@ -48143,7 +48202,7 @@ async function upsert(client, raw, id2) {
     fit_score: 3,
     status: "New",
     lead_source: "Outbound",
-    deal_value: 2500,
+    deal_value: 0,
     expected_close_date: "",
     owner: "Guy",
     client_type: "new lead",
@@ -48158,6 +48217,12 @@ async function upsert(client, raw, id2) {
     const r = await client.query("INSERT INTO crm_investors(email_key,linkedin_key,data) VALUES($1,$2,$3::jsonb) RETURNING id", payload);
     id2 = r.rows[0].id;
   } else await client.query("UPDATE crm_investors SET email_key=$1,linkedin_key=$2,data=$3::jsonb,updated_at=NOW() WHERE id=$4", [...payload, id2]);
+  if (input.created_at && /^\d{4}-\d{2}-\d{2}$/.test(input.created_at)) {
+    try {
+      await client.query("UPDATE crm_investors SET created_at=$1::timestamptz WHERE id=$2", [`${input.created_at}T12:00:00.000Z`, id2]);
+    } catch {
+    }
+  }
   await activity(client, id2, created ? "Investor created" : `Updated: ${Object.keys(input).join(", ")}`, created ? "created" : "updated");
   if (old?.status !== data.status) await activity(client, id2, `${old?.status ?? "New record"} \u2192 ${data.status}`, `status:${data.status}`);
   return { investor: await getInvestor(client, id2), created };
@@ -48240,9 +48305,9 @@ async function logOutboundActivity(client, raw) {
 }
 function summary(investors, now = /* @__PURE__ */ new Date(), expertField, filters) {
   if (filters?.workspace === "sales") {
-    investors = investors.filter((i) => ["Law Firms", "Chinese Law", "Indian Law"].includes(i.expert_field || "Law Firms"));
+    investors = investors.filter((i) => isSalesField(i.expert_field));
   } else if (filters?.workspace === "experts") {
-    investors = investors.filter((i) => ["Dentistry", "Economics"].includes(i.expert_field || ""));
+    investors = investors.filter((i) => !isSalesField(i.expert_field));
   }
   if (expertField) investors = investors.filter((i) => (i.expert_field || "Law Firms") === expertField);
   if (filters?.owner && filters.owner.trim() && filters.owner.trim().toLowerCase() !== "all") {
@@ -48294,15 +48359,27 @@ function summary(investors, now = /* @__PURE__ */ new Date(), expertField, filte
   if (closedDeals.length > 0) {
     const daysList = closedDeals.map((i) => {
       const c = Date.parse(i.created_at || "");
-      const u = Date.parse(i.updated_at || "");
-      if (!Number.isNaN(c) && !Number.isNaN(u) && u >= c) {
-        return Math.max(1, Math.round((u - c) / (1e3 * 60 * 60 * 24)));
+      const closedAct = [...i.activity_log || []].reverse().find((a) => a.kind === "status:Closed");
+      const closeDateStr = i.expected_close_date && /^\d{4}-\d{2}-\d{2}$/.test(i.expected_close_date) ? `${i.expected_close_date}T12:00:00.000Z` : closedAct?.timestamp || i.updated_at || "";
+      const u = Date.parse(closeDateStr);
+      if (!Number.isNaN(c) && !Number.isNaN(u)) {
+        return Math.max(0, Math.round((u - c) / (1e3 * 60 * 60 * 24)));
       }
-      return 14;
+      return 0;
     });
     avgDaysToClose = Math.round(daysList.reduce((a, b) => a + b, 0) / daysList.length * 10) / 10;
   } else {
-    avgDaysToClose = 18;
+    const withDates = investors.filter((i) => i.created_at && i.expected_close_date && /^\d{4}-\d{2}-\d{2}$/.test(i.expected_close_date));
+    if (withDates.length > 0) {
+      const daysList = withDates.map((i) => {
+        const c = Date.parse(i.created_at || "");
+        const u = Date.parse(`${i.expected_close_date}T12:00:00.000Z`);
+        return !Number.isNaN(c) && !Number.isNaN(u) ? Math.max(0, Math.round((u - c) / (1e3 * 60 * 60 * 24))) : 0;
+      });
+      avgDaysToClose = Math.round(daysList.reduce((a, b) => a + b, 0) / daysList.length * 10) / 10;
+    } else {
+      avgDaysToClose = 0;
+    }
   }
   const reachedMeetingOrBeyond = investors.filter(
     (i) => ["Meeting set", "Proposal sent", "Contract review", "Closed"].includes(i.status) || hasStatus(i, ["Meeting Set", "Meeting set", "Proposal sent", "Contract review", "Committed"])
@@ -48337,6 +48414,78 @@ function summary(investors, now = /* @__PURE__ */ new Date(), expertField, filte
     funnel,
     stage_probabilities: STAGE_PROBABILITIES
   };
+}
+async function ensureCrmTablesAndDefaults(client) {
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS crm_users (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      email TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT 'member',
+      workspace_settings JSONB NOT NULL DEFAULT '{}'::jsonb,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE TABLE IF NOT EXISTS crm_calls (
+      id SERIAL PRIMARY KEY,
+      investor_id INTEGER REFERENCES crm_investors(id) ON DELETE SET NULL,
+      call_id TEXT,
+      from_number TEXT NOT NULL DEFAULT '+15619031414',
+      to_number TEXT NOT NULL,
+      duration_sec INTEGER NOT NULL DEFAULT 0,
+      recording_url TEXT NOT NULL DEFAULT '',
+      ai_overview TEXT NOT NULL DEFAULT '',
+      outcome TEXT NOT NULL DEFAULT 'connected_live',
+      sentiment TEXT NOT NULL DEFAULT 'neutral',
+      action_items JSONB NOT NULL DEFAULT '[]'::jsonb,
+      next_steps TEXT NOT NULL DEFAULT '',
+      transcript JSONB NOT NULL DEFAULT '[]'::jsonb,
+      metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE TABLE IF NOT EXISTS crm_whatsapp_messages (
+      id SERIAL PRIMARY KEY,
+      investor_id INTEGER REFERENCES crm_investors(id) ON DELETE SET NULL,
+      phone TEXT NOT NULL,
+      direction TEXT NOT NULL DEFAULT 'outbound',
+      body TEXT NOT NULL,
+      sender TEXT NOT NULL DEFAULT 'Guy',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+  const existingUsers = await client.query("SELECT count(*)::int AS n FROM crm_users");
+  if ((existingUsers.rows[0]?.n ?? 0) === 0) {
+    const defaultUsers = [
+      {
+        name: "Guy",
+        email: "guy@gcs.org",
+        password: process.env.CRM_ADMIN_PASSWORD || process.env.CRM_PIN || "SellingHighs2026!",
+        role: "admin",
+        workspace: { default_field: "All", title: "Founder & Admin" }
+      },
+      {
+        name: "Growth",
+        email: "growth@gcs.org",
+        password: process.env.CRM_GROWTH_PASSWORD || "Growth2026!",
+        role: "admin",
+        workspace: { default_field: "Law Firms", title: "Outbound & Growth Lead" }
+      },
+      {
+        name: "Eduardo",
+        email: "eduardo@gcs.org",
+        password: process.env.CRM_GROK_PASSWORD || "GrokBot2026!",
+        role: "admin",
+        workspace: { default_field: "All", title: "Autonomous Outbound Agent" }
+      }
+    ];
+    for (const u of defaultUsers) {
+      await client.query(
+        "INSERT INTO crm_users(name,email,password_hash,role,workspace_settings) VALUES($1,$2,$3,$4,$5::jsonb) ON CONFLICT (email) DO NOTHING",
+        [u.name, u.email, hashPassword(u.password), u.role, JSON.stringify(u.workspace)]
+      );
+    }
+  }
 }
 async function verifyUserCredentials(email, password) {
   try {
@@ -48415,6 +48564,61 @@ async function deleteUser(client, userId) {
   if (!r.rows[0]) throw new CrmError("User not found", 404);
   return { deleted: true, id: userId };
 }
+async function listExpertTypes(client) {
+  const customSet = /* @__PURE__ */ new Set();
+  try {
+    const uRes = await client.query("SELECT workspace_settings FROM crm_users");
+    for (const row of uRes.rows) {
+      const arr = row.workspace_settings?.custom_expert_types;
+      if (Array.isArray(arr)) {
+        for (const item of arr) {
+          if (typeof item === "string" && item.trim() && !isSalesField(item.trim())) {
+            customSet.add(item.trim());
+          }
+        }
+      }
+    }
+  } catch {
+  }
+  try {
+    const iRes = await client.query("SELECT DISTINCT data->>'expert_field' AS expert_field FROM crm_investors WHERE data->>'expert_field' IS NOT NULL");
+    for (const row of iRes.rows) {
+      const f = typeof row.expert_field === "string" ? row.expert_field.trim() : "";
+      if (f && !isSalesField(f)) {
+        customSet.add(f);
+      }
+    }
+  } catch {
+  }
+  const all = Array.from(/* @__PURE__ */ new Set([...DEFAULT_EXPERT_DISCIPLINES, ...Array.from(customSet)]));
+  const customOnly = Array.from(customSet).filter((x) => !DEFAULT_EXPERT_DISCIPLINES.includes(x));
+  return {
+    expert_types: all,
+    custom_expert_types: customOnly,
+    sales_fields: [...SALES_FIELDS]
+  };
+}
+async function addCustomExpertType(client, rawName) {
+  const cleaned = normalizeExpertFieldValue(rawName);
+  if (isSalesField(cleaned)) {
+    return listExpertTypes(client);
+  }
+  try {
+    await ensureCrmTablesAndDefaults(client);
+    const uRes = await client.query("SELECT id, workspace_settings FROM crm_users ORDER BY id ASC LIMIT 1 FOR UPDATE");
+    if (uRes.rows[0]) {
+      const ws = uRes.rows[0].workspace_settings || {};
+      const existing = Array.isArray(ws.custom_expert_types) ? ws.custom_expert_types.map(String) : [];
+      if (!existing.some((x) => x.toLowerCase() === cleaned.toLowerCase())) {
+        existing.push(cleaned);
+      }
+      const nextWs = { ...ws, custom_expert_types: existing };
+      await client.query("UPDATE crm_users SET workspace_settings=$1::jsonb, updated_at=NOW() WHERE id=$2", [JSON.stringify(nextWs), uRes.rows[0].id]);
+    }
+  } catch {
+  }
+  return listExpertTypes(client);
+}
 
 // src/lib/crmCsv.ts
 function parseCsv(text2) {
@@ -48461,16 +48665,12 @@ function parseCsv(text2) {
   if (row.some((v) => v !== "")) rows.push(row);
   return rows;
 }
-function csvExpertField(value) {
-  const field = value.trim().toLowerCase();
-  if (!field || field === "law firms") return "Law Firms";
-  if (field === "dentistry" || field === "dentists") return "Dentistry";
-  if (field === "economics" || field === "economists") return "Economics";
-  if (field === "chinese law") return "Chinese Law";
-  if (field === "indian law") return "Indian Law";
-  throw fieldError("expert_field", value, "expert_field must be Dentistry, Economics, Law Firms, Chinese Law or Indian Law");
+function csvExpertField(value, defaultField = "Law Firms") {
+  const field = value.trim();
+  if (!field) return normalizeExpertFieldValue(defaultField || "Law Firms");
+  return normalizeExpertFieldValue(field);
 }
-async function importCsv(client, text2) {
+async function importCsv(client, text2, defaultExpertField) {
   const rows = parseCsv(text2);
   if (rows.length < 2) throw new CrmError("CSV must contain headers and at least one investor");
   if (rows.length > 5001) throw new CrmError("Import at most 5,000 investors at once");
@@ -48502,6 +48702,8 @@ async function importCsv(client, text2) {
           if (key === "fit_score") input[key] = Number(rows[i][j]);
           else if (key === "deal_value") input[key] = rows[i][j].trim() === "" ? void 0 : Number(rows[i][j].replace(/[$,\s]/g, ""));
           else input[key] = rows[i][j];
+        } else if (key === "created_at" && rows[i][j].trim()) {
+          input.created_at = rows[i][j].trim();
         }
       });
       if (input.fit_score === 0) delete input.fit_score;
@@ -48517,7 +48719,13 @@ async function importCsv(client, text2) {
         }
       }
       if (input.investor_type === "") delete input.investor_type;
-      if (typeof input.expert_field === "string") input.expert_field = csvExpertField(input.expert_field);
+      if (typeof input.expert_field === "string") {
+        if (input.expert_field.trim()) input.expert_field = csvExpertField(input.expert_field, defaultExpertField || "Law Firms");
+        else if (defaultExpertField?.trim()) input.expert_field = csvExpertField(defaultExpertField);
+        else delete input.expert_field;
+      } else if (defaultExpertField?.trim()) {
+        input.expert_field = csvExpertField(defaultExpertField);
+      }
       const result = await upsert(client, input);
       result.created ? created++ : updated++;
       if (typeof originalStage === "string" && originalStage.trim() && originalStage !== input.status) {
@@ -48577,9 +48785,17 @@ function id(value) {
   if (!Number.isSafeInteger(n) || n <= 0) throw new CrmError("Invalid investor id");
   return n;
 }
+router3.get("/expert-types", async (_req, res) => {
+  res.json(await listExpertTypes(pool));
+});
+router3.post("/expert-types", async (req, res) => {
+  const name = req.body?.name ?? req.body?.expert_field;
+  const result = await transaction((client) => addCustomExpertType(client, name));
+  res.status(201).json(result);
+});
 router3.get("/summary", async (req, res) => {
-  const expertField = req.query.expert_field;
-  if (expertField !== void 0 && expertField !== "Dentistry" && expertField !== "Economics" && expertField !== "Law Firms" && expertField !== "Chinese Law" && expertField !== "Indian Law") {
+  const expertField = typeof req.query.expert_field === "string" ? req.query.expert_field.trim() : void 0;
+  if (expertField !== void 0 && (!expertField || expertField.length > 120)) {
     throw new CrmError("Invalid expert field");
   }
   const owner = typeof req.query.owner === "string" ? req.query.owner : void 0;
@@ -48601,7 +48817,7 @@ router3.get("/investors/export", async (_req, res) => {
 router3.post("/investors/import", async (req, res) => {
   const input = BrowserImportInvestorsBody.safeParse(req.body);
   if (!input.success) throw new CrmError("CSV text required");
-  res.json(await transaction((client) => importCsv(client, input.data.csv)));
+  res.json(await transaction((client) => importCsv(client, input.data.csv, input.data.default_expert_field)));
 });
 router3.post("/investors/deduplicate", async (_req, res) => {
   res.json(await transaction((client) => deduplicateInvestors(client)));
@@ -49005,7 +49221,7 @@ router3.get("/campaigns", async (_req, res) => {
     const contacted = matching.filter((i) => i.status !== "New").length;
     const meetings = matching.filter((i) => ["Meeting set", "Proposal sent", "Contract review", "Closed"].includes(i.status)).length;
     const proposals = matching.filter((i) => ["Proposal sent", "Contract review", "Closed"].includes(i.status)).length;
-    const val = matching.reduce((acc, i) => acc + (Number(i.deal_value) || 2500), 0);
+    const val = matching.reduce((acc, i) => acc + (Number.isFinite(Number(i.deal_value)) && Number(i.deal_value) >= 0 ? Number(i.deal_value) : 0), 0);
     campaignMap.set(d.name, {
       name: d.name,
       field: d.field,

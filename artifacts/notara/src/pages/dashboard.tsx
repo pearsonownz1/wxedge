@@ -46,11 +46,17 @@ import {
   TIER_TONE,
   TEMPLATE_CSV,
   SALES_FIELD_FILTERS,
-  EXPERTS_FIELD_FILTERS,
+  SALES_FIELDS_LIST,
+  ADD_EXPERT_TYPE_OPTION,
   WORKSPACE_OPTIONS,
+  getAvailableExpertDisciplines,
+  getDynamicExpertFieldFilters,
+  saveCustomExpertType,
   filterByWorkspace,
   workspaceOfRecord,
   defaultExpertFieldFor,
+  parseDealValue,
+  toDateInputValue,
   type ExpertFieldFilter,
   type StageStatus,
   type WorkspaceMode,
@@ -228,6 +234,31 @@ export default function Dashboard() {
     },
   });
 
+  const expertTypesQuery = useQuery<{ expert_types: string[]; custom_expert_types: string[] }>({
+    queryKey: ['/api/crm/expert-types'],
+    queryFn: async () => {
+      const r = await fetch('/api/crm/expert-types', { credentials: 'include' });
+      if (!r.ok) return { expert_types: [], custom_expert_types: [] };
+      return r.json();
+    },
+  });
+
+  const [expertTypesVersion, setExpertTypesVersion] = useState(0);
+  const [headerAddingType, setHeaderAddingType] = useState(false);
+  const [headerNewTypeInput, setHeaderNewTypeInput] = useState('');
+  const [importExpertField, setImportExpertField] = useState<string>('');
+  const [importAddingType, setImportAddingType] = useState(false);
+  const [importNewTypeInput, setImportNewTypeInput] = useState('');
+
+  useEffect(() => {
+    const onTypesUpdated = () => {
+      setExpertTypesVersion((v) => v + 1);
+      expertTypesQuery.refetch();
+    };
+    window.addEventListener('gcs-crm-expert-types-updated', onTypesUpdated);
+    return () => window.removeEventListener('gcs-crm-expert-types-updated', onTypesUpdated);
+  }, []);
+
   const update = useBrowserUpdateInvestor();
   const importer = useBrowserImportInvestors();
   const [view, setView] = useState<'board' | 'table'>('board');
@@ -310,17 +341,39 @@ export default function Dashboard() {
 
   const kpiMetrics = useMemo(() => {
     const s = sum.data;
-    const valOf = (i: Investor) => Number((i as any).deal_value) || 2500;
-    const totalPipelineVal = s?.total_pipeline_value ?? rows.reduce((acc, i) => acc + valOf(i), 0);
-    const weightedForecast =
-      s?.pipeline_forecast ??
-      Math.round(
-        rows.reduce((acc, i) => {
-          const prob = STAGE_PROBABILITIES[i.status as StageStatus] ?? 0.05;
-          return acc + valOf(i) * prob;
-        }, 0),
-      );
-    const avgDays = s?.avg_days_to_close ?? 18;
+    const valOf = (i: Investor) => parseDealValue((i as any).deal_value);
+    const totalPipelineVal = rows.reduce((acc, i) => acc + valOf(i), 0);
+    const weightedForecast = Math.round(
+      rows.reduce((acc, i) => {
+        const prob = STAGE_PROBABILITIES[i.status as StageStatus] ?? 0.05;
+        return acc + valOf(i) * prob;
+      }, 0),
+    );
+    const closedRows = rows.filter((i) => i.status === 'Closed');
+    let computedAvgDays: number | null = null;
+    if (closedRows.length > 0) {
+      const daysList = closedRows.map((i) => {
+        const c = Date.parse(i.created_at || '');
+        const closedAct = [...(i.activity_log || [])].reverse().find((a) => a.kind === 'status:Closed');
+        const closeDateStr = (i as any).expected_close_date && /^\d{4}-\d{2}-\d{2}$/.test((i as any).expected_close_date)
+          ? `${(i as any).expected_close_date}T12:00:00.000Z`
+          : (closedAct?.timestamp || i.updated_at || '');
+        const u = Date.parse(closeDateStr);
+        return !Number.isNaN(c) && !Number.isNaN(u) ? Math.max(0, Math.round((u - c) / (1000 * 60 * 60 * 24))) : 0;
+      });
+      computedAvgDays = Math.round((daysList.reduce((a, b) => a + b, 0) / daysList.length) * 10) / 10;
+    } else {
+      const withExpected = rows.filter((i) => i.created_at && (i as any).expected_close_date && /^\d{4}-\d{2}-\d{2}$/.test((i as any).expected_close_date));
+      if (withExpected.length > 0) {
+        const daysList = withExpected.map((i) => {
+          const c = Date.parse(i.created_at || '');
+          const u = Date.parse(`${(i as any).expected_close_date}T12:00:00.000Z`);
+          return !Number.isNaN(c) && !Number.isNaN(u) ? Math.max(0, Math.round((u - c) / (1000 * 60 * 60 * 24))) : 0;
+        });
+        computedAvgDays = Math.round((daysList.reduce((a, b) => a + b, 0) / daysList.length) * 10) / 10;
+      }
+    }
+    const avgDays = computedAvgDays ?? s?.avg_days_to_close ?? 0;
     const closedCount = rows.filter((i) => i.status === 'Closed').length;
     const meetingReached = rows.filter((i) =>
       ['Meeting set', 'Proposal sent', 'Contract review', 'Closed'].includes(i.status),
@@ -385,8 +438,15 @@ export default function Dashboard() {
 
   const doImport = () => {
     setImportError('');
+    let chosenField = importExpertField;
+    if (importAddingType && importNewTypeInput.trim()) {
+      chosenField = saveCustomExpertType(importNewTypeInput.trim());
+      setImportExpertField(chosenField);
+      setImportAddingType(false);
+      setImportNewTypeInput('');
+    }
     importer.mutate(
-      { data: { csv } },
+      { data: { csv, ...(chosenField && chosenField !== ADD_EXPERT_TYPE_OPTION ? { default_expert_field: chosenField } : {}) } },
       {
         onSuccess: (r) => {
           toast({ title: `Imported: ${r.created} created, ${r.updated} updated` });
@@ -445,7 +505,14 @@ export default function Dashboard() {
   );
 
   const isExperts = workspaceMode === "experts";
-  const activeFieldFilters = isExperts ? EXPERTS_FIELD_FILTERS : SALES_FIELD_FILTERS;
+  const availableExpertTypes = useMemo(
+    () => getAvailableExpertDisciplines(list.data, expertTypesQuery.data?.expert_types),
+    [list.data, expertTypesQuery.data, expertTypesVersion],
+  );
+  const activeFieldFilters = useMemo(
+    () => (isExperts ? getDynamicExpertFieldFilters(list.data, expertTypesQuery.data?.custom_expert_types) : SALES_FIELD_FILTERS),
+    [isExperts, list.data, expertTypesQuery.data, expertTypesVersion],
+  );
 
   const navItems: Array<{ id: NavSection; label: string; icon: any; badge?: string | number }> = [
     { id: "overview", label: "Overview", icon: Home },
@@ -609,11 +676,11 @@ export default function Dashboard() {
             </select>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
               {isExperts ? "DISCIPLINE:" : "MARKET / REGION:"}
             </span>
-            <div role="group" aria-label={isExperts ? "DISCIPLINE" : "MARKET / REGION"} className="flex rounded-lg border bg-slate-100 p-0.5">
+            <div role="group" aria-label={isExperts ? "DISCIPLINE" : "MARKET / REGION"} className="flex flex-wrap rounded-lg border bg-slate-100 p-0.5">
               {activeFieldFilters.map(({ value, label }) => (
                 <button
                   key={value}
@@ -631,7 +698,54 @@ export default function Dashboard() {
                   {label}
                 </button>
               ))}
+              {isExperts && (
+                <button
+                  type="button"
+                  data-testid="button-header-add-expert-type"
+                  onClick={() => setHeaderAddingType((prev) => !prev)}
+                  className="flex items-center gap-0.5 rounded-md px-2.5 py-1 text-xs font-semibold text-purple-700 hover:bg-purple-100/70"
+                >
+                  <Plus className="h-3 w-3" /> Add Expert Type
+                </button>
+              )}
             </div>
+            {isExperts && headerAddingType && (
+              <div className="flex items-center gap-1.5 rounded-lg border border-purple-200 bg-purple-50 px-2 py-1">
+                <input
+                  data-testid="input-header-expert-type"
+                  type="text"
+                  value={headerNewTypeInput}
+                  onChange={(e) => setHeaderNewTypeInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && headerNewTypeInput.trim()) {
+                      const saved = saveCustomExpertType(headerNewTypeInput.trim());
+                      setExpertField(saved);
+                      setHeaderNewTypeInput('');
+                      setHeaderAddingType(false);
+                      toast({ title: `Added expert type "${saved}"` });
+                    }
+                  }}
+                  placeholder="New expert type..."
+                  className="w-40 rounded border border-purple-300 bg-white px-2 py-0.5 text-xs focus:outline-none"
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  data-testid="button-header-confirm-expert-type"
+                  onClick={() => {
+                    if (!headerNewTypeInput.trim()) return;
+                    const saved = saveCustomExpertType(headerNewTypeInput.trim());
+                    setExpertField(saved);
+                    setHeaderNewTypeInput('');
+                    setHeaderAddingType(false);
+                    toast({ title: `Added expert type "${saved}"` });
+                  }}
+                  className="rounded bg-purple-600 px-2 py-0.5 text-xs font-semibold text-white hover:bg-purple-700"
+                >
+                  Add
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="ml-auto flex flex-wrap items-center gap-2">
@@ -908,7 +1022,7 @@ export default function Dashboard() {
                 <div className="flex gap-3 overflow-x-auto pb-4">
                   {STATUSES.map((st) => {
                     const col = rows.filter((i) => i.status === st);
-                    const colVal = col.reduce((acc, i) => acc + (Number((i as any).deal_value) || 2500), 0);
+                    const colVal = col.reduce((acc, i) => acc + parseDealValue((i as any).deal_value), 0);
                     return (
                       <div
                         key={st}
@@ -989,11 +1103,14 @@ export default function Dashboard() {
                                   <span>{i.expert_field}</span>
                                   <Fit n={i.fit_score} />
                                 </div>
-                                {((i as any).expected_close_date || i.next_follow_up_date) && (
-                                  <div className="mt-1 font-mono-ui text-[11px] text-blue-600">
-                                    Close: {(i as any).expected_close_date || i.next_follow_up_date}
-                                  </div>
-                                )}
+                                <div className="mt-1 flex items-center justify-between font-mono-ui text-[10px] text-slate-400">
+                                  <span>Created: {toDateInputValue(i.created_at)}</span>
+                                  {((i as any).expected_close_date || i.next_follow_up_date) && (
+                                    <span className="text-blue-600">
+                                      Close: {(i as any).expected_close_date || i.next_follow_up_date}
+                                    </span>
+                                  )}
+                                </div>
                               </button>
 
                               <select
@@ -1169,6 +1286,12 @@ export default function Dashboard() {
         defaultExpertField={defaultExpertFieldFor(expertField, workspaceMode)}
         workspaceMode={workspaceMode}
         teamOwners={teamOwners}
+        availableExpertTypes={availableExpertTypes}
+        onExpertTypeAdded={(newType) => {
+          setExpertTypesVersion((v) => v + 1);
+          expertTypesQuery.refetch();
+          if (workspaceMode === 'experts') setExpertField(newType);
+        }}
         onDialContact={(cardId, phone, firm) => {
           setDialCardId(cardId);
           setDialPhone(phone);
@@ -1190,6 +1313,78 @@ export default function Dashboard() {
               Paste CSV text or choose a file. Columns can be in any order; values are matched by header name.
             </DialogDescription>
           </DialogHeader>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-600">
+              {isExperts ? 'Expert Type / Discipline for Imported Leads' : 'Category / Expert Type for Imported Leads'}
+            </label>
+            <select
+              data-testid="select-import-expert-field"
+              value={importAddingType ? ADD_EXPERT_TYPE_OPTION : importExpertField}
+              onChange={(e) => {
+                if (e.target.value === ADD_EXPERT_TYPE_OPTION) {
+                  setImportAddingType(true);
+                } else {
+                  setImportAddingType(false);
+                  setImportExpertField(e.target.value);
+                }
+              }}
+              className={`${sel} w-full`}
+            >
+              <option value="">Use CSV expert_field column (or default)</option>
+              <optgroup label="Expert Disciplines">
+                {availableExpertTypes.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="Sales Markets">
+                {SALES_FIELDS_LIST.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </optgroup>
+              <option value={ADD_EXPERT_TYPE_OPTION}>+ Add Expert Type</option>
+            </select>
+            {importAddingType && (
+              <div className="mt-2 flex items-center gap-1.5">
+                <input
+                  data-testid="input-import-custom-expert-type"
+                  type="text"
+                  value={importNewTypeInput}
+                  onChange={(e) => setImportNewTypeInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && importNewTypeInput.trim()) {
+                      e.preventDefault();
+                      const saved = saveCustomExpertType(importNewTypeInput.trim());
+                      setImportExpertField(saved);
+                      setImportAddingType(false);
+                      setImportNewTypeInput('');
+                      toast({ title: `Added expert type "${saved}"` });
+                    }
+                  }}
+                  placeholder="Enter new expert type (e.g. Civil Engineering)..."
+                  className={`${sel} flex-1`}
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!importNewTypeInput.trim()) return;
+                    const saved = saveCustomExpertType(importNewTypeInput.trim());
+                    setImportExpertField(saved);
+                    setImportAddingType(false);
+                    setImportNewTypeInput('');
+                    toast({ title: `Added expert type "${saved}"` });
+                  }}
+                  className="rounded-md bg-purple-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-purple-700"
+                >
+                  Add
+                </button>
+              </div>
+            )}
+          </div>
           <code className="block break-words rounded bg-muted p-2 font-mono-ui text-[11px]">{TEMPLATE_CSV.trim()}</code>
           <div className="flex gap-2">
             <button

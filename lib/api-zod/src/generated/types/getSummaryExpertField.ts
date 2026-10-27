@@ -6,7 +6,7 @@
  * OpenAPI spec version: 1.0.0
  */
 
-export type GetSummaryExpertField = typeof GetSummaryExpertField[keyof typeof GetSummaryExpertField];
+export type GetSummaryExpertField = typeof GetSummaryExpertField[keyof typeof GetSummaryExpertField] | (string & {});
 
 
 export const GetSummaryExpertField = {

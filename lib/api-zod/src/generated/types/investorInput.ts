@@ -41,5 +41,6 @@ export interface InvestorInput {
   client_type?: 'new lead' | 'cold client' | 'active client' | '';
   type?: 'new lead' | 'cold client' | 'active client' | '';
   phone?: string;
+  created_at?: string;
   expert_field?: InvestorInputExpertField;
 }

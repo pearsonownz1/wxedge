@@ -6,8 +6,47 @@ import { nextStageForEvent, normalizeStage, STAGE_PROBABILITIES, STAGES, type St
 export const STATUSES: string[] = [...STAGES];
 export const CLIENT_TYPES = ["new lead", "cold client", "active client"] as const;
 export type ClientType = typeof CLIENT_TYPES[number];
+export const SALES_FIELDS = ["Law Firms", "Chinese Law", "Indian Law"] as const;
+export const DEFAULT_EXPERT_DISCIPLINES = [
+  "Dentistry",
+  "Economics",
+  "Computer Science & AI",
+  "Medicine & Healthcare",
+  "Biotechnology & Life Sciences",
+  "Engineering",
+  "Finance & Business",
+  "Data Science & Analytics",
+  "Cybersecurity",
+  "Public Health",
+  "Education",
+  "Law & Policy",
+] as const;
 export const EXPERT_FIELDS = ["Law Firms", "Chinese Law", "Indian Law", "Dentistry", "Economics"] as const;
-export type ExpertField = typeof EXPERT_FIELDS[number];
+export type ExpertField = typeof EXPERT_FIELDS[number] | (string & {});
+
+export function isSalesField(field?: string | null): boolean {
+  const f = (field || "Law Firms").trim();
+  return (SALES_FIELDS as readonly string[]).includes(f);
+}
+
+export function normalizeExpertFieldValue(value: unknown): string {
+  const raw = typeof value === "string" ? value.trim() : "";
+  if (!raw || raw.length > 120) {
+    throw fieldError("expert_field", value, "expert_field must be Law Firms, Chinese Law, Indian Law, Dentistry, Economics, or a valid discipline name");
+  }
+  const lower = raw.toLowerCase();
+  if (lower === "law_firms" || lower === "brazilian law" || lower === "brazil") {
+    throw fieldError("expert_field", value, "expert_field must be Dentistry, Economics, Law Firms, Chinese Law or Indian Law");
+  }
+  if (lower === "law firms") return "Law Firms";
+  if (lower === "chinese law") return "Chinese Law";
+  if (lower === "indian law") return "Indian Law";
+  if (lower === "dentistry" || lower === "dentists") return "Dentistry";
+  if (lower === "economics" || lower === "economists") return "Economics";
+  const matchedBuiltIn = DEFAULT_EXPERT_DISCIPLINES.find(d => d.toLowerCase() === lower);
+  if (matchedBuiltIn) return matchedBuiltIn;
+  return raw;
+}
 export const EXPERT_FIELD_FILTERS = [
   { value: "Law Firms", label: "Law Firms" },
   { value: "Chinese Law", label: "Chinese Law" },
@@ -62,9 +101,10 @@ export function normalizeLinkedIn(value: string): string | null {
   return `https://www.linkedin.com${url.pathname.toLowerCase().replace(/\/+$/, "")}`;
 }
 
-export function parseDealValueNumber(raw: unknown, fallbackCheckSize?: unknown, investorType?: unknown): number {
+export function parseDealValueNumber(raw: unknown, fallbackCheckSize?: unknown, _investorType?: unknown): number {
+  if (raw === 0 || raw === "0") return 0;
   if (typeof raw === "number" && Number.isFinite(raw) && raw >= 0) return raw;
-  if (typeof raw === "string" && raw.trim()) {
+  if (typeof raw === "string" && raw.trim() !== "") {
     const cleaned = raw.replace(/[$,\s]/g, "");
     const n = Number(cleaned);
     if (Number.isFinite(n) && n >= 0) return n;
@@ -73,10 +113,10 @@ export function parseDealValueNumber(raw: unknown, fallbackCheckSize?: unknown, 
     const m = fallbackCheckSize.replace(/,/g, "").match(/\d+(?:\.\d+)?/);
     if (m) {
       const n = Number(m[0]);
-      if (Number.isFinite(n) && n > 0) return n;
+      if (Number.isFinite(n) && n >= 0) return n;
     }
   }
-  return investorType === "PREMIUM" ? 4500 : 2500;
+  return 0;
 }
 
 export function extractPhoneFromRecord(data: Record<string, unknown>): string {
@@ -110,9 +150,24 @@ export function validateInput(raw: unknown) {
       catch { throw fieldError(key, data[key], `${key} must be an http or https URL`); }
     }
   }
+  if (data.expert_field !== undefined) {
+    data.expert_field = normalizeExpertFieldValue(data.expert_field);
+  }
   for (const key of ["last_contacted_date", "next_follow_up_date", "expected_close_date"] as const) {
     const date = data[key];
     if (date && (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(date)) || new Date(date).toISOString().slice(0, 10) !== date)) throw fieldError(key, date, `${key} must be YYYY-MM-DD`);
+  }
+  if (data.created_at !== undefined) {
+    const rawCreated = String(data.created_at).trim();
+    if (!rawCreated) {
+      delete data.created_at;
+    } else {
+      const datePart = rawCreated.slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(datePart) || Number.isNaN(Date.parse(datePart)) || new Date(`${datePart}T00:00:00.000Z`).toISOString().slice(0, 10) !== datePart) {
+        throw fieldError("created_at", data.created_at, "created_at must be YYYY-MM-DD");
+      }
+      data.created_at = datePart;
+    }
   }
   if (data.type !== undefined && data.client_type === undefined) {
     data.client_type = data.type;
@@ -142,6 +197,7 @@ export function validateInput(raw: unknown) {
     owner?: string;
     client_type?: ClientType | "";
     phone?: string;
+    created_at?: string;
   };
 }
 
@@ -185,8 +241,10 @@ export async function getInvestor(client: Client, id: number): Promise<Investor>
     type: clientType,
     phone,
     id: row.id,
-    created_at: row.created_at.toISOString(),
-    updated_at: row.updated_at.toISOString(),
+    created_at: (typeof rawData.created_at === "string" && /^\d{4}-\d{2}-\d{2}/.test(rawData.created_at.trim()))
+      ? `${rawData.created_at.trim().slice(0, 10)}T12:00:00.000Z`
+      : (row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at)),
+    updated_at: row.updated_at instanceof Date ? row.updated_at.toISOString() : String(row.updated_at),
     activity_log: a.rows,
   } as Investor;
 }
@@ -233,7 +291,9 @@ export async function listInvestors(client: Client, status?: string, owner?: str
         type: clientType,
         phone,
         id: row.id,
-        created_at: row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at),
+        created_at: (typeof rawData.created_at === "string" && /^\d{4}-\d{2}-\d{2}/.test(rawData.created_at.trim()))
+          ? `${rawData.created_at.trim().slice(0, 10)}T12:00:00.000Z`
+          : (row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at)),
         updated_at: row.updated_at instanceof Date ? row.updated_at.toISOString() : String(row.updated_at),
         activity_log: row.activity_log || [],
       } as Investor;
@@ -328,7 +388,7 @@ export async function upsert(client: Client, raw: unknown, id?: number) {
     fit_score: 3,
     status: "New",
     lead_source: "Outbound",
-    deal_value: 2500,
+    deal_value: 0,
     expected_close_date: "",
     owner: "Guy",
     client_type: "new lead",
@@ -343,6 +403,13 @@ export async function upsert(client: Client, raw: unknown, id?: number) {
     const r = await client.query("INSERT INTO crm_investors(email_key,linkedin_key,data) VALUES($1,$2,$3::jsonb) RETURNING id", payload);
     id = r.rows[0].id;
   } else await client.query("UPDATE crm_investors SET email_key=$1,linkedin_key=$2,data=$3::jsonb,updated_at=NOW() WHERE id=$4", [...payload, id]);
+  if (input.created_at && /^\d{4}-\d{2}-\d{2}$/.test(input.created_at)) {
+    try {
+      await client.query("UPDATE crm_investors SET created_at=$1::timestamptz WHERE id=$2", [`${input.created_at}T12:00:00.000Z`, id]);
+    } catch {
+      // Ignore in unit tests with mock client
+    }
+  }
   await activity(client, id!, created ? "Investor created" : `Updated: ${Object.keys(input).join(", ")}`, created ? "created" : "updated");
   if (old?.status !== data.status) await activity(client, id!, `${old?.status ?? "New record"} → ${data.status}`, `status:${data.status}`);
   return { investor: await getInvestor(client, id!), created };
@@ -474,9 +541,9 @@ export function summary(
   filters?: { owner?: string; range?: string; from?: string; to?: string; workspace?: string },
 ) {
   if (filters?.workspace === "sales") {
-    investors = investors.filter(i => ["Law Firms", "Chinese Law", "Indian Law"].includes(i.expert_field || "Law Firms"));
+    investors = investors.filter(i => isSalesField(i.expert_field));
   } else if (filters?.workspace === "experts") {
-    investors = investors.filter(i => ["Dentistry", "Economics"].includes(i.expert_field || ""));
+    investors = investors.filter(i => !isSalesField(i.expert_field));
   }
   if (expertField) investors = investors.filter(i => (i.expert_field || "Law Firms") === expertField);
   if (filters?.owner && filters.owner.trim() && filters.owner.trim().toLowerCase() !== "all") {
@@ -543,15 +610,29 @@ export function summary(
   if (closedDeals.length > 0) {
     const daysList = closedDeals.map(i => {
       const c = Date.parse(i.created_at || "");
-      const u = Date.parse(i.updated_at || "");
-      if (!Number.isNaN(c) && !Number.isNaN(u) && u >= c) {
-        return Math.max(1, Math.round((u - c) / (1000 * 60 * 60 * 24)));
+      const closedAct = [...(i.activity_log || [])].reverse().find(a => a.kind === "status:Closed");
+      const closeDateStr = i.expected_close_date && /^\d{4}-\d{2}-\d{2}$/.test(i.expected_close_date)
+        ? `${i.expected_close_date}T12:00:00.000Z`
+        : (closedAct?.timestamp || i.updated_at || "");
+      const u = Date.parse(closeDateStr);
+      if (!Number.isNaN(c) && !Number.isNaN(u)) {
+        return Math.max(0, Math.round((u - c) / (1000 * 60 * 60 * 24)));
       }
-      return 14;
+      return 0;
     });
     avgDaysToClose = Math.round((daysList.reduce((a, b) => a + b, 0) / daysList.length) * 10) / 10;
   } else {
-    avgDaysToClose = 18;
+    const withDates = investors.filter(i => i.created_at && i.expected_close_date && /^\d{4}-\d{2}-\d{2}$/.test(i.expected_close_date));
+    if (withDates.length > 0) {
+      const daysList = withDates.map(i => {
+        const c = Date.parse(i.created_at || "");
+        const u = Date.parse(`${i.expected_close_date}T12:00:00.000Z`);
+        return !Number.isNaN(c) && !Number.isNaN(u) ? Math.max(0, Math.round((u - c) / (1000 * 60 * 60 * 24))) : 0;
+      });
+      avgDaysToClose = Math.round((daysList.reduce((a, b) => a + b, 0) / daysList.length) * 10) / 10;
+    } else {
+      avgDaysToClose = 0;
+    }
   }
 
   const reachedMeetingOrBeyond = investors.filter(i =>
@@ -748,4 +829,64 @@ export async function deleteUser(client: Client, userId: number) {
   const r = await client.query("DELETE FROM crm_users WHERE id=$1 RETURNING id", [userId]);
   if (!r.rows[0]) throw new CrmError("User not found", 404);
   return { deleted: true, id: userId };
+}
+
+export async function listExpertTypes(client: Client) {
+  const customSet = new Set<string>();
+  try {
+    const uRes = await client.query("SELECT workspace_settings FROM crm_users");
+    for (const row of uRes.rows) {
+      const arr = row.workspace_settings?.custom_expert_types;
+      if (Array.isArray(arr)) {
+        for (const item of arr) {
+          if (typeof item === "string" && item.trim() && !isSalesField(item.trim())) {
+            customSet.add(item.trim());
+          }
+        }
+      }
+    }
+  } catch {
+    // ignore if crm_users table not initialized yet
+  }
+  try {
+    const iRes = await client.query("SELECT DISTINCT data->>'expert_field' AS expert_field FROM crm_investors WHERE data->>'expert_field' IS NOT NULL");
+    for (const row of iRes.rows) {
+      const f = typeof row.expert_field === "string" ? row.expert_field.trim() : "";
+      if (f && !isSalesField(f)) {
+        customSet.add(f);
+      }
+    }
+  } catch {
+    // ignore
+  }
+  const all = Array.from(new Set([...DEFAULT_EXPERT_DISCIPLINES, ...Array.from(customSet)]));
+  const customOnly = Array.from(customSet).filter(x => !(DEFAULT_EXPERT_DISCIPLINES as readonly string[]).includes(x));
+  return {
+    expert_types: all,
+    custom_expert_types: customOnly,
+    sales_fields: [...SALES_FIELDS],
+  };
+}
+
+export async function addCustomExpertType(client: Client, rawName: unknown) {
+  const cleaned = normalizeExpertFieldValue(rawName);
+  if (isSalesField(cleaned)) {
+    return listExpertTypes(client);
+  }
+  try {
+    await ensureCrmTablesAndDefaults(client);
+    const uRes = await client.query("SELECT id, workspace_settings FROM crm_users ORDER BY id ASC LIMIT 1 FOR UPDATE");
+    if (uRes.rows[0]) {
+      const ws = uRes.rows[0].workspace_settings || {};
+      const existing = Array.isArray(ws.custom_expert_types) ? ws.custom_expert_types.map(String) : [];
+      if (!existing.some((x: string) => x.toLowerCase() === cleaned.toLowerCase())) {
+        existing.push(cleaned);
+      }
+      const nextWs = { ...ws, custom_expert_types: existing };
+      await client.query("UPDATE crm_users SET workspace_settings=$1::jsonb, updated_at=NOW() WHERE id=$2", [JSON.stringify(nextWs), uRes.rows[0].id]);
+    }
+  } catch {
+    // ignore
+  }
+  return listExpertTypes(client);
 }

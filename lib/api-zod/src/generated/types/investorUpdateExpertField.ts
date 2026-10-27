@@ -6,7 +6,7 @@
  * OpenAPI spec version: 1.0.0
  */
 
-export type InvestorUpdateExpertField = typeof InvestorUpdateExpertField[keyof typeof InvestorUpdateExpertField];
+export type InvestorUpdateExpertField = typeof InvestorUpdateExpertField[keyof typeof InvestorUpdateExpertField] | (string & {});
 
 
 export const InvestorUpdateExpertField = {

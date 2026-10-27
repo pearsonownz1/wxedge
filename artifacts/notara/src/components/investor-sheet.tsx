@@ -9,15 +9,21 @@ import {
 } from '@workspace/api-client-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { useToast } from '@/hooks/use-toast';
-import { Copy, Trash2, PhoneCall, MessageSquare, Send } from 'lucide-react';
+import { Copy, Trash2, PhoneCall, MessageSquare, Send, Plus } from 'lucide-react';
 import {
   STATUSES,
   CLIENT_TYPES,
   TYPES,
   FIELDS,
-  EXPERT_FIELDS,
+  SALES_FIELDS_LIST,
+  ADD_EXPERT_TYPE_OPTION,
+  getAvailableExpertDisciplines,
+  saveCustomExpertType,
   expertFieldOf,
   workspaceOfRecord,
+  parseDealValue,
+  todayDateInput,
+  toDateInputValue,
   type ExpertField,
   type WorkspaceMode,
   fmtTs,
@@ -30,17 +36,18 @@ const empty = (expertField: ExpertField = 'Law Firms', defaultOwner = 'Guy', wor
   fit_score: '3',
   investor_type: 'STANDARD',
   typical_check_size: workspaceMode === 'experts' ? '$200 per letter' : '',
-  expert_field: expertField,
+  expert_field: workspaceMode === 'experts' && (SALES_FIELDS_LIST as readonly string[]).includes(expertField) ? 'Dentistry' : expertField,
   lead_source: workspaceMode === 'experts' ? 'University Directory' : 'Outbound',
-  deal_value: workspaceMode === 'experts' ? '200' : '2500',
+  deal_value: workspaceMode === 'experts' ? '200' : '0',
   expected_close_date: '',
+  created_at: todayDateInput(),
   owner: defaultOwner,
   client_type: 'new lead',
   phone: '',
 });
 
 const LONG = ['pitch_body', 'notes', 'thesis_notes'];
-const DATES = ['last_contacted_date', 'next_follow_up_date', 'expected_close_date'];
+const DATES = ['last_contacted_date', 'next_follow_up_date', 'expected_close_date', 'created_at'];
 const lbl = (k: string, isExperts: boolean) => {
   if (k === 'expert_field') return isExperts ? 'DISCIPLINE / FIELD' : 'MARKET / REGION';
   if (k === 'firm') return isExperts ? 'university / institution' : 'firm';
@@ -49,7 +56,8 @@ const lbl = (k: string, isExperts: boolean) => {
   if (k === 'stage_focus') return isExperts ? 'research focus / specialty' : 'stage focus';
   if (k === 'thesis_notes') return isExperts ? 'credentials & bio summary' : 'thesis notes';
   if (k === 'client_type') return 'type (lead / client)';
-  if (k === 'deal_value') return isExperts ? 'honorarium value ($ USD)' : 'deal value ($ USD)';
+  if (k === 'deal_value') return isExperts ? 'honorarium value ($ USD)' : 'deal size ($ USD)';
+  if (k === 'created_at') return 'card creation date (opportunity date)';
   return k.replace(/_/g, ' ');
 };
 const inp = 'w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-900 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20';
@@ -61,6 +69,8 @@ export function InvestorSheet({
   defaultExpertField = 'Law Firms',
   workspaceMode = 'sales',
   teamOwners = ['Guy', 'Eduardo', 'Growth'],
+  availableExpertTypes,
+  onExpertTypeAdded,
   onDialContact,
   onOpenWhatsApp,
 }: {
@@ -70,6 +80,8 @@ export function InvestorSheet({
   defaultExpertField?: ExpertField;
   workspaceMode?: WorkspaceMode;
   teamOwners?: string[];
+  availableExpertTypes?: string[];
+  onExpertTypeAdded?: (newType: string) => void;
   onDialContact?: (cardId: number, phone: string, firm: string) => void;
   onOpenWhatsApp?: (cardId: number, phone: string, firm: string) => void;
 }) {
@@ -86,7 +98,14 @@ export function InvestorSheet({
   const [campaignTag, setCampaignTag] = useState(workspaceMode === 'experts' ? 'dentistry-faculty-experts' : 'law-firms-niw-q4');
   const [deleting, setDeleting] = useState(false);
   const [loggingAct, setLoggingAct] = useState(false);
+  const [addingExpertType, setAddingExpertType] = useState(false);
+  const [customExpertTypeInput, setCustomExpertTypeInput] = useState('');
+  const [localExpertTypes, setLocalExpertTypes] = useState<string[]>(() => getAvailableExpertDisciplines(undefined, availableExpertTypes));
   const dirty = useRef(false);
+
+  useEffect(() => {
+    setLocalExpertTypes(getAvailableExpertDisciplines(undefined, availableExpertTypes));
+  }, [availableExpertTypes, open]);
 
   const isExpertsRecord = isNew
     ? workspaceMode === 'experts'
@@ -95,6 +114,8 @@ export function InvestorSheet({
   useEffect(() => {
     dirty.current = false;
     setMsg('');
+    setAddingExpertType(false);
+    setCustomExpertTypeInput('');
   }, [numId, open]);
 
   const create = useBrowserUpsertInvestor();
@@ -109,14 +130,14 @@ export function InvestorSheet({
 
   useEffect(() => {
     if (!dirty.current && data && data.id === numId) {
-      setF(
-        Object.fromEntries(
+      setF({
+        ...Object.fromEntries(
           FIELDS.map((k) => [
             k,
             k === 'expert_field'
               ? expertFieldOf(data)
               : k === 'deal_value'
-                ? String((data as any).deal_value ?? 2500)
+                ? String(parseDealValue((data as any).deal_value))
                 : k === 'client_type'
                   ? String((data as any).client_type || (data as any).type || 'new lead')
                   : k === 'investor_type'
@@ -128,9 +149,10 @@ export function InvestorSheet({
                         : String((data as any)[k] ?? ''),
           ]),
         ),
-      );
+        created_at: toDateInputValue((data as any).created_at),
+      });
     }
-  }, [data?.id, data?.updated_at, numId]);
+  }, [data?.id, data?.updated_at, data?.created_at, numId]);
 
   const refresh = () => qc.invalidateQueries({ predicate: (q) => String(q.queryKey[0]).startsWith('/api/crm') });
   const set = (k: string, v: string) => {
@@ -146,14 +168,34 @@ export function InvestorSheet({
     }
   };
 
-  const payload = (): InvestorInput => {
+  const commitNewExpertType = () => {
+    const cleaned = customExpertTypeInput.trim();
+    if (!cleaned) {
+      toast({ title: 'Enter an expert type name', variant: 'destructive' });
+      return null;
+    }
+    const saved = saveCustomExpertType(cleaned);
+    setLocalExpertTypes((prev) => (prev.some((x) => x.toLowerCase() === saved.toLowerCase()) ? prev : [...prev, saved]));
+    set('expert_field', saved);
+    setAddingExpertType(false);
+    setCustomExpertTypeInput('');
+    onExpertTypeAdded?.(saved);
+    toast({ title: `Added expert type "${saved}"` });
+    return saved;
+  };
+
+  const payload = (overrideExpertField?: string): InvestorInput => {
     const o: any = {};
     FIELDS.forEach((k) => {
       if (k === 'fit_score') o[k] = Math.min(5, Math.max(1, parseInt(f[k]) || 3));
-      else if (k === 'deal_value') o[k] = Math.max(0, Number(String(f[k] || '0').replace(/[$,\s]/g, '')) || 0);
+      else if (k === 'deal_value') o[k] = parseDealValue(f[k]);
       else if (k === 'investor_type') o[k] = f[k] === 'PREMIUM' ? 'PREMIUM' : 'STANDARD';
+      else if (k === 'expert_field') o[k] = overrideExpertField || f[k] || (isExpertsRecord ? 'Dentistry' : 'Law Firms');
       else o[k] = f[k];
     });
+    if (f.created_at && /^\d{4}-\d{2}-\d{2}$/.test(f.created_at.trim())) {
+      o.created_at = f.created_at.trim();
+    }
     return o;
   };
 
@@ -161,6 +203,10 @@ export function InvestorSheet({
     if (!f.name.trim()) {
       toast({ title: 'Name is required', variant: 'destructive' });
       return;
+    }
+    let committedField: string | undefined;
+    if (addingExpertType && customExpertTypeInput.trim()) {
+      committedField = commitNewExpertType() || undefined;
     }
     const done = {
       onSuccess: () => {
@@ -170,8 +216,8 @@ export function InvestorSheet({
       },
       onError: () => toast({ title: 'Save failed', variant: 'destructive' }),
     };
-    if (isNew) create.mutate({ data: payload() }, done);
-    else update.mutate({ id: numId, data: payload() }, done);
+    if (isNew) create.mutate({ data: payload(committedField) }, done);
+    else update.mutate({ id: numId, data: payload(committedField) }, done);
   };
 
   const deleteCard = async () => {
@@ -223,11 +269,38 @@ export function InvestorSheet({
   };
 
   const pending = create.isPending || update.isPending;
+
+  const disciplineOptions = isExpertsRecord
+    ? Array.from(new Set([...localExpertTypes, ...(f.expert_field && !(SALES_FIELDS_LIST as readonly string[]).includes(f.expert_field) ? [f.expert_field] : [])]))
+    : Array.from(new Set([...SALES_FIELDS_LIST, ...(f.expert_field ? [f.expert_field] : [])]));
+
   const field = (k: string) => (
-    <label key={k} className={`block ${LONG.includes(k) ? 'sm:col-span-2' : ''}`}>
-      <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-        {lbl(k, isExpertsRecord)}
-      </span>
+    <div key={k} className={`block ${LONG.includes(k) ? 'sm:col-span-2' : ''}`}>
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <span className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+          {lbl(k, isExpertsRecord)}
+        </span>
+        {k === 'expert_field' && (
+          <button
+            type="button"
+            data-testid="button-inline-add-expert-type"
+            onClick={() => setAddingExpertType((prev) => !prev)}
+            className="flex items-center gap-0.5 text-[11px] font-semibold text-purple-700 hover:text-purple-900 hover:underline"
+          >
+            <Plus className="h-3 w-3" /> Add Expert Type
+          </button>
+        )}
+        {k === 'deal_value' && !isExpertsRecord && f.deal_value !== '0' && (
+          <button
+            type="button"
+            data-testid="button-reset-deal-zero"
+            onClick={() => set('deal_value', '0')}
+            className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-700 hover:bg-slate-200"
+          >
+            Set $0
+          </button>
+        )}
+      </div>
       {k === 'status' ? (
         <select data-testid="select-status" className={inp} value={f[k]} onChange={(e) => set(k, e.target.value)}>
           {STATUSES.map((s) => (
@@ -260,13 +333,65 @@ export function InvestorSheet({
           placeholder="Guy, Eduardo, Growth..."
         />
       ) : k === 'expert_field' ? (
-        <select data-testid="select-expert-field" className={inp} value={f[k]} onChange={(e) => set(k, e.target.value)}>
-          {EXPERT_FIELDS.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
+        <div className="space-y-2">
+          <select
+            data-testid="select-expert-field"
+            className={inp}
+            value={addingExpertType ? ADD_EXPERT_TYPE_OPTION : f[k]}
+            onChange={(e) => {
+              if (e.target.value === ADD_EXPERT_TYPE_OPTION) {
+                setAddingExpertType(true);
+              } else {
+                setAddingExpertType(false);
+                set(k, e.target.value);
+              }
+            }}
+          >
+            {disciplineOptions.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+            <option value={ADD_EXPERT_TYPE_OPTION}>+ Add Expert Type</option>
+          </select>
+          {addingExpertType && (
+            <div className="flex items-center gap-1.5 rounded-lg border border-purple-200 bg-purple-50/60 p-2">
+              <input
+                data-testid="input-custom-expert-type"
+                type="text"
+                value={customExpertTypeInput}
+                onChange={(e) => setCustomExpertTypeInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    commitNewExpertType();
+                  }
+                }}
+                placeholder="New expert type (e.g. Civil Engineering, AI)..."
+                className={`${inp} flex-1`}
+                autoFocus
+              />
+              <button
+                type="button"
+                data-testid="button-confirm-expert-type"
+                onClick={commitNewExpertType}
+                className="rounded-md bg-purple-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-purple-700"
+              >
+                Add
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setAddingExpertType(false);
+                  setCustomExpertTypeInput('');
+                }}
+                className="rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+        </div>
       ) : k === 'fit_score' ? (
         <select data-testid="select-fit" className={inp} value={f[k]} onChange={(e) => set(k, e.target.value)}>
           {[1, 2, 3, 4, 5].map((s) => (
@@ -278,11 +403,25 @@ export function InvestorSheet({
           data-testid="input-deal_value"
           type="number"
           min="0"
-          step="50"
+          step="any"
+          placeholder="0"
           className={inp}
           value={f[k]}
           onChange={(e) => set(k, e.target.value)}
         />
+      ) : k === 'created_at' ? (
+        <div>
+          <input
+            data-testid="input-created_at"
+            type="date"
+            className={inp}
+            value={f.created_at || ''}
+            onChange={(e) => set('created_at', e.target.value)}
+          />
+          <span className="mt-0.5 block text-[10px] text-slate-400">
+            Real opportunity creation date (used to calculate Average Days to Close KPI)
+          </span>
+        </div>
       ) : LONG.includes(k) ? (
         <textarea data-testid={`input-${k}`} rows={k === 'pitch_body' ? 6 : 3} className={inp} value={f[k]} onChange={(e) => set(k, e.target.value)} />
       ) : (
@@ -294,7 +433,7 @@ export function InvestorSheet({
           onChange={(e) => set(k, e.target.value)}
         />
       )}
-    </label>
+    </div>
   );
   const log = [...(data?.activity_log ?? [])].reverse();
 
@@ -394,6 +533,7 @@ export function InvestorSheet({
                   {field('typical_check_size')}
                   {field('stage_focus')}
                   {field('owner')}
+                  {field('created_at')}
                   {field('thesis_notes')}
                 </div>
               </div>
@@ -405,6 +545,7 @@ export function InvestorSheet({
                 <div className="grid gap-3 sm:grid-cols-2">
                   {field('status')}
                   {field('deal_value')}
+                  {field('created_at')}
                   {field('expected_close_date')}
                   {field('owner')}
                   {field('lead_source')}

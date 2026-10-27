@@ -1,4 +1,4 @@
-import { CrmError, FIELDS, activity, fieldError, upsert, type Client } from "./crmData";
+import { CrmError, FIELDS, activity, fieldError, normalizeExpertFieldValue, upsert, type Client } from "./crmData";
 import { normalizeStage, STAGES } from "./crmStages";
 import type { Investor } from "@workspace/api-zod";
 
@@ -42,17 +42,13 @@ export const EXPERT_FIELD_FILTERS = [
   { value: "All", label: "All" },
 ] as const;
 
-export function csvExpertField(value: string): "Dentistry" | "Economics" | "Law Firms" | "Chinese Law" | "Indian Law" {
-  const field = value.trim().toLowerCase();
-  if (!field || field === "law firms") return "Law Firms";
-  if (field === "dentistry" || field === "dentists") return "Dentistry";
-  if (field === "economics" || field === "economists") return "Economics";
-  if (field === "chinese law") return "Chinese Law";
-  if (field === "indian law") return "Indian Law";
-  throw fieldError("expert_field", value, "expert_field must be Dentistry, Economics, Law Firms, Chinese Law or Indian Law");
+export function csvExpertField(value: string, defaultField = "Law Firms"): string {
+  const field = value.trim();
+  if (!field) return normalizeExpertFieldValue(defaultField || "Law Firms");
+  return normalizeExpertFieldValue(field);
 }
 
-export async function importCsv(client: Client, text: string) {
+export async function importCsv(client: Client, text: string, defaultExpertField?: string) {
   const rows = parseCsv(text);
   if (rows.length < 2) throw new CrmError("CSV must contain headers and at least one investor");
   if (rows.length > 5001) throw new CrmError("Import at most 5,000 investors at once");
@@ -81,6 +77,8 @@ export async function importCsv(client: Client, text: string) {
           if (key === "fit_score") input[key] = Number(rows[i][j]);
           else if (key === "deal_value") input[key] = rows[i][j].trim() === "" ? undefined : Number(rows[i][j].replace(/[$,\s]/g, ""));
           else input[key] = rows[i][j];
+        } else if (key === "created_at" && rows[i][j].trim()) {
+          input.created_at = rows[i][j].trim();
         }
       });
       if (input.fit_score === 0) delete input.fit_score;
@@ -96,7 +94,13 @@ export async function importCsv(client: Client, text: string) {
         }
       }
       if (input.investor_type === "") delete input.investor_type;
-      if (typeof input.expert_field === "string") input.expert_field = csvExpertField(input.expert_field);
+      if (typeof input.expert_field === "string") {
+        if (input.expert_field.trim()) input.expert_field = csvExpertField(input.expert_field, defaultExpertField || "Law Firms");
+        else if (defaultExpertField?.trim()) input.expert_field = csvExpertField(defaultExpertField);
+        else delete input.expert_field;
+      } else if (defaultExpertField?.trim()) {
+        input.expert_field = csvExpertField(defaultExpertField);
+      }
       const result = await upsert(client, input);
       result.created ? created++ : updated++;
       if (typeof originalStage === "string" && originalStage.trim() && originalStage !== input.status) {

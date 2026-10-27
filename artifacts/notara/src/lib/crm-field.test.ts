@@ -33,3 +33,30 @@ test('New law firm defaults follow the selected field, and CSV includes expert_f
   assert.equal(defaultExpertFieldFor('All', 'experts'), 'Dentistry');
   assert.ok(TEMPLATE_CSV.trim().split(',').includes('expert_field'));
 });
+
+import { fmtCurrency, parseDealValue, workspaceOfRecord, getAvailableExpertDisciplines } from './crm';
+
+test('Deal size supports $0 without reverting to $2,500, and custom expert types route to experts workspace', () => {
+  assert.equal(parseDealValue(0), 0);
+  assert.equal(parseDealValue('0'), 0);
+  assert.equal(parseDealValue('$0'), 0);
+  assert.equal(fmtCurrency(0), '$0');
+  assert.equal(fmtCurrency('0'), '$0');
+  assert.equal(fmtCurrency(2500), '$2,500');
+
+  assert.equal(workspaceOfRecord({ expert_field: 'Law Firms' }), 'sales');
+  assert.equal(workspaceOfRecord({ expert_field: 'Chinese Law' }), 'sales');
+  assert.equal(workspaceOfRecord({ expert_field: 'Indian Law' }), 'sales');
+  assert.equal(workspaceOfRecord({ expert_field: 'Dentistry' }), 'experts');
+  assert.equal(workspaceOfRecord({ expert_field: 'Civil Engineering' }), 'experts');
+  assert.equal(workspaceOfRecord({ expert_field: 'Computer Science & AI' }), 'experts');
+
+  const disciplines = getAvailableExpertDisciplines([
+    { expert_field: 'Law Firms' },
+    { expert_field: 'Custom Robotics' },
+  ]);
+  assert.ok(!disciplines.includes('Law Firms'));
+  assert.ok(disciplines.includes('Dentistry'));
+  assert.ok(disciplines.includes('Economics'));
+  assert.ok(disciplines.includes('Custom Robotics'));
+});

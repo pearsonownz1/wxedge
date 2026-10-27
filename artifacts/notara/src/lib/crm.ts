@@ -20,7 +20,7 @@ export const WORKSPACE_OPTIONS = [
     label: 'Experts',
     fullLabel: 'Experts Workspace',
     subtitle: 'Professor & Evaluator Network',
-    description: 'University faculty, PhD reviewers & opinion letter signers (Dentists, Economists)',
+    description: 'University faculty, PhD reviewers & opinion letter signers across all disciplines',
   },
 ] as const;
 
@@ -42,10 +42,26 @@ export const FIELDS = [
 ] as const;
 
 export const SALES_FIELDS_LIST = ['Law Firms', 'Chinese Law', 'Indian Law'] as const;
-export const EXPERT_DISCIPLINE_LIST = ['Dentistry', 'Economics'] as const;
+export const EXPERT_DISCIPLINE_LIST = [
+  'Dentistry',
+  'Economics',
+  'Computer Science & AI',
+  'Medicine & Healthcare',
+  'Biotechnology & Life Sciences',
+  'Engineering',
+  'Finance & Business',
+  'Data Science & Analytics',
+  'Cybersecurity',
+  'Public Health',
+  'Education',
+  'Law & Policy',
+] as const;
 export const EXPERT_FIELDS = ['Law Firms', 'Chinese Law', 'Indian Law', 'Dentistry', 'Economics'] as const;
-export type ExpertField = typeof EXPERT_FIELDS[number];
+export type ExpertField = typeof EXPERT_FIELDS[number] | (string & {});
 export type ExpertFieldFilter = ExpertField | 'All';
+
+export const ADD_EXPERT_TYPE_OPTION = '__ADD_EXPERT_TYPE__' as const;
+export const CUSTOM_EXPERT_TYPES_STORAGE_KEY = 'gcs_crm_custom_expert_types';
 
 export const SALES_FIELD_FILTERS = [
   { value: 'Law Firms' as const, label: 'Brazil' },
@@ -69,13 +85,113 @@ export const EXPERT_FIELD_FILTERS = [
   { value: 'All' as const, label: 'All' },
 ] as const;
 
+export function isSalesField(field?: string | null): boolean {
+  const f = (field || 'Law Firms').trim();
+  return (SALES_FIELDS_LIST as readonly string[]).includes(f);
+}
+
+export function getCustomExpertTypes(): string[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(CUSTOM_EXPERT_TYPES_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map((x) => (typeof x === 'string' ? x.trim() : ''))
+      .filter((x) => Boolean(x) && !isSalesField(x));
+  } catch {
+    return [];
+  }
+}
+
+export function saveCustomExpertType(rawName: string): string {
+  const cleaned = rawName.trim();
+  if (!cleaned || isSalesField(cleaned)) return cleaned;
+  if (typeof window !== 'undefined') {
+    try {
+      const current = getCustomExpertTypes();
+      if (!current.some((x) => x.toLowerCase() === cleaned.toLowerCase())) {
+        const next = [...current, cleaned];
+        window.localStorage.setItem(CUSTOM_EXPERT_TYPES_STORAGE_KEY, JSON.stringify(next));
+      }
+      window.dispatchEvent(new CustomEvent('gcs-crm-expert-types-updated', { detail: cleaned }));
+    } catch {
+      // ignore storage errors
+    }
+    fetch('/api/crm/expert-types', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: cleaned }),
+    }).catch(() => {});
+  }
+  return cleaned;
+}
+
+export function getAvailableExpertDisciplines(
+  records?: Array<{ expert_field?: string | null }>,
+  serverCustomTypes?: string[],
+): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  const push = (val?: string | null) => {
+    const trimmed = typeof val === 'string' ? val.trim() : '';
+    if (!trimmed || isSalesField(trimmed)) return;
+    const key = trimmed.toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      result.push(trimmed);
+    }
+  };
+  for (const d of EXPERT_DISCIPLINE_LIST) push(d);
+  for (const c of getCustomExpertTypes()) push(c);
+  if (serverCustomTypes) {
+    for (const s of serverCustomTypes) push(s);
+  }
+  if (records) {
+    for (const r of records) push(r.expert_field);
+  }
+  return result;
+}
+
+export function getDynamicExpertFieldFilters(
+  records?: Array<{ expert_field?: string | null }>,
+  serverCustomTypes?: string[],
+): Array<{ value: ExpertFieldFilter; label: string }> {
+  const baseLabels: Record<string, string> = {
+    Dentistry: 'Dentists',
+    Economics: 'Economists',
+  };
+  const activeSet = new Set<string>(['Dentistry', 'Economics']);
+  for (const c of getCustomExpertTypes()) activeSet.add(c);
+  if (serverCustomTypes) {
+    for (const s of serverCustomTypes) {
+      if (s && !isSalesField(s)) activeSet.add(s.trim());
+    }
+  }
+  if (records) {
+    for (const r of records) {
+      const f = typeof r.expert_field === 'string' ? r.expert_field.trim() : '';
+      if (f && !isSalesField(f)) activeSet.add(f);
+    }
+  }
+  const items: Array<{ value: ExpertFieldFilter; label: string }> = Array.from(activeSet).map((value) => ({
+    value,
+    label: baseLabels[value] || value,
+  }));
+  items.push({ value: 'All', label: 'All Experts' });
+  return items;
+}
+
 export function expertFieldOf(record: { expert_field?: string | null }): ExpertField {
-  return EXPERT_FIELDS.find(field => field === record.expert_field) ?? 'Law Firms';
+  const raw = typeof record.expert_field === 'string' ? record.expert_field.trim() : '';
+  return (raw || 'Law Firms') as ExpertField;
 }
 
 export function workspaceOfRecord(record: { expert_field?: string | null }): WorkspaceMode {
   const f = expertFieldOf(record);
-  return f === 'Dentistry' || f === 'Economics' ? 'experts' : 'sales';
+  return isSalesField(f) ? 'sales' : 'experts';
 }
 
 export function filterExpertField<T extends { expert_field?: string | null }>(records: T[], field: ExpertFieldFilter): T[] {
@@ -92,7 +208,11 @@ export function filterByWorkspace<T extends { expert_field?: string | null }>(
 }
 
 export function defaultExpertFieldFor(field: ExpertFieldFilter, workspace: WorkspaceMode = 'sales'): ExpertField {
-  if (field !== 'All') return field;
+  if (field !== 'All') {
+    if (workspace === 'experts' && isSalesField(field)) return 'Dentistry';
+    if (workspace === 'sales' && !isSalesField(field)) return 'Law Firms';
+    return field;
+  }
   return workspace === 'experts' ? 'Dentistry' : 'Law Firms';
 }
 
@@ -118,10 +238,42 @@ export const TIER_TONE: Record<string, string> = {
   'STANDARD': 'bg-teal-50 text-teal-800 border border-teal-200',
 };
 
+export function parseDealValue(val: unknown): number {
+  if (val === 0 || val === '0' || val === '$0') return 0;
+  if (typeof val === 'number') return Number.isFinite(val) && val >= 0 ? val : 0;
+  const str = String(val ?? '').replace(/[$,\s]/g, '').trim();
+  if (!str) return 0;
+  const n = Number(str);
+  return Number.isFinite(n) && n >= 0 ? n : 0;
+}
+
 export function fmtCurrency(val: unknown): string {
-  const n = typeof val === 'number' ? val : Number(String(val ?? '').replace(/[$,\s]/g, ''));
-  if (!Number.isFinite(n) || n <= 0) return '$2,500';
+  const n = parseDealValue(val);
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
+}
+
+export function todayDateInput(): string {
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Los_Angeles',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(new Date());
+    const p = (k: string) => parts.find((x) => x.type === k)?.value || '';
+    return `${p('year')}-${p('month')}-${p('day')}`;
+  } catch {
+    return new Date().toISOString().slice(0, 10);
+  }
+}
+
+export function toDateInputValue(isoOrDate?: string | null): string {
+  if (!isoOrDate) return todayDateInput();
+  const trimmed = String(isoOrDate).trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) return trimmed.slice(0, 10);
+  const d = new Date(trimmed);
+  if (isNaN(+d)) return todayDateInput();
+  return d.toISOString().slice(0, 10);
 }
 
 export function download(name: string, text: string) {

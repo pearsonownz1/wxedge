@@ -6,7 +6,7 @@
  * OpenAPI spec version: 1.0.0
  */
 
-export type BrowserGetSummaryExpertField = typeof BrowserGetSummaryExpertField[keyof typeof BrowserGetSummaryExpertField];
+export type BrowserGetSummaryExpertField = typeof BrowserGetSummaryExpertField[keyof typeof BrowserGetSummaryExpertField] | (string & {});
 
 
 export const BrowserGetSummaryExpertField = {
