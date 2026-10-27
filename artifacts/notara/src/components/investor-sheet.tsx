@@ -319,8 +319,8 @@ export function InvestorSheet({
               <SheetDescription className="text-slate-600">
                 {isNew
                   ? isExpertsRecord
-                    ? 'Add a university professor or expert reviewer to SellingHighs Experts Workspace.'
-                    : 'Add a new law firm deal card to SellingHighs Sales Workspace.'
+                    ? 'Add a university professor or expert reviewer to GCS Experts Workspace.'
+                    : 'Add a new law firm deal card to GCS Sales Workspace.'
                   : [f.title, f.firm].filter(Boolean).join(' · ') || `Card #${numId}`}
               </SheetDescription>
             </div>

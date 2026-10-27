@@ -377,7 +377,7 @@ export default function Dashboard() {
 
   const doExport = async () => {
     try {
-      download('sellinghighs-crm.csv', await browserExportInvestors());
+      download('gcs-crm.csv', await browserExportInvestors());
     } catch {
       toast({ title: 'Export failed', variant: 'destructive' });
     }
@@ -475,7 +475,7 @@ export default function Dashboard() {
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5">
-                <span className="truncate font-display text-sm font-bold text-white">SellingHighs</span>
+                <span className="truncate font-display text-sm font-bold text-white">GCS CRM</span>
                 <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${isExperts ? "bg-purple-500/25 text-purple-200" : "bg-blue-500/25 text-blue-200"}`}>
                   {isExperts ? "Experts" : "Sales"}
                 </span>
@@ -1194,7 +1194,7 @@ export default function Dashboard() {
           <div className="flex gap-2">
             <button
               data-testid="button-template"
-              onClick={() => download('sellinghighs-template.csv', TEMPLATE_CSV)}
+              onClick={() => download('gcs-crm-template.csv', TEMPLATE_CSV)}
               className="rounded-md border px-3 py-1.5 text-sm"
             >
               Download template

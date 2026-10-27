@@ -279,7 +279,7 @@ export function InvestorSheet({
                 {isNew ? 'New Deal / Contact' : f.name || 'Deal Record'}
               </SheetTitle>
               <SheetDescription className="text-slate-600">
-                {isNew ? 'Add a new law firm deal card to SellingHighs CRM.' : [f.title, f.firm].filter(Boolean).join(' · ') || `Card #${numId}`}
+                {isNew ? 'Add a new law firm deal card to GCS CRM.' : [f.title, f.firm].filter(Boolean).join(' · ') || `Card #${numId}`}
               </SheetDescription>
             </div>
             {!isNew && (
