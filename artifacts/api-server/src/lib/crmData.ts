@@ -711,8 +711,20 @@ export async function ensureCrmTablesAndDefaults(client: Client) {
       direction TEXT NOT NULL DEFAULT 'outbound',
       body TEXT NOT NULL,
       sender TEXT NOT NULL DEFAULT 'Guy',
+      wa_message_id TEXT,
+      status TEXT NOT NULL DEFAULT 'sent',
+      message_type TEXT NOT NULL DEFAULT 'text',
+      template_name TEXT,
+      error_message TEXT,
+      metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+    ALTER TABLE crm_whatsapp_messages ADD COLUMN IF NOT EXISTS wa_message_id TEXT;
+    ALTER TABLE crm_whatsapp_messages ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'sent';
+    ALTER TABLE crm_whatsapp_messages ADD COLUMN IF NOT EXISTS message_type TEXT NOT NULL DEFAULT 'text';
+    ALTER TABLE crm_whatsapp_messages ADD COLUMN IF NOT EXISTS template_name TEXT;
+    ALTER TABLE crm_whatsapp_messages ADD COLUMN IF NOT EXISTS error_message TEXT;
+    ALTER TABLE crm_whatsapp_messages ADD COLUMN IF NOT EXISTS metadata JSONB NOT NULL DEFAULT '{}'::jsonb;
   `);
 
   const existingUsers = await client.query("SELECT count(*)::int AS n FROM crm_users");

@@ -53,5 +53,11 @@ export const crmWhatsappMessages = pgTable("crm_whatsapp_messages", {
   direction: text("direction").default("outbound").notNull(),
   body: text("body").notNull(),
   sender: text("sender").default("Guy").notNull(),
+  waMessageId: text("wa_message_id"),
+  status: text("status").default("sent").notNull(),
+  messageType: text("message_type").default("text").notNull(),
+  templateName: text("template_name"),
+  errorMessage: text("error_message"),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });

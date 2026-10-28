@@ -21,6 +21,12 @@ import {
   upsert,
 } from "../lib/crmData";
 import { exportCsv, importCsv } from "../lib/crmCsv";
+import {
+  ensureWhatsAppSchema,
+  fetchMetaPhoneStatus,
+  fetchMetaTemplates,
+  sendAndLogWhatsAppMessage,
+} from "../lib/whatsappCloud";
 import { logger } from "../lib/logger";
 
 const TELNYX_CONNECTION_ID = process.env.TELNYX_CONNECTION_ID || "3077013926030869814";
@@ -475,8 +481,9 @@ router.post("/calls/dial", async (req, res) => {
   res.status(201).json(created);
 });
 
-// WhatsApp Integration API
+// WhatsApp Integration API (Meta WhatsApp Cloud API)
 router.get("/whatsapp", async (req, res) => {
+  await ensureWhatsAppSchema(pool);
   const investorId = req.query.investor_id ? Number(req.query.investor_id) : null;
   const r = await pool.query(
     `SELECT w.*, i.data->>'firm' AS firm, i.data->>'name' AS contact_name
@@ -484,40 +491,24 @@ router.get("/whatsapp", async (req, res) => {
      LEFT JOIN crm_investors i ON i.id = w.investor_id
      WHERE ($1::int IS NULL OR w.investor_id = $1)
      ORDER BY w.created_at ASC, w.id ASC
-     LIMIT 200`,
+     LIMIT 300`,
     [investorId],
   );
   res.json(r.rows);
 });
 
-const handleWhatsAppSend = async (req: import("express").Request, res: import("express").Response) => {
-  const body = req.body || {};
-  const text = String(body.body || body.message || "").trim();
-  const phone = String(body.phone || body.to || "").trim();
-  const cardId = body.card_id || body.investor_id ? Number(body.card_id || body.investor_id) : undefined;
-  const sender = String(body.sender || "Guy").trim();
-  const direction = body.direction === "inbound" ? "inbound" : "outbound";
-  if (!text) throw new CrmError("WhatsApp message body is required", 400);
+router.get("/whatsapp/status", async (_req, res) => {
+  const status = await fetchMetaPhoneStatus();
+  res.json(status);
+});
 
-  const created = await transaction(async client => {
-    const ins = await client.query(
-      `INSERT INTO crm_whatsapp_messages(investor_id,phone,direction,body,sender)
-       VALUES($1,$2,$3,$4,$5)
-       RETURNING *`,
-      [cardId ?? null, phone || "+15619031414", direction, text, sender],
-    );
-    if (cardId) {
-      await logOutboundActivity(client, {
-        card_id: cardId,
-        event_type: direction === "inbound" ? "reply_received" : "whatsapp_sent",
-        subject: `WhatsApp ${direction === "inbound" ? "Reply" : "Message"} (${phone || "Direct"})`,
-        snippet: text,
-        campaign: body.campaign || "whatsapp-direct",
-        actor: sender,
-      });
-    }
-    return ins.rows[0];
-  });
+router.get("/whatsapp/templates", async (_req, res) => {
+  const result = await fetchMetaTemplates();
+  res.json(result);
+});
+
+const handleWhatsAppSend = async (req: import("express").Request, res: import("express").Response) => {
+  const created = await sendAndLogWhatsAppMessage(req.body || {});
   res.status(201).json(created);
 };
 router.post("/whatsapp", handleWhatsAppSend);
