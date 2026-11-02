@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   useBrowserListInvestors,
@@ -31,6 +31,9 @@ import {
   UserCheck,
   Sparkles,
   LogOut,
+  Mail,
+  CalendarDays,
+  Settings,
 } from 'lucide-react';
 import {
   STATUSES,
@@ -57,6 +60,9 @@ import {
   TeamWorkspacesPanel,
 } from '@/components/crm-panels';
 import { SESSION_KEY } from '@/components/pin-gate';
+import { EmailsPanel } from '@/components/crm/emails-panel';
+import { CalendarPanel } from '@/components/crm/calendar-panel';
+import { OutlookSettings } from '@/components/crm/outlook-settings';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Splash } from '@/pages/login';
 
@@ -64,7 +70,7 @@ const POLL = 30000;
 const sel = 'rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-900 focus:border-blue-600 focus:outline-none';
 const isForbidden = (e: unknown) => (e as any)?.status === 403;
 
-type NavSection = 'overview' | 'contacts' | 'deals' | 'reports' | 'campaigns' | 'phone' | 'whatsapp' | 'team';
+type NavSection = 'overview' | 'contacts' | 'deals' | 'emails' | 'calendar' | 'reports' | 'campaigns' | 'phone' | 'whatsapp' | 'team' | 'settings';
 
 const Pill = ({ s }: { s: string }) => (
   <span className={`whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${STATUS_TONE[s] ?? 'bg-slate-100 text-slate-800'}`}>
@@ -183,6 +189,19 @@ export default function Dashboard() {
   const [dialFirm, setDialFirm] = useState('');
   const [waCardId, setWaCardId] = useState<number | ''>('');
   const [waPhone, setWaPhone] = useState('');
+  const [mailCompose, setMailCompose] = useState<{ to: string; investorId: number; nonce: number } | null>(null);
+  const [outlookNotice, setOutlookNotice] = useState('');
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const outlook = params.get('outlook');
+    if (!outlook) return;
+    setNav('settings');
+    setOutlookNotice(outlook === 'connected' ? 'connected' : params.get('reason') || 'oauth_failed');
+    const url = new URL(window.location.href);
+    url.search = '';
+    window.history.replaceState({}, '', `${url.pathname}${url.hash}`);
+  }, []);
 
   const refresh = () => {
     qc.invalidateQueries({ predicate: (x) => String(x.queryKey[0]).startsWith('/api/crm') });
@@ -366,11 +385,14 @@ export default function Dashboard() {
     { id: 'overview', label: 'Overview', icon: Home },
     { id: 'contacts', label: 'Contacts', icon: Users, badge: fieldRows.length },
     { id: 'deals', label: 'Deals (Kanban)', icon: Kanban, badge: rows.length },
+    { id: 'emails', label: 'Emails', icon: Mail },
+    { id: 'calendar', label: 'Calendar', icon: CalendarDays },
     { id: 'reports', label: 'Reports & Forecast', icon: BarChart3 },
     { id: 'campaigns', label: 'Campaigns', icon: Send, badge: campaignsQuery.data?.length || 3 },
     { id: 'phone', label: 'Dialer', icon: PhoneCall, badge: callsQuery.data?.length || 0 },
     { id: 'whatsapp', label: 'WhatsApp', icon: MessageSquare, badge: whatsappQuery.data?.length || 0 },
     { id: 'team', label: 'Team Workspaces', icon: UserCheck, badge: usersQuery.data?.length || 4 },
+    { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
   return (
@@ -501,7 +523,7 @@ export default function Dashboard() {
         </header>
 
         {/* Top Bar KPIs — Exact 4 Requested KPIs */}
-        <section className="grid grid-cols-1 gap-3 border-b bg-white px-6 py-4 sm:grid-cols-2 lg:grid-cols-4">
+        {!['emails', 'calendar', 'settings'].includes(nav) && <section className="grid grid-cols-1 gap-3 border-b bg-white px-6 py-4 sm:grid-cols-2 lg:grid-cols-4">
           <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3.5">
             <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
               1. Average Days to Close
@@ -543,9 +565,9 @@ export default function Dashboard() {
             </div>
             <div className="mt-0.5 text-[11px] text-emerald-700/80">Conversion from Meeting set to Closed</div>
           </div>
-        </section>
+        </section>}
 
-        <main className="flex-1 p-6">
+        <main className={nav === 'emails' || nav === 'calendar' || nav === 'settings' ? 'flex-1 p-4' : 'flex-1 p-6'}>
           {nav === 'overview' && (
             <div className="space-y-6">
               <div className="grid gap-6 lg:grid-cols-2">
@@ -897,6 +919,12 @@ export default function Dashboard() {
             />
           )}
 
+          {nav === 'emails' && <EmailsPanel composeSeed={mailCompose} />}
+
+          {nav === 'calendar' && <CalendarPanel />}
+
+          {nav === 'settings' && <OutlookSettings notice={outlookNotice} />}
+
           {nav === 'team' && (
             <TeamWorkspacesPanel
               users={usersQuery.data ?? []}
@@ -927,6 +955,11 @@ export default function Dashboard() {
           setWaCardId(cardId);
           setWaPhone(phone);
           setNav('whatsapp');
+        }}
+        onComposeEmail={(address, id) => {
+          setMailCompose({ to: address, investorId: id, nonce: Date.now() });
+          setOpen(null);
+          setNav('emails');
         }}
       />
 

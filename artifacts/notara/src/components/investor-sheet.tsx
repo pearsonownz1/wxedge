@@ -10,6 +10,7 @@ import {
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { useToast } from '@/hooks/use-toast';
 import { Copy, Trash2, PhoneCall, MessageSquare, Send } from 'lucide-react';
+import { OutlookRecord } from '@/components/crm/outlook-record';
 import {
   STATUSES,
   CLIENT_TYPES,
@@ -52,6 +53,7 @@ export function InvestorSheet({
   teamOwners = ['Guy', 'Eduardo', 'Growth'],
   onDialContact,
   onOpenWhatsApp,
+  onComposeEmail,
 }: {
   id: number | 'new' | null;
   open: boolean;
@@ -60,6 +62,7 @@ export function InvestorSheet({
   teamOwners?: string[];
   onDialContact?: (cardId: number, phone: string, firm: string) => void;
   onOpenWhatsApp?: (cardId: number, phone: string, firm: string) => void;
+  onComposeEmail?: (email: string, investorId: number) => void;
 }) {
   const qc = useQueryClient();
   const { toast } = useToast();
@@ -414,6 +417,10 @@ export function InvestorSheet({
             >
               {pending ? 'Saving...' : isNew ? 'Create Deal Card' : 'Save Deal Changes'}
             </button>
+
+            {!isNew && onComposeEmail && (
+              <OutlookRecord investorId={numId} email={f.email || ''} onCompose={onComposeEmail} />
+            )}
 
             {!isNew && (
               <section className="rounded-xl border bg-white p-4 shadow-sm">
