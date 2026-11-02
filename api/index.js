@@ -15768,8 +15768,8 @@ var require_text = __commonJS({
     var debug = require_src()("body-parser:text");
     var read = require_read();
     var { normalizeOptions, passthrough } = require_utils();
-    module2.exports = text2;
-    function text2(options) {
+    module2.exports = text3;
+    function text3(options) {
       const normalizedOptions = normalizeOptions(options, "text/plain");
       return function textParser(req, res, next) {
         read(req, res, next, passthrough, debug, normalizedOptions);
@@ -15932,7 +15932,7 @@ var require_object_inspect = __commonJS({
         return inspect_(value, opts, depth + 1, seen);
       }
       if (typeof obj === "function" && !isRegExp(obj)) {
-        var name = nameOf(obj);
+        var name = nameOf2(obj);
         var keys = arrObjKeys(obj, inspect);
         return "[Function" + (name ? ": " + name : " (anonymous)") + "]" + (keys.length > 0 ? " { " + $join.call(keys, ", ") + " }" : "");
       }
@@ -16111,7 +16111,7 @@ var require_object_inspect = __commonJS({
     function toStr(obj) {
       return objectToString.call(obj);
     }
-    function nameOf(f) {
+    function nameOf2(f) {
       if (f.name) {
         return f.name;
       }
@@ -18508,8 +18508,8 @@ var require_escape_html = __commonJS({
   "../../node_modules/.pnpm/escape-html@1.0.3/node_modules/escape-html/index.js"(exports2, module2) {
     "use strict";
     var matchHtmlRegExp = /["'&<>]/;
-    module2.exports = escapeHtml;
-    function escapeHtml(string) {
+    module2.exports = escapeHtml2;
+    function escapeHtml2(string) {
       var str = "" + string;
       var match = matchHtmlRegExp.exec(str);
       if (!match) {
@@ -18640,13 +18640,13 @@ var require_finalhandler = __commonJS({
     "use strict";
     var debug = require_src()("finalhandler");
     var encodeUrl = require_encodeurl();
-    var escapeHtml = require_escape_html();
+    var escapeHtml2 = require_escape_html();
     var onFinished = require_on_finished();
     var parseUrl = require_parseurl();
     var statuses = require_statuses();
     var isFinished = onFinished.isFinished;
     function createHtmlDocument(message) {
-      var body = escapeHtml(message).replaceAll("\n", "<br>").replaceAll("  ", " &nbsp;");
+      var body = escapeHtml2(message).replaceAll("\n", "<br>").replaceAll("  ", " &nbsp;");
       return '<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<title>Error</title>\n</head>\n<body>\n<pre>' + body + "</pre>\n</body>\n</html>\n";
     }
     module2.exports = finalhandler;
@@ -20072,11 +20072,11 @@ var require_dist2 = __commonJS({
     exports2.TokenData = TokenData;
     var PathError = class extends TypeError {
       constructor(message, originalPath) {
-        let text2 = message;
+        let text3 = message;
         if (originalPath)
-          text2 += `: ${originalPath}`;
-        text2 += `; visit https://git.new/pathToRegexpError for info`;
-        super(text2);
+          text3 += `: ${originalPath}`;
+        text3 += `; visit https://git.new/pathToRegexpError for info`;
+        super(text3);
         this.originalPath = originalPath;
       }
     };
@@ -20473,7 +20473,7 @@ var require_layer = __commonJS({
       }
       this.matchers = Array.isArray(path) ? path.map(matcher) : [matcher(path)];
     }
-    Layer.prototype.handleError = function handleError(error, req, res, next) {
+    Layer.prototype.handleError = function handleError2(error, req, res, next) {
       const fn = this.handle;
       if (fn.length !== 4) {
         return next(error);
@@ -20694,27 +20694,27 @@ var require_router = __commonJS({
     var slice = Array.prototype.slice;
     var flatten = Array.prototype.flat;
     var methods = METHODS.map((method) => method.toLowerCase());
-    module2.exports = Router6;
+    module2.exports = Router7;
     module2.exports.Route = Route;
-    function Router6(options) {
-      if (!(this instanceof Router6)) {
-        return new Router6(options);
+    function Router7(options) {
+      if (!(this instanceof Router7)) {
+        return new Router7(options);
       }
       const opts = options || {};
-      function router5(req, res, next) {
-        router5.handle(req, res, next);
+      function router6(req, res, next) {
+        router6.handle(req, res, next);
       }
-      Object.setPrototypeOf(router5, this);
-      router5.caseSensitive = opts.caseSensitive;
-      router5.mergeParams = opts.mergeParams;
-      router5.params = {};
-      router5.strict = opts.strict;
-      router5.stack = [];
-      return router5;
+      Object.setPrototypeOf(router6, this);
+      router6.caseSensitive = opts.caseSensitive;
+      router6.mergeParams = opts.mergeParams;
+      router6.params = {};
+      router6.strict = opts.strict;
+      router6.stack = [];
+      return router6;
     }
-    Router6.prototype = function() {
+    Router7.prototype = function() {
     };
-    Router6.prototype.param = function param(name, fn) {
+    Router7.prototype.param = function param(name, fn) {
       if (!name) {
         throw new TypeError("argument name is required");
       }
@@ -20734,7 +20734,7 @@ var require_router = __commonJS({
       params.push(fn);
       return this;
     };
-    Router6.prototype.handle = function handle(req, res, callback) {
+    Router7.prototype.handle = function handle(req, res, callback) {
       if (!callback) {
         throw new TypeError("argument callback is required");
       }
@@ -20861,7 +20861,7 @@ var require_router = __commonJS({
         }
       }
     };
-    Router6.prototype.use = function use(handler) {
+    Router7.prototype.use = function use(handler) {
       let offset = 0;
       let path = "/";
       if (typeof handler !== "function") {
@@ -20894,7 +20894,7 @@ var require_router = __commonJS({
       }
       return this;
     };
-    Router6.prototype.route = function route(path) {
+    Router7.prototype.route = function route(path) {
       const route2 = new Route(path);
       const layer = new Layer(path, {
         sensitive: this.caseSensitive,
@@ -20909,7 +20909,7 @@ var require_router = __commonJS({
       return route2;
     };
     methods.concat("all").forEach(function(method) {
-      Router6.prototype[method] = function(path) {
+      Router7.prototype[method] = function(path) {
         const route = this.route(path);
         route[method].apply(route, slice.call(arguments, 1));
         return this;
@@ -21092,13 +21092,13 @@ var require_application = __commonJS({
     var compileTrust = require_utils3().compileTrust;
     var resolve = require("node:path").resolve;
     var once = require_once();
-    var Router6 = require_router();
+    var Router7 = require_router();
     var slice = Array.prototype.slice;
     var flatten = Array.prototype.flat;
     var app2 = exports2 = module2.exports = {};
     var trustProxyDefaultSymbol = "@@symbol:trust_proxy_default";
     app2.init = function init() {
-      var router5 = null;
+      var router6 = null;
       this.cache = /* @__PURE__ */ Object.create(null);
       this.engines = /* @__PURE__ */ Object.create(null);
       this.settings = /* @__PURE__ */ Object.create(null);
@@ -21107,13 +21107,13 @@ var require_application = __commonJS({
         configurable: true,
         enumerable: true,
         get: function getrouter() {
-          if (router5 === null) {
-            router5 = new Router6({
+          if (router6 === null) {
+            router6 = new Router7({
               caseSensitive: this.enabled("case sensitive routing"),
               strict: this.enabled("strict routing")
             });
           }
-          return router5;
+          return router6;
         }
       });
     };
@@ -21184,15 +21184,15 @@ var require_application = __commonJS({
       if (fns.length === 0) {
         throw new TypeError("app.use() requires a middleware function");
       }
-      var router5 = this.router;
+      var router6 = this.router;
       fns.forEach(function(fn2) {
         if (!fn2 || !fn2.handle || !fn2.set) {
-          return router5.use(path, fn2);
+          return router6.use(path, fn2);
         }
         debug(".use app under %s", path);
         fn2.mountpath = path;
         fn2.parent = this;
-        router5.use(path, function mounted_app(req, res, next) {
+        router6.use(path, function mounted_app(req, res, next) {
           var orig = req.app;
           fn2.handle(req, res, function(err) {
             Object.setPrototypeOf(req, orig.request);
@@ -22646,7 +22646,7 @@ var require_send = __commonJS({
     var createError = require_http_errors();
     var debug = require_src()("send");
     var encodeUrl = require_encodeurl();
-    var escapeHtml = require_escape_html();
+    var escapeHtml2 = require_escape_html();
     var etag = require_etag();
     var fresh = require_fresh();
     var fs = require("fs");
@@ -22699,7 +22699,7 @@ var require_send = __commonJS({
       }
       var res = this.res;
       var msg = statuses.message[status] || String(status);
-      var doc = createHtmlDocument("Error", escapeHtml(msg));
+      var doc = createHtmlDocument("Error", escapeHtml2(msg));
       clearHeaders(res);
       if (err && err.headers) {
         setHeaders(res, err.headers);
@@ -22799,7 +22799,7 @@ var require_send = __commonJS({
         return;
       }
       var loc = encodeUrl(collapseLeadingSlashes(this.path + "/"));
-      var doc = createHtmlDocument("Redirecting", "Redirecting to " + escapeHtml(loc));
+      var doc = createHtmlDocument("Redirecting", "Redirecting to " + escapeHtml2(loc));
       res.statusCode = 301;
       res.setHeader("Content-Type", "text/html; charset=UTF-8");
       res.setHeader("Content-Length", Buffer.byteLength(doc));
@@ -23203,7 +23203,7 @@ var require_response = __commonJS({
     var createError = require_http_errors();
     var deprecate = require_depd()("express");
     var encodeUrl = require_encodeurl();
-    var escapeHtml = require_escape_html();
+    var escapeHtml2 = require_escape_html();
     var http = require("node:http");
     var onFinished = require_on_finished();
     var mime = require_mime_types();
@@ -23542,7 +23542,7 @@ var require_response = __commonJS({
           body = statuses.message[status] + ". Redirecting to " + address;
         },
         html: function() {
-          var u = escapeHtml(address);
+          var u = escapeHtml2(address);
           body = "<p>" + statuses.message[status] + ". Redirecting to " + u + "</p>";
         },
         default: function() {
@@ -23670,7 +23670,7 @@ var require_serve_static = __commonJS({
   "../../node_modules/.pnpm/serve-static@2.2.1/node_modules/serve-static/index.js"(exports2, module2) {
     "use strict";
     var encodeUrl = require_encodeurl();
-    var escapeHtml = require_escape_html();
+    var escapeHtml2 = require_escape_html();
     var parseUrl = require_parseurl();
     var resolve = require("path").resolve;
     var send = require_send();
@@ -23756,7 +23756,7 @@ var require_serve_static = __commonJS({
         originalUrl.path = null;
         originalUrl.pathname = collapseLeadingSlashes(originalUrl.pathname + "/");
         var loc = encodeUrl(url.format(originalUrl));
-        var doc = createHtmlDocument("Redirecting", "Redirecting to " + escapeHtml(loc));
+        var doc = createHtmlDocument("Redirecting", "Redirecting to " + escapeHtml2(loc));
         res.statusCode = 301;
         res.setHeader("Content-Type", "text/html; charset=UTF-8");
         res.setHeader("Content-Length", Buffer.byteLength(doc));
@@ -23777,7 +23777,7 @@ var require_express = __commonJS({
     var EventEmitter = require("node:events").EventEmitter;
     var mixin = require_merge_descriptors();
     var proto = require_application();
-    var Router6 = require_router();
+    var Router7 = require_router();
     var req = require_request();
     var res = require_response();
     exports2 = module2.exports = createApplication;
@@ -23799,8 +23799,8 @@ var require_express = __commonJS({
     exports2.application = proto;
     exports2.request = req;
     exports2.response = res;
-    exports2.Route = Router6.Route;
-    exports2.Router = Router6;
+    exports2.Route = Router7.Route;
+    exports2.Router = Router7;
     exports2.json = bodyParser.json;
     exports2.raw = bodyParser.raw;
     exports2.static = require_serve_static();
@@ -25085,7 +25085,7 @@ var require_utils5 = __commonJS({
     var nodeCrypto = require("crypto");
     module2.exports = {
       postgresMd5PasswordHash,
-      randomBytes: randomBytes3,
+      randomBytes: randomBytes5,
       deriveKey,
       sha256,
       hashByName,
@@ -25095,7 +25095,7 @@ var require_utils5 = __commonJS({
     var webCrypto = nodeCrypto.webcrypto || globalThis.crypto;
     var subtleCrypto = webCrypto.subtle;
     var textEncoder = new TextEncoder();
-    function randomBytes3(length) {
+    function randomBytes5(length) {
       return webCrypto.getRandomValues(Buffer.alloc(length));
     }
     async function md5(string) {
@@ -25112,11 +25112,11 @@ var require_utils5 = __commonJS({
       const outer = await md5(Buffer.concat([Buffer.from(inner), salt]));
       return "md5" + outer;
     }
-    async function sha256(text2) {
-      return await subtleCrypto.digest("SHA-256", text2);
+    async function sha256(text3) {
+      return await subtleCrypto.digest("SHA-256", text3);
     }
-    async function hashByName(hashName, text2) {
-      return await subtleCrypto.digest(hashName, text2);
+    async function hashByName(hashName, text3) {
+      return await subtleCrypto.digest(hashName, text3);
     }
     async function hmacSha256(keyBuffer, msg) {
       const key = await subtleCrypto.importKey("raw", keyBuffer, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
@@ -25337,21 +25337,21 @@ var require_sasl = __commonJS({
         throw new Error("SASL: SCRAM-SERVER-FINAL-MESSAGE: server signature does not match");
       }
     }
-    function isPrintableChars(text2) {
-      if (typeof text2 !== "string") {
+    function isPrintableChars(text3) {
+      if (typeof text3 !== "string") {
         throw new TypeError("SASL: text must be a string");
       }
-      return text2.split("").map((_, i) => text2.charCodeAt(i)).every((c) => c >= 33 && c <= 43 || c >= 45 && c <= 126);
+      return text3.split("").map((_, i) => text3.charCodeAt(i)).every((c) => c >= 33 && c <= 43 || c >= 45 && c <= 126);
     }
-    function isBase64(text2) {
-      return /^(?:[a-zA-Z0-9+/]{4})*(?:[a-zA-Z0-9+/]{2}==|[a-zA-Z0-9+/]{3}=)?$/.test(text2);
+    function isBase64(text3) {
+      return /^(?:[a-zA-Z0-9+/]{4})*(?:[a-zA-Z0-9+/]{2}==|[a-zA-Z0-9+/]{3}=)?$/.test(text3);
     }
-    function parseAttributePairs(text2) {
-      if (typeof text2 !== "string") {
+    function parseAttributePairs(text3) {
+      if (typeof text3 !== "string") {
         throw new TypeError("SASL: attribute pairs text must be a string");
       }
       return new Map(
-        text2.split(",").map((attrValue) => {
+        text3.split(",").map((attrValue) => {
           if (!/^.=/.test(attrValue)) {
             throw new Error("SASL: Invalid attribute pair entry");
           }
@@ -26230,9 +26230,9 @@ var require_messages = __commonJS({
     };
     exports2.ReadyForQueryMessage = ReadyForQueryMessage;
     var CommandCompleteMessage = class {
-      constructor(length, text2) {
+      constructor(length, text3) {
         this.length = length;
-        this.text = text2;
+        this.text = text3;
         this.name = "commandComplete";
       }
     };
@@ -26404,8 +26404,8 @@ var require_serializer = __commonJS({
         /* code.startup */
       );
     };
-    var query = (text2) => {
-      return writer.addCString(text2).flush(
+    var query = (text3) => {
+      return writer.addCString(text3).flush(
         81
         /* code.query */
       );
@@ -26530,8 +26530,8 @@ var require_serializer = __commonJS({
       return msg.name ? cstringMessage(68, `${msg.type}${msg.name || ""}`) : msg.type === "P" ? emptyDescribePortal : emptyDescribeStatement;
     };
     var close = (msg) => {
-      const text2 = `${msg.type}${msg.name || ""}`;
-      return cstringMessage(67, text2);
+      const text3 = `${msg.type}${msg.name || ""}`;
+      return cstringMessage(67, text3);
     };
     var copyData = (chunk) => {
       return writer.add(chunk).flush(
@@ -26803,8 +26803,8 @@ var require_parser = __commonJS({
       return new messages_1.ReadyForQueryMessage(LATEINIT_LENGTH, status);
     };
     var parseCommandCompleteMessage = (reader) => {
-      const text2 = reader.cstring();
-      return new messages_1.CommandCompleteMessage(LATEINIT_LENGTH, text2);
+      const text3 = reader.cstring();
+      return new messages_1.CommandCompleteMessage(LATEINIT_LENGTH, text3);
     };
     var parseCopyData = (reader, length) => {
       const chunk = reader.bytes(length - 4);
@@ -27185,8 +27185,8 @@ var require_connection = __commonJS({
         }
         return this.stream.write(buffer);
       }
-      query(text2) {
-        this._send(serialize.query(text2));
+      query(text3) {
+        this._send(serialize.query(text3));
       }
       // send parse message
       parse(query) {
@@ -28527,9 +28527,9 @@ var require_pg_pool = __commonJS({
         this._idle.push(new IdleItem(client, idleListener, tid));
         this._pulseQueue();
       }
-      query(text2, values, cb) {
-        if (typeof text2 === "function") {
-          const response2 = promisify(this.Promise, text2);
+      query(text3, values, cb) {
+        if (typeof text3 === "function") {
+          const response2 = promisify(this.Promise, text3);
           setImmediate(function() {
             return response2.callback(new Error("Passing a function as the first parameter to pool.query is not supported"));
           });
@@ -28557,7 +28557,7 @@ var require_pg_pool = __commonJS({
           client.once("error", onError);
           this.log("dispatching query");
           try {
-            client.query(text2, values, (err2, res) => {
+            client.query(text3, values, (err2, res) => {
               this.log("query dispatched");
               client.removeListener("error", onError);
               if (clientReleased) {
@@ -33639,7 +33639,7 @@ __export(app_exports, {
   default: () => app_default
 });
 module.exports = __toCommonJS(app_exports);
-var import_express6 = __toESM(require_express2(), 1);
+var import_express7 = __toESM(require_express2(), 1);
 var import_cookie_parser = __toESM(require_cookie_parser(), 1);
 
 // ../../node_modules/.pnpm/oauth4webapi@3.8.8/node_modules/oauth4webapi/build/index.js
@@ -42247,7 +42247,12 @@ __export(schema_exports, {
   books: () => books,
   crmActivities: () => crmActivities,
   crmCalls: () => crmCalls,
+  crmEmailDrafts: () => crmEmailDrafts,
+  crmEmailTemplates: () => crmEmailTemplates,
   crmInvestors: () => crmInvestors,
+  crmOutlookAccounts: () => crmOutlookAccounts,
+  crmOutlookEvents: () => crmOutlookEvents,
+  crmOutlookMessages: () => crmOutlookMessages,
   crmUsers: () => crmUsers,
   crmWhatsappMessages: () => crmWhatsappMessages,
   dailyPnl: () => dailyPnl,
@@ -42559,6 +42564,80 @@ var crmCalls = pgTable("crm_calls", {
   metadata: jsonb("metadata").$type().default({}).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull()
 });
+var crmOutlookAccounts = pgTable("crm_outlook_accounts", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().unique(),
+  email: text("email").notNull(),
+  microsoftId: text("microsoft_id").default("").notNull(),
+  displayName: text("display_name").default("").notNull(),
+  accessTokenEnc: text("access_token_enc").notNull(),
+  refreshTokenEnc: text("refresh_token_enc").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  scopes: text("scopes").default("").notNull(),
+  autoCreatePeople: boolean("auto_create_people").default(false).notNull(),
+  inboxCursor: text("inbox_cursor"),
+  sentCursor: text("sent_cursor"),
+  lastSyncAt: timestamp("last_sync_at", { withTimezone: true }),
+  lastSyncError: text("last_sync_error").default("").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
+});
+var crmOutlookMessages = pgTable("crm_outlook_messages", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  graphId: text("graph_id").notNull(),
+  conversationId: text("conversation_id").default("").notNull(),
+  folder: text("folder").notNull(),
+  subject: text("subject").default("").notNull(),
+  preview: text("preview").default("").notNull(),
+  fromEmail: text("from_email").default("").notNull(),
+  fromName: text("from_name").default("").notNull(),
+  participants: text("participants").default("").notNull(),
+  receivedAt: timestamp("received_at", { withTimezone: true }),
+  hasAttachments: boolean("has_attachments").default(false).notNull(),
+  isRead: boolean("is_read").default(false).notNull(),
+  webLink: text("web_link").default("").notNull()
+});
+var crmOutlookEvents = pgTable("crm_outlook_events", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  graphId: text("graph_id").notNull(),
+  subject: text("subject").default("").notNull(),
+  preview: text("preview").default("").notNull(),
+  location: text("location").default("").notNull(),
+  startAt: timestamp("start_at", { withTimezone: true }),
+  endAt: timestamp("end_at", { withTimezone: true }),
+  organizerEmail: text("organizer_email").default("").notNull(),
+  attendees: text("attendees").default("").notNull(),
+  isAllDay: boolean("is_all_day").default(false).notNull(),
+  webLink: text("web_link").default("").notNull()
+});
+var crmEmailTemplates = pgTable("crm_email_templates", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  name: text("name").notNull(),
+  subject: text("subject").default("").notNull(),
+  bodyHtml: text("body_html").default("").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
+});
+var crmEmailDrafts = pgTable("crm_email_drafts", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  toAddresses: text("to_addresses").default("").notNull(),
+  ccAddresses: text("cc_addresses").default("").notNull(),
+  bccAddresses: text("bcc_addresses").default("").notNull(),
+  subject: text("subject").default("").notNull(),
+  bodyHtml: text("body_html").default("").notNull(),
+  attachments: jsonb("attachments").$type().default([]).notNull(),
+  investorId: integer("investor_id"),
+  replyMessageId: text("reply_message_id").default("").notNull(),
+  forwardMessageId: text("forward_message_id").default("").notNull(),
+  status: text("status").default("draft").notNull(),
+  error: text("error").default("").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
+});
 var crmWhatsappMessages = pgTable("crm_whatsapp_messages", {
   id: serial("id").primaryKey(),
   investorId: integer("investor_id").references(() => crmInvestors.id),
@@ -42724,7 +42803,7 @@ async function authMiddleware(req, res, next) {
   req.isAuthenticated = function() {
     return this.user != null;
   };
-  if (req.path.startsWith("/api/crm") || req.path.startsWith("/crm") || req.path.startsWith("/api/investors") || req.path.startsWith("/api/summary")) {
+  if (req.path.startsWith("/api/crm") || req.path.startsWith("/crm") || req.path.startsWith("/api/investors") || req.path.startsWith("/api/summary") || req.path.startsWith("/api/integrations/outlook")) {
     next();
     return;
   }
@@ -42753,7 +42832,7 @@ async function authMiddleware(req, res, next) {
 var import_pino_http = __toESM(require_logger(), 1);
 
 // src/routes/index.ts
-var import_express5 = __toESM(require_express2(), 1);
+var import_express6 = __toESM(require_express2(), 1);
 
 // src/routes/health.ts
 var import_express = __toESM(require_express2(), 1);
@@ -47574,6 +47653,13 @@ var config = () => ({
   signingSecret: process.env.SESSION_SECRET,
   apiKey: process.env.CRM_API_KEY
 });
+function crmAuthConfigFromEnv() {
+  return {
+    pin: process.env.CRM_PIN || "123456",
+    signingSecret: process.env.SESSION_SECRET || process.env.SUPABASE_JWT_SECRET || "sellinghighs-crm-session-secret-2026",
+    apiKey: process.env.CRM_API_KEY || process.env.GROK_API_KEY || "sellinghighs-grok-key-2026"
+  };
+}
 function hashPassword(password, salt = (0, import_node_crypto.randomBytes)(16).toString("hex")) {
   const hash = (0, import_node_crypto.createHmac)("sha256", salt).update(password).digest("hex");
   return `${salt}:${hash}`;
@@ -47680,8 +47766,8 @@ function createCrmPinAuth(getConfig = config) {
     }
     next();
   };
-  const router5 = (0, import_express3.Router)();
-  router5.get("/", (req, res) => {
+  const router6 = (0, import_express3.Router)();
+  router6.get("/", (req, res) => {
     const user = getSessionUser(req);
     const base = { signed_in: validSession(req), configured: !!signingKey() };
     if (user) {
@@ -47690,7 +47776,7 @@ function createCrmPinAuth(getConfig = config) {
     }
     res.json(base);
   });
-  router5.post("/", sameOrigin, async (req, res) => {
+  router6.post("/", sameOrigin, async (req, res) => {
     const { pin, verifyUser } = getConfig();
     const key = signingKey();
     const now = Date.now();
@@ -47744,12 +47830,12 @@ function createCrmPinAuth(getConfig = config) {
     res.cookie(COOKIE, `${payload}.${sign(payload, key)}`, { ...cookieOptions(req), maxAge: LIFETIME_MS });
     res.json({ signed_in: true, configured: true });
   });
-  router5.delete("/", sameOrigin, (req, res) => {
+  router6.delete("/", sameOrigin, (req, res) => {
     res.clearCookie(COOKIE, cookieOptions(req));
     res.clearCookie(USER_COOKIE, cookieOptions(req));
     res.json({ signed_in: false, configured: !!signingKey() });
   });
-  return { router: router5, requirePin, getSessionUser };
+  return { router: router6, requirePin, getSessionUser };
 }
 
 // src/lib/crmStages.ts
@@ -48353,6 +48439,78 @@ function summary(investors, now = /* @__PURE__ */ new Date(), expertField, filte
     stage_probabilities: STAGE_PROBABILITIES
   };
 }
+async function ensureCrmTablesAndDefaults(client) {
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS crm_users (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      email TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT 'member',
+      workspace_settings JSONB NOT NULL DEFAULT '{}'::jsonb,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE TABLE IF NOT EXISTS crm_calls (
+      id SERIAL PRIMARY KEY,
+      investor_id INTEGER REFERENCES crm_investors(id) ON DELETE SET NULL,
+      call_id TEXT,
+      from_number TEXT NOT NULL DEFAULT '+15619031414',
+      to_number TEXT NOT NULL,
+      duration_sec INTEGER NOT NULL DEFAULT 0,
+      recording_url TEXT NOT NULL DEFAULT '',
+      ai_overview TEXT NOT NULL DEFAULT '',
+      outcome TEXT NOT NULL DEFAULT 'connected_live',
+      sentiment TEXT NOT NULL DEFAULT 'neutral',
+      action_items JSONB NOT NULL DEFAULT '[]'::jsonb,
+      next_steps TEXT NOT NULL DEFAULT '',
+      transcript JSONB NOT NULL DEFAULT '[]'::jsonb,
+      metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE TABLE IF NOT EXISTS crm_whatsapp_messages (
+      id SERIAL PRIMARY KEY,
+      investor_id INTEGER REFERENCES crm_investors(id) ON DELETE SET NULL,
+      phone TEXT NOT NULL,
+      direction TEXT NOT NULL DEFAULT 'outbound',
+      body TEXT NOT NULL,
+      sender TEXT NOT NULL DEFAULT 'Guy',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+  const existingUsers = await client.query("SELECT count(*)::int AS n FROM crm_users");
+  if ((existingUsers.rows[0]?.n ?? 0) === 0) {
+    const defaultUsers = [
+      {
+        name: "Guy",
+        email: "guy@gcs.org",
+        password: process.env.CRM_ADMIN_PASSWORD || process.env.CRM_PIN || "SellingHighs2026!",
+        role: "admin",
+        workspace: { default_field: "All", title: "Founder & Admin" }
+      },
+      {
+        name: "Growth",
+        email: "growth@gcs.org",
+        password: process.env.CRM_GROWTH_PASSWORD || "Growth2026!",
+        role: "admin",
+        workspace: { default_field: "Law Firms", title: "Outbound & Growth Lead" }
+      },
+      {
+        name: "Eduardo",
+        email: "eduardo@gcs.org",
+        password: process.env.CRM_GROK_PASSWORD || "GrokBot2026!",
+        role: "admin",
+        workspace: { default_field: "All", title: "Autonomous Outbound Agent" }
+      }
+    ];
+    for (const u of defaultUsers) {
+      await client.query(
+        "INSERT INTO crm_users(name,email,password_hash,role,workspace_settings) VALUES($1,$2,$3,$4,$5::jsonb) ON CONFLICT (email) DO NOTHING",
+        [u.name, u.email, hashPassword(u.password), u.role, JSON.stringify(u.workspace)]
+      );
+    }
+  }
+}
 async function verifyUserCredentials(email, password) {
   try {
     const r = await pool.query("SELECT id, name, email, password_hash, role FROM crm_users WHERE lower(email)=$1 LIMIT 1", [email.trim().toLowerCase()]);
@@ -48432,7 +48590,7 @@ async function deleteUser(client, userId) {
 }
 
 // src/lib/crmCsv.ts
-function parseCsv(text2) {
+function parseCsv(text3) {
   const rows = [];
   let row = [];
   let cell = "";
@@ -48443,11 +48601,11 @@ function parseCsv(text2) {
     const error = fieldError(field, cell, reason);
     return new CrmError(`CSV row ${rows.length + 1}: ${error.message}`, 400, { ...error.details, row: rows.length + 1 });
   };
-  text2 = text2.replace(/^\uFEFF/, "");
-  for (let i = 0; i < text2.length; i++) {
-    const c = text2[i];
+  text3 = text3.replace(/^\uFEFF/, "");
+  for (let i = 0; i < text3.length; i++) {
+    const c = text3[i];
     if (quoted) {
-      if (c === '"' && text2[i + 1] === '"') {
+      if (c === '"' && text3[i + 1] === '"') {
         cell += '"';
         i++;
       } else if (c === '"') {
@@ -48464,7 +48622,7 @@ function parseCsv(text2) {
       if (c !== ",") {
         if (row.some((v) => v !== "")) rows.push(row);
         row = [];
-        if (c === "\r" && text2[i + 1] === "\n") i++;
+        if (c === "\r" && text3[i + 1] === "\n") i++;
       }
     } else {
       if (endedQuote) throw malformed("Unexpected text after a quoted CSV field");
@@ -48483,8 +48641,8 @@ function csvExpertField(value) {
   if (field === "indian law") return "Indian Law";
   throw fieldError("expert_field", value, "expert_field must be Law Firms, Chinese Law or Indian Law");
 }
-async function importCsv(client, text2) {
-  const rows = parseCsv(text2);
+async function importCsv(client, text3) {
+  const rows = parseCsv(text3);
   if (rows.length < 2) throw new CrmError("CSV must contain headers and at least one investor");
   if (rows.length > 5001) throw new CrmError("Import at most 5,000 investors at once");
   const aliases2 = {
@@ -48973,25 +49131,25 @@ router3.get("/whatsapp", async (req, res) => {
 });
 var handleWhatsAppSend = async (req, res) => {
   const body = req.body || {};
-  const text2 = String(body.body || body.message || "").trim();
+  const text3 = String(body.body || body.message || "").trim();
   const phone = String(body.phone || body.to || "").trim();
   const cardId = body.card_id || body.investor_id ? Number(body.card_id || body.investor_id) : void 0;
   const sender = String(body.sender || "Guy").trim();
   const direction = body.direction === "inbound" ? "inbound" : "outbound";
-  if (!text2) throw new CrmError("WhatsApp message body is required", 400);
+  if (!text3) throw new CrmError("WhatsApp message body is required", 400);
   const created = await transaction(async (client) => {
     const ins = await client.query(
       `INSERT INTO crm_whatsapp_messages(investor_id,phone,direction,body,sender)
        VALUES($1,$2,$3,$4,$5)
        RETURNING *`,
-      [cardId ?? null, phone || "+15619031414", direction, text2, sender]
+      [cardId ?? null, phone || "+15619031414", direction, text3, sender]
     );
     if (cardId) {
       await logOutboundActivity(client, {
         card_id: cardId,
         event_type: direction === "inbound" ? "reply_received" : "whatsapp_sent",
         subject: `WhatsApp ${direction === "inbound" ? "Reply" : "Message"} (${phone || "Direct"})`,
-        snippet: text2,
+        snippet: text3,
         campaign: body.campaign || "whatsapp-direct",
         actor: sender
       });
@@ -49067,24 +49225,1612 @@ router3.use((err, req, res, next) => {
 });
 var crm_default = router3;
 
-// src/routes/index.ts
+// src/routes/outlook.ts
+var import_node_crypto3 = require("node:crypto");
+var import_express5 = __toESM(require_express2(), 1);
+
+// src/lib/outlookLogic.ts
+var import_node_crypto2 = require("node:crypto");
+var OUTLOOK_SCOPES = ["offline_access", "User.Read", "Mail.ReadWrite", "Mail.Send", "Calendars.ReadWrite"];
+var AUTHORIZE_URL = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize";
+var TOKEN_URL = "https://login.microsoftonline.com/common/oauth2/v2.0/token";
+var GRAPH_BASE = "https://graph.microsoft.com/v1.0";
+var DEFAULT_REDIRECT = "https://crm.gcs.org/api/integrations/outlook/callback";
+var OutlookError = class extends Error {
+  constructor(status, message, code) {
+    super(message);
+    this.status = status;
+    this.code = code;
+  }
+};
+function outlookRedirectUri() {
+  const value = process.env.MS_OUTLOOK_REDIRECT_URI?.trim();
+  return value || DEFAULT_REDIRECT;
+}
+function outlookConfigError() {
+  if (!process.env.MS_OUTLOOK_CLIENT_ID?.trim()) return "MS_OUTLOOK_CLIENT_ID is not set";
+  if (!process.env.MS_OUTLOOK_CLIENT_SECRET?.trim()) return "MS_OUTLOOK_CLIENT_SECRET is not set";
+  if (!process.env.TOKEN_ENCRYPTION_KEY?.trim()) return "TOKEN_ENCRYPTION_KEY is not set";
+  try {
+    parseEncryptionKey(process.env.TOKEN_ENCRYPTION_KEY);
+  } catch (err) {
+    return err instanceof Error ? err.message : "TOKEN_ENCRYPTION_KEY is invalid";
+  }
+  return null;
+}
+function parseEncryptionKey(raw) {
+  const value = raw.trim();
+  if (/^[0-9a-fA-F]{64}$/.test(value)) return Buffer.from(value, "hex");
+  const decoded = Buffer.from(value, "base64");
+  if (decoded.length === 32 && decoded.toString("base64").replace(/=+$/, "") === value.replace(/=+$/, "")) return decoded;
+  throw new OutlookError(500, "TOKEN_ENCRYPTION_KEY must be 32 bytes encoded as base64 or hex", "config");
+}
+function encryptSecret(plain, key = parseEncryptionKey(process.env.TOKEN_ENCRYPTION_KEY || "")) {
+  const iv = (0, import_node_crypto2.randomBytes)(12);
+  const cipher = (0, import_node_crypto2.createCipheriv)("aes-256-gcm", key, iv);
+  const ciphertext = Buffer.concat([cipher.update(plain, "utf8"), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return `v1.${iv.toString("base64url")}.${tag.toString("base64url")}.${ciphertext.toString("base64url")}`;
+}
+function decryptSecret(payload, key = parseEncryptionKey(process.env.TOKEN_ENCRYPTION_KEY || "")) {
+  const parts = payload.split(".");
+  if (parts.length !== 4 || parts[0] !== "v1") throw new OutlookError(500, "Stored Outlook token could not be read", "config");
+  const iv = Buffer.from(parts[1], "base64url");
+  const tag = Buffer.from(parts[2], "base64url");
+  const data = Buffer.from(parts[3], "base64url");
+  const decipher = (0, import_node_crypto2.createDecipheriv)("aes-256-gcm", key, iv);
+  decipher.setAuthTag(tag);
+  return Buffer.concat([decipher.update(data), decipher.final()]).toString("utf8");
+}
+function createPkce() {
+  const verifier = (0, import_node_crypto2.randomBytes)(32).toString("base64url");
+  const challenge = (0, import_node_crypto2.createHash)("sha256").update(verifier).digest("base64url");
+  return { verifier, challenge };
+}
+function authorizeUrl(state, challenge) {
+  const params = new URLSearchParams({
+    client_id: process.env.MS_OUTLOOK_CLIENT_ID || "",
+    response_type: "code",
+    redirect_uri: outlookRedirectUri(),
+    response_mode: "query",
+    scope: OUTLOOK_SCOPES.join(" "),
+    state,
+    code_challenge: challenge,
+    code_challenge_method: "S256",
+    prompt: "select_account"
+  });
+  return `${AUTHORIZE_URL}?${params.toString()}`;
+}
+function tokenRequestBody(fields) {
+  return new URLSearchParams({
+    client_id: process.env.MS_OUTLOOK_CLIENT_ID || "",
+    client_secret: process.env.MS_OUTLOOK_CLIENT_SECRET || "",
+    scope: OUTLOOK_SCOPES.join(" "),
+    ...fields
+  }).toString();
+}
+function cronAuthorized(header, secret = process.env.CRON_SECRET) {
+  if (!secret || secret.length < 16) return false;
+  const token = header?.toLowerCase().startsWith("bearer ") ? header.slice(7).trim() : "";
+  if (!token) return false;
+  const a = (0, import_node_crypto2.createHash)("sha256").update(token).digest();
+  const b = (0, import_node_crypto2.createHash)("sha256").update(secret).digest();
+  return (0, import_node_crypto2.timingSafeEqual)(a, b);
+}
+var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+function parseAddressList(value, limit = 50) {
+  const seen = /* @__PURE__ */ new Set();
+  const out = [];
+  for (const part of value.split(/[,;\n]/)) {
+    const email = part.trim().toLowerCase().replace(/^mailto:/, "");
+    if (!email) continue;
+    if (!EMAIL_RE.test(email) || email.length > 320) {
+      throw new OutlookError(400, `Invalid email address: ${email.slice(0, 80)}`);
+    }
+    if (seen.has(email)) continue;
+    seen.add(email);
+    out.push(email);
+    if (out.length > limit) throw new OutlookError(400, `Too many recipients (max ${limit})`);
+  }
+  return out;
+}
+function escapeHtml(value) {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+function toHtmlBody(body) {
+  const trimmed = body.trim();
+  if (!trimmed) return "";
+  if (/<[a-z][\s\S]*>/i.test(trimmed)) return trimmed.slice(0, 2e5);
+  return escapeHtml(trimmed).replace(/\n/g, "<br>");
+}
+function participantBlob(emails) {
+  const unique = [...new Set(emails.map((e2) => (e2 || "").trim().toLowerCase()).filter((e2) => EMAIL_RE.test(e2)))];
+  return unique.length ? `,${unique.join(",")},` : "";
+}
+function blobHas(blob, email) {
+  const needle = `,${email.trim().toLowerCase()},`;
+  return needle.length > 2 && blob.toLowerCase().includes(needle);
+}
+var NOISY_LOCAL = /^(no[-_.]?reply|do[-_.]?not[-_.]?reply|mailer-daemon|postmaster|notifications?|bounces?|newsletter|automated)$/i;
+function isNoisySender(email) {
+  const local = email.trim().toLowerCase().split("@")[0] || "";
+  return !local || NOISY_LOCAL.test(local) || local.startsWith("noreply") || local.startsWith("no-reply");
+}
+function shouldAutoCreateSender(input) {
+  const sender = input.sender.trim().toLowerCase();
+  if (!input.enabled || input.alreadyExists) return false;
+  if (!EMAIL_RE.test(sender) || isNoisySender(sender)) return false;
+  if (sender === input.selfEmail.trim().toLowerCase()) return false;
+  return true;
+}
+function addressOf(value) {
+  return (value?.emailAddress?.address || "").trim().toLowerCase();
+}
+function nameOf(value) {
+  return (value?.emailAddress?.name || "").trim();
+}
+function messageFromGraph(message, folder) {
+  const graphId = message.id || "";
+  if (!graphId) return null;
+  if (message["@removed"]) {
+    return {
+      graphId,
+      conversationId: "",
+      folder,
+      subject: "",
+      preview: "",
+      fromEmail: "",
+      fromName: "",
+      participants: "",
+      receivedAt: null,
+      hasAttachments: false,
+      isRead: false,
+      webLink: "",
+      removed: true
+    };
+  }
+  const to = (message.toRecipients || []).map(addressOf);
+  const cc = (message.ccRecipients || []).map(addressOf);
+  const fromEmail = addressOf(message.from);
+  return {
+    graphId,
+    conversationId: message.conversationId || "",
+    folder,
+    subject: (message.subject || "").slice(0, 500),
+    preview: (message.bodyPreview || "").slice(0, 500),
+    fromEmail,
+    fromName: nameOf(message.from).slice(0, 200),
+    participants: participantBlob([fromEmail, ...to, ...cc]),
+    receivedAt: message.receivedDateTime || message.sentDateTime || null,
+    hasAttachments: !!message.hasAttachments,
+    isRead: !!message.isRead,
+    webLink: message.webLink || "",
+    removed: false
+  };
+}
+function graphDateToIso(value) {
+  const raw = value?.dateTime?.trim();
+  if (!raw) return null;
+  if (/[zZ]$|[+-]\d{2}:?\d{2}$/.test(raw)) {
+    const date3 = new Date(raw);
+    return Number.isNaN(date3.getTime()) ? null : date3.toISOString();
+  }
+  const zone = (value?.timeZone || "UTC").toUpperCase();
+  const date2 = new Date(zone === "UTC" ? `${raw.replace(/\.\d+$/, "")}Z` : raw);
+  return Number.isNaN(date2.getTime()) ? null : date2.toISOString();
+}
+function eventFromGraph(event) {
+  if (!event.id || event.isCancelled) return null;
+  const attendees = (event.attendees || []).map(addressOf);
+  const organizer = addressOf(event.organizer);
+  return {
+    graphId: event.id,
+    subject: (event.subject || "").slice(0, 500),
+    preview: (event.bodyPreview || "").slice(0, 500),
+    location: (event.location?.displayName || "").slice(0, 300),
+    startAt: graphDateToIso(event.start),
+    endAt: graphDateToIso(event.end),
+    organizerEmail: organizer,
+    attendees: participantBlob([organizer, ...attendees]),
+    isAllDay: !!event.isAllDay,
+    webLink: event.webLink || ""
+  };
+}
+function eventIncludes(attendeesBlob, emails) {
+  return emails.some((email) => blobHas(attendeesBlob, email));
+}
+function cleanAttachment(input) {
+  const name = (input.name || "attachment").replace(/[/\\]/g, "").replace(/[^\w.\- ()[\]]+/g, "_").slice(0, 180) || "attachment";
+  const contentType = (input.contentType || "application/octet-stream").split(";")[0].trim().slice(0, 120) || "application/octet-stream";
+  const raw = (input.contentBytes || "").replace(/^data:[^;]+;base64,/, "").replace(/\s/g, "");
+  if (!raw || !/^[A-Za-z0-9+/]*={0,2}$/.test(raw) || raw.length % 4 === 1) {
+    throw new OutlookError(400, `Attachment ${name} is not valid base64`);
+  }
+  const bytes = Buffer.from(raw, "base64").length;
+  if (bytes > 3 * 1024 * 1024) throw new OutlookError(413, `Attachment ${name} is larger than 3 MB`);
+  return { name, contentType, contentBytes: raw };
+}
+function cleanAttachments(list) {
+  if (list == null) return [];
+  if (!Array.isArray(list)) throw new OutlookError(400, "Attachments must be a list");
+  if (list.length > 3) throw new OutlookError(400, "Attach up to 3 files");
+  const files = list.map((item) => cleanAttachment(item || {}));
+  const total = files.reduce((sum, file) => sum + Buffer.from(file.contentBytes, "base64").length, 0);
+  if (total > 3 * 1024 * 1024) throw new OutlookError(413, "Attachments must total 3 MB or less");
+  return files;
+}
+function buildSendMailBody(input) {
+  if (!input.to.length) throw new OutlookError(400, "Add at least one recipient");
+  return {
+    message: {
+      subject: input.subject.slice(0, 500),
+      body: { contentType: "HTML", content: input.html },
+      toRecipients: input.to.map((address) => ({ emailAddress: { address } })),
+      ccRecipients: (input.cc || []).map((address) => ({ emailAddress: { address } })),
+      bccRecipients: (input.bcc || []).map((address) => ({ emailAddress: { address } })),
+      attachments: (input.attachments || []).map((file) => ({
+        "@odata.type": "#microsoft.graph.fileAttachment",
+        name: file.name,
+        contentType: file.contentType,
+        contentBytes: file.contentBytes
+      }))
+    },
+    saveToSentItems: true
+  };
+}
+function safeFileName(name) {
+  return name.replace(/[/\\"]/g, "").slice(0, 180) || "attachment";
+}
+function displayNameFromEmail(email, name) {
+  const trimmed = (name || "").trim();
+  if (trimmed && !trimmed.includes("@")) return trimmed.slice(0, 120);
+  const local = email.split("@")[0] || email;
+  return local.replace(/[._-]+/g, " ").replace(/\b\w/g, (char2) => char2.toUpperCase()).slice(0, 120);
+}
+
+// src/lib/outlookStore.ts
+var schemaReady = null;
+function flag(value) {
+  return value === true || value === "t" || value === "true" || value === 1 || value === "1";
+}
+function iso(value) {
+  if (!value) return null;
+  const date2 = value instanceof Date ? value : new Date(String(value));
+  return Number.isNaN(date2.getTime()) ? null : date2.toISOString();
+}
+async function exec(sql2, params = []) {
+  return pool.query(sql2, params);
+}
+function ensureOutlookSchema() {
+  if (!schemaReady) {
+    schemaReady = createOutlookSchema().catch((err) => {
+      schemaReady = null;
+      throw err;
+    });
+  }
+  return schemaReady;
+}
+async function createOutlookSchema() {
+  try {
+    await ensureCrmTablesAndDefaults({ query: pool.query.bind(pool) });
+  } catch (err) {
+    logger.warn({ message: err instanceof Error ? err.message : "ensure failed" }, "outlook continued without crm table ensure");
+  }
+  const statements = [
+    `CREATE TABLE IF NOT EXISTS crm_outlook_accounts (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL UNIQUE,
+      email TEXT NOT NULL,
+      microsoft_id TEXT NOT NULL DEFAULT '',
+      display_name TEXT NOT NULL DEFAULT '',
+      access_token_enc TEXT NOT NULL,
+      refresh_token_enc TEXT NOT NULL,
+      expires_at TIMESTAMPTZ NOT NULL,
+      scopes TEXT NOT NULL DEFAULT '',
+      auto_create_people BOOLEAN NOT NULL DEFAULT FALSE,
+      inbox_cursor TEXT,
+      sent_cursor TEXT,
+      last_sync_at TIMESTAMPTZ,
+      last_sync_error TEXT NOT NULL DEFAULT '',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE TABLE IF NOT EXISTS crm_outlook_oauth_states (
+      state TEXT PRIMARY KEY,
+      user_id INTEGER NOT NULL,
+      code_verifier TEXT NOT NULL,
+      expires_at TIMESTAMPTZ NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE TABLE IF NOT EXISTS crm_outlook_messages (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL,
+      graph_id TEXT NOT NULL,
+      conversation_id TEXT NOT NULL DEFAULT '',
+      folder TEXT NOT NULL,
+      subject TEXT NOT NULL DEFAULT '',
+      preview TEXT NOT NULL DEFAULT '',
+      from_email TEXT NOT NULL DEFAULT '',
+      from_name TEXT NOT NULL DEFAULT '',
+      participants TEXT NOT NULL DEFAULT '',
+      received_at TIMESTAMPTZ,
+      has_attachments BOOLEAN NOT NULL DEFAULT FALSE,
+      is_read BOOLEAN NOT NULL DEFAULT FALSE,
+      web_link TEXT NOT NULL DEFAULT '',
+      UNIQUE (user_id, graph_id)
+    )`,
+    `CREATE INDEX IF NOT EXISTS crm_outlook_messages_user_idx ON crm_outlook_messages (user_id, received_at)`,
+    `CREATE TABLE IF NOT EXISTS crm_outlook_events (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL,
+      graph_id TEXT NOT NULL,
+      subject TEXT NOT NULL DEFAULT '',
+      preview TEXT NOT NULL DEFAULT '',
+      location TEXT NOT NULL DEFAULT '',
+      start_at TIMESTAMPTZ,
+      end_at TIMESTAMPTZ,
+      organizer_email TEXT NOT NULL DEFAULT '',
+      attendees TEXT NOT NULL DEFAULT '',
+      is_all_day BOOLEAN NOT NULL DEFAULT FALSE,
+      web_link TEXT NOT NULL DEFAULT '',
+      UNIQUE (user_id, graph_id)
+    )`,
+    `CREATE INDEX IF NOT EXISTS crm_outlook_events_user_idx ON crm_outlook_events (user_id, start_at)`,
+    `CREATE TABLE IF NOT EXISTS crm_email_templates (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      subject TEXT NOT NULL DEFAULT '',
+      body_html TEXT NOT NULL DEFAULT '',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE TABLE IF NOT EXISTS crm_email_drafts (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL,
+      to_addresses TEXT NOT NULL DEFAULT '',
+      cc_addresses TEXT NOT NULL DEFAULT '',
+      bcc_addresses TEXT NOT NULL DEFAULT '',
+      subject TEXT NOT NULL DEFAULT '',
+      body_html TEXT NOT NULL DEFAULT '',
+      attachments JSONB NOT NULL DEFAULT '[]'::jsonb,
+      investor_id INTEGER,
+      reply_message_id TEXT NOT NULL DEFAULT '',
+      forward_message_id TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'draft',
+      error TEXT NOT NULL DEFAULT '',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`
+  ];
+  for (const sql2 of statements) await exec(sql2);
+}
+function mapAccount(row) {
+  return {
+    userId: Number(row.user_id),
+    email: String(row.email || ""),
+    microsoftId: String(row.microsoft_id || ""),
+    displayName: String(row.display_name || ""),
+    accessTokenEnc: String(row.access_token_enc || ""),
+    refreshTokenEnc: String(row.refresh_token_enc || ""),
+    expiresAt: new Date(String(row.expires_at)),
+    scopes: String(row.scopes || ""),
+    autoCreatePeople: flag(row.auto_create_people),
+    inboxCursor: row.inbox_cursor ? String(row.inbox_cursor) : null,
+    sentCursor: row.sent_cursor ? String(row.sent_cursor) : null,
+    lastSyncAt: iso(row.last_sync_at),
+    lastSyncError: String(row.last_sync_error || "")
+  };
+}
+async function getAccount(userId) {
+  await ensureOutlookSchema();
+  const result = await exec("SELECT * FROM crm_outlook_accounts WHERE user_id=$1", [userId]);
+  return result.rows[0] ? mapAccount(result.rows[0]) : null;
+}
+async function listAccounts() {
+  await ensureOutlookSchema();
+  const result = await exec("SELECT * FROM crm_outlook_accounts ORDER BY user_id");
+  return result.rows.map(mapAccount);
+}
+async function saveAccount(input) {
+  await ensureOutlookSchema();
+  await exec(
+    `INSERT INTO crm_outlook_accounts
+      (user_id, email, microsoft_id, display_name, access_token_enc, refresh_token_enc, expires_at, scopes, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW())
+     ON CONFLICT (user_id) DO UPDATE SET
+      email=EXCLUDED.email,
+      microsoft_id=EXCLUDED.microsoft_id,
+      display_name=EXCLUDED.display_name,
+      access_token_enc=EXCLUDED.access_token_enc,
+      refresh_token_enc=EXCLUDED.refresh_token_enc,
+      expires_at=EXCLUDED.expires_at,
+      scopes=EXCLUDED.scopes,
+      inbox_cursor=NULL,
+      sent_cursor=NULL,
+      last_sync_error='',
+      updated_at=NOW()`,
+    [input.userId, input.email, input.microsoftId, input.displayName, input.accessTokenEnc, input.refreshTokenEnc, input.expiresAt.toISOString(), input.scopes]
+  );
+}
+async function saveTokens(userId, accessTokenEnc, refreshTokenEnc, expiresAt) {
+  await exec(
+    "UPDATE crm_outlook_accounts SET access_token_enc=$2, refresh_token_enc=$3, expires_at=$4, updated_at=NOW() WHERE user_id=$1",
+    [userId, accessTokenEnc, refreshTokenEnc, expiresAt.toISOString()]
+  );
+}
+async function setAutoCreate(userId, enabled) {
+  await ensureOutlookSchema();
+  await exec("UPDATE crm_outlook_accounts SET auto_create_people=$2, updated_at=NOW() WHERE user_id=$1", [userId, enabled]);
+}
+async function saveCursor(userId, folder, cursor) {
+  const column = folder === "inbox" ? "inbox_cursor" : "sent_cursor";
+  await exec(`UPDATE crm_outlook_accounts SET ${column}=$2, updated_at=NOW() WHERE user_id=$1`, [userId, cursor]);
+}
+async function saveSyncStatus(userId, error) {
+  await exec("UPDATE crm_outlook_accounts SET last_sync_at=NOW(), last_sync_error=$2, updated_at=NOW() WHERE user_id=$1", [userId, error.slice(0, 500)]);
+}
+async function deleteAccount(userId) {
+  await ensureOutlookSchema();
+  await exec("DELETE FROM crm_outlook_messages WHERE user_id=$1", [userId]);
+  await exec("DELETE FROM crm_outlook_events WHERE user_id=$1", [userId]);
+  await exec("DELETE FROM crm_outlook_oauth_states WHERE user_id=$1", [userId]);
+  await exec("DELETE FROM crm_outlook_accounts WHERE user_id=$1", [userId]);
+}
+async function putOAuthState(state, userId, verifier) {
+  await ensureOutlookSchema();
+  await exec("DELETE FROM crm_outlook_oauth_states WHERE expires_at < NOW()");
+  await exec(
+    "INSERT INTO crm_outlook_oauth_states(state, user_id, code_verifier, expires_at) VALUES($1,$2,$3,NOW() + INTERVAL '10 minutes')",
+    [state, userId, verifier]
+  );
+}
+async function takeOAuthState(state) {
+  await ensureOutlookSchema();
+  const result = await exec("SELECT user_id, code_verifier FROM crm_outlook_oauth_states WHERE state=$1 AND expires_at >= NOW()", [state]);
+  const row = result.rows[0];
+  if (!row) return null;
+  await exec("DELETE FROM crm_outlook_oauth_states WHERE state=$1", [state]);
+  return { userId: Number(row.user_id), verifier: String(row.code_verifier) };
+}
+async function upsertSyncedMessage(userId, message) {
+  if (message.removed) {
+    await exec("DELETE FROM crm_outlook_messages WHERE user_id=$1 AND graph_id=$2", [userId, message.graphId]);
+    return;
+  }
+  await exec(
+    `INSERT INTO crm_outlook_messages
+      (user_id, graph_id, conversation_id, folder, subject, preview, from_email, from_name, participants, received_at, has_attachments, is_read, web_link)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+     ON CONFLICT (user_id, graph_id) DO UPDATE SET
+      conversation_id=EXCLUDED.conversation_id,
+      folder=EXCLUDED.folder,
+      subject=EXCLUDED.subject,
+      preview=EXCLUDED.preview,
+      from_email=EXCLUDED.from_email,
+      from_name=EXCLUDED.from_name,
+      participants=EXCLUDED.participants,
+      received_at=EXCLUDED.received_at,
+      has_attachments=EXCLUDED.has_attachments,
+      is_read=EXCLUDED.is_read,
+      web_link=EXCLUDED.web_link`,
+    [
+      userId,
+      message.graphId,
+      message.conversationId,
+      message.folder,
+      message.subject,
+      message.preview,
+      message.fromEmail,
+      message.fromName,
+      message.participants,
+      message.receivedAt,
+      message.hasAttachments,
+      message.isRead,
+      message.webLink
+    ]
+  );
+}
+async function upsertSyncedEvent(userId, event) {
+  await exec(
+    `INSERT INTO crm_outlook_events
+      (user_id, graph_id, subject, preview, location, start_at, end_at, organizer_email, attendees, is_all_day, web_link)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+     ON CONFLICT (user_id, graph_id) DO UPDATE SET
+      subject=EXCLUDED.subject,
+      preview=EXCLUDED.preview,
+      location=EXCLUDED.location,
+      start_at=EXCLUDED.start_at,
+      end_at=EXCLUDED.end_at,
+      organizer_email=EXCLUDED.organizer_email,
+      attendees=EXCLUDED.attendees,
+      is_all_day=EXCLUDED.is_all_day,
+      web_link=EXCLUDED.web_link`,
+    [userId, event.graphId, event.subject, event.preview, event.location, event.startAt, event.endAt, event.organizerEmail, event.attendees, event.isAllDay, event.webLink]
+  );
+}
+async function pruneEvents(userId, startIso, endIso, keepIds) {
+  if (!keepIds.length) {
+    await exec("DELETE FROM crm_outlook_events WHERE user_id=$1 AND start_at >= $2 AND start_at < $3", [userId, startIso, endIso]);
+    return;
+  }
+  const placeholders = keepIds.map((_, index2) => `$${index2 + 4}`).join(",");
+  await exec(
+    `DELETE FROM crm_outlook_events WHERE user_id=$1 AND start_at >= $2 AND start_at < $3 AND graph_id NOT IN (${placeholders})`,
+    [userId, startIso, endIso, ...keepIds]
+  );
+}
+async function messagesForEmails(userId, emails) {
+  if (!emails.length) return [];
+  const clauses = emails.map((_, index2) => `strpos(participants, $${index2 + 2}) > 0`);
+  const result = await exec(
+    `SELECT graph_id, conversation_id, folder, subject, preview, from_email, from_name, participants, received_at, has_attachments, is_read, web_link
+     FROM crm_outlook_messages WHERE user_id=$1 AND (${clauses.join(" OR ")})
+     ORDER BY received_at DESC NULLS LAST LIMIT 40`,
+    [userId, ...emails.map((email) => `,${email},`)]
+  );
+  return result.rows;
+}
+async function eventsForEmails(userId, emails, fromIso) {
+  if (!emails.length) return [];
+  const clauses = emails.map((_, index2) => `strpos(attendees, $${index2 + 3}) > 0`);
+  const result = await exec(
+    `SELECT graph_id, subject, preview, location, start_at, end_at, organizer_email, attendees, is_all_day, web_link
+     FROM crm_outlook_events WHERE user_id=$1 AND start_at >= $2 AND (${clauses.join(" OR ")})
+     ORDER BY start_at ASC LIMIT 20`,
+    [userId, fromIso, ...emails.map((email) => `,${email},`)]
+  );
+  return result.rows;
+}
+async function investorContext(investorId) {
+  const row = await exec("SELECT data FROM crm_investors WHERE id=$1", [investorId]);
+  if (!row.rows[0]) return null;
+  const data = row.rows[0].data || {};
+  const email = String(data.email || "").trim().toLowerCase();
+  const firm = String(data.firm || "").trim();
+  const emails = /* @__PURE__ */ new Set();
+  if (email) emails.add(email);
+  if (firm) {
+    const siblings = await exec(
+      "SELECT lower(trim(coalesce(data->>'email',''))) AS email FROM crm_investors WHERE lower(trim(coalesce(data->>'firm','')))=$1 AND trim(coalesce(data->>'email','')) <> '' LIMIT 15",
+      [firm.toLowerCase()]
+    );
+    for (const sibling of siblings.rows) if (sibling.email) emails.add(String(sibling.email));
+  }
+  return { email, firm, name: String(data.name || ""), emails: [...emails] };
+}
+async function emailExists(email) {
+  const result = await exec("SELECT 1 FROM crm_investors WHERE email_key=$1 LIMIT 1", [email]);
+  return !!result.rows[0];
+}
+async function userName(userId) {
+  const result = await exec("SELECT name FROM crm_users WHERE id=$1", [userId]);
+  return String(result.rows[0]?.name || "Guy");
+}
+function mapDraft(row) {
+  let attachments = row.attachments;
+  if (typeof attachments === "string") {
+    try {
+      attachments = JSON.parse(attachments);
+    } catch {
+      attachments = [];
+    }
+  }
+  return {
+    id: Number(row.id),
+    to: String(row.to_addresses || ""),
+    cc: String(row.cc_addresses || ""),
+    bcc: String(row.bcc_addresses || ""),
+    subject: String(row.subject || ""),
+    body: String(row.body_html || ""),
+    attachments: Array.isArray(attachments) ? attachments : [],
+    investorId: row.investor_id == null ? null : Number(row.investor_id),
+    replyMessageId: String(row.reply_message_id || ""),
+    forwardMessageId: String(row.forward_message_id || ""),
+    status: String(row.status || "draft"),
+    error: String(row.error || ""),
+    updatedAt: iso(row.updated_at)
+  };
+}
+async function listDrafts(userId, status) {
+  await ensureOutlookSchema();
+  const result = await exec(
+    "SELECT * FROM crm_email_drafts WHERE user_id=$1 AND status=$2 ORDER BY updated_at DESC LIMIT 100",
+    [userId, status]
+  );
+  return result.rows.map(mapDraft);
+}
+async function getDraft(userId, id2) {
+  await ensureOutlookSchema();
+  const result = await exec("SELECT * FROM crm_email_drafts WHERE user_id=$1 AND id=$2", [userId, id2]);
+  return result.rows[0] ? mapDraft(result.rows[0]) : null;
+}
+async function saveDraft(userId, input) {
+  await ensureOutlookSchema();
+  const attachments = JSON.stringify(input.attachments || []);
+  if (input.id) {
+    const result2 = await exec(
+      `UPDATE crm_email_drafts SET to_addresses=$3, cc_addresses=$4, bcc_addresses=$5, subject=$6, body_html=$7,
+        attachments=$8::jsonb, investor_id=$9, reply_message_id=$10, forward_message_id=$11, status=$12, error=$13, updated_at=NOW()
+       WHERE user_id=$1 AND id=$2 RETURNING id`,
+      [userId, input.id, input.to, input.cc, input.bcc, input.subject, input.body, attachments, input.investorId, input.replyMessageId, input.forwardMessageId, input.status || "draft", input.error || ""]
+    );
+    if (!result2.rows[0]) return null;
+    return getDraft(userId, input.id);
+  }
+  const result = await exec(
+    `INSERT INTO crm_email_drafts
+      (user_id, to_addresses, cc_addresses, bcc_addresses, subject, body_html, attachments, investor_id, reply_message_id, forward_message_id, status, error)
+     VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10,$11,$12) RETURNING id`,
+    [userId, input.to, input.cc, input.bcc, input.subject, input.body, attachments, input.investorId, input.replyMessageId, input.forwardMessageId, input.status || "draft", input.error || ""]
+  );
+  return getDraft(userId, Number(result.rows[0].id));
+}
+async function markDraft(userId, id2, status, error) {
+  await exec("UPDATE crm_email_drafts SET status=$3, error=$4, updated_at=NOW() WHERE user_id=$1 AND id=$2", [userId, id2, status, error.slice(0, 500)]);
+}
+async function deleteDraft(userId, id2) {
+  await ensureOutlookSchema();
+  await exec("DELETE FROM crm_email_drafts WHERE user_id=$1 AND id=$2", [userId, id2]);
+}
+async function listTemplates(userId) {
+  await ensureOutlookSchema();
+  const result = await exec("SELECT id, name, subject, body_html, updated_at FROM crm_email_templates WHERE user_id=$1 ORDER BY updated_at DESC", [userId]);
+  return result.rows.map((row) => ({
+    id: Number(row.id),
+    name: String(row.name),
+    subject: String(row.subject || ""),
+    body: String(row.body_html || ""),
+    updatedAt: iso(row.updated_at)
+  }));
+}
+async function saveTemplate(userId, input) {
+  await ensureOutlookSchema();
+  if (input.id) {
+    const result2 = await exec(
+      "UPDATE crm_email_templates SET name=$3, subject=$4, body_html=$5, updated_at=NOW() WHERE user_id=$1 AND id=$2 RETURNING id, name, subject, body_html, updated_at",
+      [userId, input.id, input.name, input.subject, input.body]
+    );
+    return result2.rows[0] ? { id: Number(result2.rows[0].id), name: String(result2.rows[0].name), subject: String(result2.rows[0].subject), body: String(result2.rows[0].body_html), updatedAt: iso(result2.rows[0].updated_at) } : null;
+  }
+  const result = await exec(
+    "INSERT INTO crm_email_templates(user_id, name, subject, body_html) VALUES($1,$2,$3,$4) RETURNING id, name, subject, body_html, updated_at",
+    [userId, input.name, input.subject, input.body]
+  );
+  const row = result.rows[0];
+  return { id: Number(row.id), name: String(row.name), subject: String(row.subject), body: String(row.body_html), updatedAt: iso(row.updated_at) };
+}
+async function deleteTemplate(userId, id2) {
+  await ensureOutlookSchema();
+  await exec("DELETE FROM crm_email_templates WHERE user_id=$1 AND id=$2", [userId, id2]);
+}
+async function localCounts(userId) {
+  await ensureOutlookSchema();
+  const drafts = await exec("SELECT count(*)::int AS n FROM crm_email_drafts WHERE user_id=$1 AND status='draft'", [userId]);
+  const outbox = await exec("SELECT count(*)::int AS n FROM crm_email_drafts WHERE user_id=$1 AND status='outbox'", [userId]);
+  const templates = await exec("SELECT count(*)::int AS n FROM crm_email_templates WHERE user_id=$1", [userId]);
+  return {
+    drafts: Number(drafts.rows[0]?.n || 0),
+    outbox: Number(outbox.rows[0]?.n || 0),
+    templates: Number(templates.rows[0]?.n || 0)
+  };
+}
+
+// src/lib/outlookGraph.ts
+var refreshing = /* @__PURE__ */ new Map();
+var syncing = /* @__PURE__ */ new Map();
+async function refreshAccount(account) {
+  const refreshToken = decryptSecret(account.refreshTokenEnc);
+  const response = await fetch(TOKEN_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: tokenRequestBody({ grant_type: "refresh_token", refresh_token: refreshToken })
+  });
+  const json2 = await response.json().catch(() => ({}));
+  if (!response.ok || !json2.access_token) {
+    throw new OutlookError(401, "Outlook needs to be reconnected", "reconnect");
+  }
+  const access = json2.access_token;
+  const nextRefresh = json2.refresh_token || refreshToken;
+  const expires = new Date(Date.now() + (Number(json2.expires_in) || 3600) * 1e3);
+  await saveTokens(account.userId, encryptSecret(access), encryptSecret(nextRefresh), expires);
+  return access;
+}
+async function getAccessToken(userId, force = false) {
+  const account = await getAccount(userId);
+  if (!account) throw new OutlookError(409, "Connect Outlook first", "not_connected");
+  if (!force && account.expiresAt.getTime() > Date.now() + 6e4) return decryptSecret(account.accessTokenEnc);
+  const existing = refreshing.get(userId);
+  if (existing) return existing;
+  const pending = refreshAccount(account).finally(() => refreshing.delete(userId));
+  refreshing.set(userId, pending);
+  return pending;
+}
+async function exchangeAuthCode(userId, code, verifier) {
+  const response = await fetch(TOKEN_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: tokenRequestBody({
+      grant_type: "authorization_code",
+      code,
+      redirect_uri: outlookRedirectUri(),
+      code_verifier: verifier
+    })
+  });
+  const json2 = await response.json().catch(() => ({}));
+  if (!response.ok || !json2.access_token || !json2.refresh_token) {
+    logger.warn({ message: String(json2.error_description || "token exchange failed").slice(0, 240) }, "outlook oauth failed");
+    throw new OutlookError(400, "Microsoft did not complete the Outlook connection", "oauth");
+  }
+  const profileResponse = await fetch(`${GRAPH_BASE}/me?$select=id,displayName,mail,userPrincipalName`, {
+    headers: { Authorization: `Bearer ${json2.access_token}` }
+  });
+  const profile = await profileResponse.json().catch(() => ({}));
+  const email = String(profile.mail || profile.userPrincipalName || "").trim().toLowerCase();
+  if (!profileResponse.ok || !email) throw new OutlookError(400, "Microsoft account has no mailbox address", "oauth");
+  await saveAccount({
+    userId,
+    email,
+    microsoftId: profile.id || "",
+    displayName: profile.displayName || email,
+    accessTokenEnc: encryptSecret(json2.access_token),
+    refreshTokenEnc: encryptSecret(json2.refresh_token),
+    expiresAt: new Date(Date.now() + (Number(json2.expires_in) || 3600) * 1e3),
+    scopes: "offline_access User.Read Mail.ReadWrite Mail.Send Calendars.ReadWrite"
+  });
+  return email;
+}
+async function graphJson(userId, path, init = {}) {
+  const run = async (token) => {
+    const headers2 = new Headers(init.headers);
+    headers2.set("Authorization", `Bearer ${token}`);
+    if (init.body && !headers2.has("Content-Type")) headers2.set("Content-Type", "application/json");
+    const url = path.startsWith("http") ? path : `${GRAPH_BASE}${path}`;
+    return fetch(url, { ...init, headers: headers2 });
+  };
+  let response = await run(await getAccessToken(userId));
+  if (response.status === 401) response = await run(await getAccessToken(userId, true));
+  if (response.status === 204) return void 0;
+  const text3 = await response.text();
+  if (!response.ok) {
+    let message = `Outlook request failed (${response.status})`;
+    try {
+      const parsed = JSON.parse(text3);
+      if (parsed.error?.message) message = parsed.error.message.slice(0, 300);
+      if (response.status === 410 || parsed.error?.code === "SyncStateNotFound") {
+        throw new OutlookError(410, message, "resync");
+      }
+    } catch (err) {
+      if (err instanceof OutlookError) throw err;
+    }
+    throw new OutlookError(response.status === 401 ? 401 : 502, message, response.status === 401 ? "reconnect" : "graph");
+  }
+  if (!text3) return void 0;
+  return JSON.parse(text3);
+}
+async function pullMailDelta(userId, folder, cursor, pageBudget) {
+  const initial = folder === "inbox" ? "/me/mailFolders/inbox/messages/delta?$top=25" : "/me/mailFolders/sentitems/messages/delta?$top=25";
+  let url = cursor || initial;
+  let guard = cursor;
+  let upserted = 0;
+  const candidates = [];
+  while (url && pageBudget.left > 0) {
+    pageBudget.left -= 1;
+    let page;
+    try {
+      page = await graphJson(userId, url, { headers: { Prefer: "odata.maxpagesize=25" } });
+    } catch (err) {
+      if (err instanceof OutlookError && err.status === 410 && guard) {
+        guard = null;
+        url = initial;
+        continue;
+      }
+      throw err;
+    }
+    for (const item of page.value || []) {
+      const stored = messageFromGraph(item, folder);
+      if (!stored) continue;
+      await upsertSyncedMessage(userId, stored);
+      if (!stored.removed) {
+        upserted += 1;
+        if (folder === "inbox" && stored.fromEmail) candidates.push({ email: stored.fromEmail, name: stored.fromName, receivedAt: stored.receivedAt });
+      }
+    }
+    if (page["@odata.deltaLink"]) {
+      url = null;
+      await saveCursor(userId, folder, page["@odata.deltaLink"]);
+    } else if (page["@odata.nextLink"]) {
+      url = page["@odata.nextLink"];
+      await saveCursor(userId, folder, page["@odata.nextLink"]);
+    } else {
+      url = null;
+    }
+  }
+  return { upserted, candidates };
+}
+async function pullCalendar(userId) {
+  const start = new Date(Date.now() - 14 * 24 * 60 * 60 * 1e3);
+  const end = new Date(Date.now() + 60 * 24 * 60 * 60 * 1e3);
+  const params = new URLSearchParams({
+    startDateTime: start.toISOString(),
+    endDateTime: end.toISOString(),
+    $orderby: "start/dateTime",
+    $top: "50",
+    $select: "id,subject,bodyPreview,start,end,location,organizer,attendees,isAllDay,webLink,isCancelled"
+  });
+  let url = `/me/calendarView?${params.toString()}`;
+  const keep = [];
+  let pages = 0;
+  let upserted = 0;
+  while (url && pages < 5) {
+    pages += 1;
+    const page = await graphJson(userId, url, {
+      headers: { Prefer: 'outlook.timezone="UTC"' }
+    });
+    for (const item of page.value || []) {
+      const stored = eventFromGraph(item);
+      if (!stored) continue;
+      await upsertSyncedEvent(userId, stored);
+      keep.push(stored.graphId);
+      upserted += 1;
+    }
+    url = page["@odata.nextLink"] || null;
+  }
+  await pruneEvents(userId, start.toISOString(), end.toISOString(), keep);
+  return upserted;
+}
+async function createPeople(userId, accountEmail, candidates) {
+  const owner = await userName(userId);
+  const seen = /* @__PURE__ */ new Set();
+  let created = 0;
+  for (const candidate of candidates) {
+    if (created >= 20) break;
+    const email = candidate.email.trim().toLowerCase();
+    if (seen.has(email)) continue;
+    seen.add(email);
+    if (candidate.receivedAt) {
+      const age = Date.now() - new Date(candidate.receivedAt).getTime();
+      if (Number.isFinite(age) && age > 14 * 24 * 60 * 60 * 1e3) continue;
+    }
+    const exists2 = await emailExists(email);
+    if (!shouldAutoCreateSender({ enabled: true, sender: email, selfEmail: accountEmail, alreadyExists: exists2 })) continue;
+    await transaction((client) => upsert(client, {
+      name: displayNameFromEmail(email, candidate.name),
+      email,
+      status: "New",
+      lead_source: "Outlook",
+      owner,
+      client_type: "new lead",
+      deal_value: 0,
+      expert_field: "Law Firms",
+      notes: "Added from an Outlook inbox sender because auto-create is on."
+    }));
+    created += 1;
+  }
+  return created;
+}
+async function syncOutlookUser(userId) {
+  const existing = syncing.get(userId);
+  if (existing) return existing;
+  const pending = runSync(userId).finally(() => syncing.delete(userId));
+  syncing.set(userId, pending);
+  return pending;
+}
+async function runSync(userId) {
+  const account = await getAccount(userId);
+  if (!account) throw new OutlookError(409, "Connect Outlook first", "not_connected");
+  const pages = { left: 8 };
+  const inbox = await pullMailDelta(userId, "inbox", account.inboxCursor, pages);
+  const fresh = await getAccount(userId);
+  const sent = await pullMailDelta(userId, "sent", fresh?.sentCursor ?? account.sentCursor, pages);
+  const events = await pullCalendar(userId);
+  const peopleCreated = account.autoCreatePeople ? await createPeople(userId, account.email, inbox.candidates) : 0;
+  await saveSyncStatus(userId, "");
+  return { inbox: inbox.upserted, sent: sent.upserted, events, peopleCreated };
+}
+async function syncAllOutlookAccounts() {
+  const accounts = await listAccounts();
+  const results = [];
+  for (const account of accounts) {
+    try {
+      results.push({ userId: account.userId, ...await syncOutlookUser(account.userId) });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Sync failed";
+      await saveSyncStatus(account.userId, message).catch(() => void 0);
+      results.push({ userId: account.userId, error: message });
+    }
+  }
+  return results;
+}
+function publicMessage(message) {
+  const to = (message.toRecipients || []).map((item) => item.emailAddress?.address || "").filter(Boolean);
+  const cc = (message.ccRecipients || []).map((item) => item.emailAddress?.address || "").filter(Boolean);
+  return {
+    id: message.id,
+    conversationId: message.conversationId || "",
+    subject: message.subject || "(no subject)",
+    preview: message.bodyPreview || "",
+    from: message.from?.emailAddress?.address || "",
+    fromName: message.from?.emailAddress?.name || "",
+    to,
+    cc,
+    receivedAt: message.receivedDateTime || message.sentDateTime || null,
+    hasAttachments: !!message.hasAttachments,
+    isRead: !!message.isRead,
+    webLink: message.webLink || ""
+  };
+}
+function publicEvent(event) {
+  const attendees = (event.attendees || []).map((item) => ({
+    email: item.emailAddress?.address || "",
+    name: item.emailAddress?.name || ""
+  })).filter((item) => item.email);
+  return {
+    id: event.id,
+    subject: event.subject || "(no title)",
+    preview: event.bodyPreview || "",
+    location: event.location?.displayName || "",
+    start: graphDateToIso(event.start),
+    end: graphDateToIso(event.end),
+    organizer: event.organizer?.emailAddress?.address || "",
+    attendees,
+    isAllDay: !!event.isAllDay,
+    webLink: event.webLink || ""
+  };
+}
+async function listFolderMessages(userId, folder) {
+  const name = folder === "sent" ? "sentitems" : "inbox";
+  const order = folder === "sent" ? "sentDateTime desc" : "receivedDateTime desc";
+  const params = new URLSearchParams({
+    $top: "40",
+    $orderby: order,
+    $select: "id,conversationId,subject,bodyPreview,from,toRecipients,ccRecipients,receivedDateTime,sentDateTime,hasAttachments,isRead,webLink"
+  });
+  const page = await graphJson(userId, `/me/mailFolders/${name}/messages?${params.toString()}`);
+  return (page.value || []).map(publicMessage);
+}
+async function readMessage(userId, id2) {
+  const select = "id,conversationId,subject,bodyPreview,body,from,toRecipients,ccRecipients,bccRecipients,receivedDateTime,sentDateTime,hasAttachments,isRead,webLink";
+  const message = await graphJson(userId, `/me/messages/${encodeURIComponent(id2)}?$select=${select}`);
+  const conversationId = message.conversationId || "";
+  let thread = [];
+  if (conversationId) {
+    const params = new URLSearchParams({
+      $filter: `conversationId eq '${conversationId.replace(/'/g, "''")}'`,
+      $top: "30",
+      $select: "id,conversationId,subject,bodyPreview,from,toRecipients,receivedDateTime,sentDateTime,hasAttachments,isRead"
+    });
+    const page = await graphJson(userId, `/me/messages?${params.toString()}`);
+    thread = (page.value || []).map(publicMessage);
+  }
+  return {
+    message: {
+      ...publicMessage(message),
+      body: message.body?.content || "",
+      bodyType: message.body?.contentType || "text",
+      bcc: (message.bccRecipients || []).map((item) => item.emailAddress?.address || "").filter(Boolean)
+    },
+    thread
+  };
+}
+async function listAttachments(userId, id2) {
+  const page = await graphJson(
+    userId,
+    `/me/messages/${encodeURIComponent(id2)}/attachments?$select=id,name,contentType,size,isInline`
+  );
+  return (page.value || []).filter((item) => !item.isInline).map((item) => ({
+    id: item.id,
+    name: item.name || "attachment",
+    contentType: item.contentType || "application/octet-stream",
+    size: item.size || 0
+  }));
+}
+async function downloadAttachment(userId, messageId, attachmentId) {
+  const item = await graphJson(
+    userId,
+    `/me/messages/${encodeURIComponent(messageId)}/attachments/${encodeURIComponent(attachmentId)}`
+  );
+  if (!item.contentBytes) throw new OutlookError(404, "Attachment has no file content");
+  return {
+    name: item.name || "attachment",
+    contentType: item.contentType || "application/octet-stream",
+    bytes: Buffer.from(item.contentBytes, "base64")
+  };
+}
+async function folderCounts(userId) {
+  const [inbox, sent] = await Promise.all([
+    graphJson(userId, "/me/mailFolders/inbox?$select=totalItemCount,unreadItemCount"),
+    graphJson(userId, "/me/mailFolders/sentitems?$select=totalItemCount")
+  ]);
+  return { inbox: inbox.totalItemCount || 0, unread: inbox.unreadItemCount || 0, sent: sent.totalItemCount || 0 };
+}
+async function listEvents(userId, start, end, timeZone) {
+  const params = new URLSearchParams({
+    startDateTime: start,
+    endDateTime: end,
+    $orderby: "start/dateTime",
+    $top: "100",
+    $select: "id,subject,bodyPreview,start,end,location,organizer,attendees,isAllDay,webLink,isCancelled"
+  });
+  const page = await graphJson(userId, `/me/calendarView?${params.toString()}`, {
+    headers: { Prefer: `outlook.timezone="${timeZone}"` }
+  });
+  return (page.value || []).filter((event) => !event.isCancelled).map(publicEvent);
+}
+async function saveEvent(userId, input) {
+  const payload = {
+    subject: input.subject.slice(0, 300) || "(no title)",
+    body: { contentType: "Text", content: input.body.slice(0, 8e3) },
+    start: { dateTime: input.start, timeZone: input.timeZone },
+    end: { dateTime: input.end, timeZone: input.timeZone },
+    location: { displayName: input.location.slice(0, 300) }
+  };
+  if (input.notify) {
+    payload.attendees = input.attendees.map((address) => ({ emailAddress: { address }, type: "required" }));
+  }
+  const path = input.id ? `/me/events/${encodeURIComponent(input.id)}` : "/me/events";
+  const event = await graphJson(userId, path, { method: input.id ? "PATCH" : "POST", body: JSON.stringify(payload) });
+  if (event?.id) return publicEvent(event);
+  if (input.id) {
+    const fresh = await graphJson(userId, `/me/events/${encodeURIComponent(input.id)}`);
+    return publicEvent(fresh);
+  }
+  throw new OutlookError(502, "Outlook did not return the event");
+}
+async function searchMessages(userId, emails) {
+  const safe = emails.map((email) => email.replace(/["\\]/g, "")).filter((email) => email.includes("@")).slice(0, 3);
+  if (!safe.length) return [];
+  const query = safe.map((email) => `from:${email} OR to:${email}`).join(" OR ");
+  const params = new URLSearchParams({
+    $search: `"${query}"`,
+    $top: "25",
+    $select: "id,conversationId,subject,bodyPreview,from,toRecipients,ccRecipients,receivedDateTime,sentDateTime,hasAttachments,isRead,webLink"
+  });
+  const page = await graphJson(userId, `/me/messages?${params.toString()}`, {
+    headers: { ConsistencyLevel: "eventual" }
+  });
+  return (page.value || []).map(publicMessage);
+}
+
+// src/lib/outlookSend.ts
+async function deleteDraft2(userId, draftId) {
+  await graphJson(userId, `/me/messages/${encodeURIComponent(draftId)}`, { method: "DELETE" }).catch(() => void 0);
+}
+async function attachFiles(userId, draftId, files) {
+  for (const file of files) {
+    await graphJson(userId, `/me/messages/${encodeURIComponent(draftId)}/attachments`, {
+      method: "POST",
+      body: JSON.stringify({
+        "@odata.type": "#microsoft.graph.fileAttachment",
+        name: file.name,
+        contentType: file.contentType,
+        contentBytes: file.contentBytes
+      })
+    });
+  }
+}
+async function sendNewMail(userId, input) {
+  const to = parseAddressList(input.to || "");
+  const cc = parseAddressList(input.cc || "");
+  const bcc = parseAddressList(input.bcc || "");
+  const html = toHtmlBody(input.body || "");
+  if (!html) throw new OutlookError(400, "Write a message before sending");
+  const attachments = cleanAttachments(input.attachments);
+  const payload = buildSendMailBody({ to, cc, bcc, subject: input.subject || "", html, attachments });
+  await graphJson(userId, "/me/sendMail", { method: "POST", body: JSON.stringify(payload) });
+  return { to, subject: input.subject || "" };
+}
+async function replyToMessage(userId, messageId, input) {
+  const html = toHtmlBody(input.body || "");
+  if (!html) throw new OutlookError(400, "Write a reply before sending");
+  const attachments = cleanAttachments(input.attachments);
+  const draft = await graphJson(userId, `/me/messages/${encodeURIComponent(messageId)}/createReply`, {
+    method: "POST",
+    body: "{}"
+  });
+  if (!draft?.id) throw new OutlookError(502, "Outlook did not create the reply");
+  try {
+    await graphJson(userId, `/me/messages/${encodeURIComponent(draft.id)}`, {
+      method: "PATCH",
+      body: JSON.stringify({ body: { contentType: "HTML", content: html } })
+    });
+    await attachFiles(userId, draft.id, attachments);
+    await graphJson(userId, `/me/messages/${encodeURIComponent(draft.id)}/send`, { method: "POST" });
+  } catch (err) {
+    await deleteDraft2(userId, draft.id);
+    throw err;
+  }
+}
+async function forwardMessage(userId, messageId, input) {
+  const to = parseAddressList(input.to || "");
+  const html = toHtmlBody(input.body || "");
+  if (!html) throw new OutlookError(400, "Write a note before forwarding");
+  const attachments = cleanAttachments(input.attachments);
+  const draft = await graphJson(userId, `/me/messages/${encodeURIComponent(messageId)}/createForward`, {
+    method: "POST",
+    body: "{}"
+  });
+  if (!draft?.id) throw new OutlookError(502, "Outlook did not create the forward");
+  try {
+    await graphJson(userId, `/me/messages/${encodeURIComponent(draft.id)}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        body: { contentType: "HTML", content: html },
+        toRecipients: to.map((address) => ({ emailAddress: { address } }))
+      })
+    });
+    await attachFiles(userId, draft.id, attachments);
+    await graphJson(userId, `/me/messages/${encodeURIComponent(draft.id)}/send`, { method: "POST" });
+  } catch (err) {
+    await deleteDraft2(userId, draft.id);
+    throw err;
+  }
+  return { to };
+}
+
+// src/routes/outlook.ts
+var pinAuth = createCrmPinAuth(() => crmAuthConfigFromEnv());
 var router4 = (0, import_express5.Router)();
-var pinAuth = createCrmPinAuth(() => ({
-  pin: process.env.CRM_PIN || "123456",
-  signingSecret: process.env.SESSION_SECRET || process.env.SUPABASE_JWT_SECRET || "sellinghighs-crm-session-secret-2026",
-  apiKey: process.env.CRM_API_KEY || process.env.GROK_API_KEY || "sellinghighs-grok-key-2026",
+var manualSyncAt = /* @__PURE__ */ new Map();
+function redirectHome(req, res, query) {
+  const proto = (req.get("x-forwarded-proto") || req.protocol || "https").split(",")[0].trim();
+  const host = (req.get("x-forwarded-host") || req.get("host") || "crm.gcs.org").split(",")[0].trim();
+  res.redirect(302, `${proto}://${host}/?${query}`);
+}
+function handleError(err, res) {
+  if (err instanceof OutlookError) {
+    res.status(err.status).json({ error: err.message, code: err.code });
+    return;
+  }
+  if (err instanceof CrmError) {
+    res.status(err.status).json({ error: err.message });
+    return;
+  }
+  logger.error({ message: err instanceof Error ? err.message : "outlook failed" }, "outlook request failed");
+  res.status(500).json({ error: "Outlook request failed" });
+}
+function protectedRoute(handler) {
+  return (req, res) => {
+    pinAuth.requirePin(req, res, () => {
+      const user = pinAuth.getSessionUser(req);
+      if (!user) {
+        res.status(401).json({ error: "Sign in with your team email to use Outlook.", code: "user_required" });
+        return;
+      }
+      handler(req, res, user).catch((err) => handleError(err, res));
+    });
+  };
+}
+function text2(value, max) {
+  return typeof value === "string" ? value.slice(0, max) : "";
+}
+function graphItemId(value) {
+  if (typeof value !== "string" || value.length < 4 || value.length > 2e3 || /\s/.test(value)) {
+    throw new OutlookError(400, "Missing Outlook item id");
+  }
+  return value;
+}
+function numericId(value) {
+  const n = Number(value);
+  if (!Number.isSafeInteger(n) || n <= 0) throw new OutlookError(400, "Invalid id");
+  return n;
+}
+function timeZoneOf(value) {
+  const zone = typeof value === "string" && zoneSafe(value) ? value.trim() : "UTC";
+  return zone;
+}
+function zoneSafe(value) {
+  return /^[A-Za-z0-9_+\-/]{1,64}$/.test(value.trim());
+}
+function localDateTime(value) {
+  if (typeof value !== "string") throw new OutlookError(400, "Choose a start and end time");
+  const match = value.match(/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2})(?::\d{2})?$/);
+  if (!match) throw new OutlookError(400, "Use a date and time");
+  return `${match[1]}:00`;
+}
+function isoQuery(value, fallback) {
+  if (typeof value !== "string" || !value.trim()) return fallback.toISOString();
+  const date2 = new Date(value);
+  if (Number.isNaN(date2.getTime())) throw new OutlookError(400, "Invalid date");
+  return date2.toISOString();
+}
+function publicDraft(row, full) {
+  if (!row) return null;
+  const attachments = Array.isArray(row.attachments) ? row.attachments : [];
+  return {
+    id: row.id,
+    to: row.to,
+    cc: row.cc,
+    bcc: row.bcc,
+    subject: row.subject,
+    body: row.body,
+    investorId: row.investorId,
+    replyMessageId: row.replyMessageId,
+    forwardMessageId: row.forwardMessageId,
+    status: row.status,
+    error: row.error,
+    updatedAt: row.updatedAt,
+    attachments: attachments.map((item) => {
+      const file = item;
+      return full ? { name: file.name, contentType: file.contentType, contentBytes: file.contentBytes } : { name: file.name || "attachment", contentType: file.contentType || "" };
+    })
+  };
+}
+async function noteSent(investorId, to, subject) {
+  try {
+    let id2 = investorId;
+    if (!id2 && to[0]) {
+      const found = await pool.query("SELECT id FROM crm_investors WHERE email_key=$1 LIMIT 1", [to[0]]);
+      if (found.rows[0]) id2 = Number(found.rows[0].id);
+    }
+    if (!id2) return false;
+    await transaction(async (client) => {
+      const investor = await getInvestor(client, id2);
+      const stage = normalizeStage(investor.status) ?? "New";
+      const next = nextStageForEvent(stage, "email_sent");
+      await activity(client, id2, `Outlook: sent "${subject || "(no subject)"}" to ${to.join(", ")}`, "email_sent");
+      const date2 = businessDate();
+      if (next !== stage) {
+        await client.query(
+          "UPDATE crm_investors SET data=jsonb_set(jsonb_set(data,'{status}',to_jsonb($2::text),true),'{last_contacted_date}',to_jsonb($3::text),true), updated_at=NOW() WHERE id=$1",
+          [id2, next, date2]
+        );
+      } else {
+        await client.query(
+          "UPDATE crm_investors SET data=jsonb_set(data,'{last_contacted_date}',to_jsonb($2::text),true), updated_at=NOW() WHERE id=$1",
+          [id2, date2]
+        );
+      }
+    });
+    return true;
+  } catch (err) {
+    logger.warn({ message: err instanceof Error ? err.message : "log failed" }, "outlook activity log failed");
+    return false;
+  }
+}
+router4.get("/callback", async (req, res) => {
+  try {
+    if (req.query.error) {
+      redirectHome(req, res, "outlook=error&reason=denied");
+      return;
+    }
+    const code = typeof req.query.code === "string" ? req.query.code : "";
+    const state = typeof req.query.state === "string" ? req.query.state : "";
+    const saved = state ? await takeOAuthState(state) : null;
+    if (!saved || !code) {
+      redirectHome(req, res, "outlook=error&reason=oauth_failed");
+      return;
+    }
+    await exchangeAuthCode(saved.userId, code, saved.verifier);
+    redirectHome(req, res, "outlook=connected");
+  } catch (err) {
+    logger.warn({ message: err instanceof Error ? err.message : "callback failed" }, "outlook callback failed");
+    redirectHome(req, res, "outlook=error&reason=oauth_failed");
+  }
+});
+router4.get("/cron", async (req, res) => {
+  try {
+    if (!process.env.CRON_SECRET || process.env.CRON_SECRET.length < 16) {
+      res.status(503).json({ error: "Set CRON_SECRET to a random string of at least 16 characters" });
+      return;
+    }
+    if (!cronAuthorized(req.get("authorization") || void 0)) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+    const results = await syncAllOutlookAccounts();
+    res.json({
+      ok: true,
+      results: results.map((item) => ({
+        userId: item.userId,
+        inbox: item.inbox || 0,
+        sent: item.sent || 0,
+        events: item.events || 0,
+        peopleCreated: item.peopleCreated || 0,
+        error: item.error || ""
+      }))
+    });
+  } catch (err) {
+    handleError(err, res);
+  }
+});
+router4.get("/connect", (req, res) => {
+  pinAuth.requirePin(req, res, async () => {
+    try {
+      const user = pinAuth.getSessionUser(req);
+      if (!user) {
+        redirectHome(req, res, "outlook=error&reason=user_required");
+        return;
+      }
+      if (outlookConfigError()) {
+        redirectHome(req, res, "outlook=error&reason=missing_config");
+        return;
+      }
+      const { verifier, challenge } = createPkce();
+      const state = (0, import_node_crypto3.randomBytes)(32).toString("base64url");
+      await putOAuthState(state, user.id, verifier);
+      res.redirect(302, authorizeUrl(state, challenge));
+    } catch (err) {
+      logger.warn({ message: err instanceof Error ? err.message : "connect failed" }, "outlook connect failed");
+      redirectHome(req, res, "outlook=error&reason=oauth_failed");
+    }
+  });
+});
+router4.get("/account", protectedRoute(async (_req, res, user) => {
+  const configError = outlookConfigError();
+  const account = await getAccount(user.id);
+  res.json({
+    configured: !configError,
+    configError,
+    connected: !!account,
+    email: account?.email || "",
+    displayName: account?.displayName || "",
+    autoCreatePeople: account?.autoCreatePeople || false,
+    lastSyncAt: account?.lastSyncAt || null,
+    lastSyncError: account?.lastSyncError || ""
+  });
+}));
+router4.patch("/account", protectedRoute(async (req, res, user) => {
+  if (typeof req.body?.autoCreatePeople !== "boolean") throw new OutlookError(400, "autoCreatePeople must be true or false");
+  const account = await getAccount(user.id);
+  if (!account) throw new OutlookError(409, "Connect Outlook first", "not_connected");
+  await setAutoCreate(user.id, req.body.autoCreatePeople);
+  res.json({ autoCreatePeople: req.body.autoCreatePeople });
+}));
+router4.post("/disconnect", protectedRoute(async (_req, res, user) => {
+  await deleteAccount(user.id);
+  res.json({ connected: false });
+}));
+router4.post("/sync", protectedRoute(async (_req, res, user) => {
+  const last = manualSyncAt.get(user.id) || 0;
+  if (Date.now() - last < 15e3) throw new OutlookError(429, "Wait a few seconds before syncing again");
+  manualSyncAt.set(user.id, Date.now());
+  const result = await syncOutlookUser(user.id);
+  res.json(result);
+}));
+router4.get("/counts", protectedRoute(async (_req, res, user) => {
+  const local = await localCounts(user.id);
+  const account = await getAccount(user.id);
+  if (!account) {
+    res.json({ connected: false, inbox: 0, sent: 0, unread: 0, ...local });
+    return;
+  }
+  try {
+    const folders = await folderCounts(user.id);
+    res.json({ connected: true, ...folders, ...local });
+  } catch {
+    res.json({ connected: true, inbox: 0, sent: 0, unread: 0, ...local });
+  }
+}));
+router4.get("/messages", protectedRoute(async (req, res, user) => {
+  const folder = req.query.folder === "sent" ? "sent" : "inbox";
+  res.json({ messages: await listFolderMessages(user.id, folder) });
+}));
+router4.get("/message", protectedRoute(async (req, res, user) => {
+  res.json(await readMessage(user.id, graphItemId(req.query.id)));
+}));
+router4.get("/attachments", protectedRoute(async (req, res, user) => {
+  res.json({ attachments: await listAttachments(user.id, graphItemId(req.query.id)) });
+}));
+router4.get("/attachment", protectedRoute(async (req, res, user) => {
+  const file = await downloadAttachment(user.id, graphItemId(req.query.messageId), graphItemId(req.query.attachmentId));
+  res.setHeader("Content-Type", file.contentType);
+  res.setHeader("Content-Disposition", `attachment; filename="${safeFileName(file.name)}"`);
+  res.send(file.bytes);
+}));
+router4.post("/send", protectedRoute(async (req, res, user) => {
+  const result = await sendNewMail(user.id, req.body || {});
+  const investorId = req.body?.investorId ? numericId(req.body.investorId) : null;
+  const logged = await noteSent(investorId, result.to, result.subject);
+  res.json({ sent: true, logged });
+}));
+router4.post("/reply", protectedRoute(async (req, res, user) => {
+  await replyToMessage(user.id, graphItemId(req.body?.id), req.body || {});
+  const investorId = req.body?.investorId ? numericId(req.body.investorId) : null;
+  let recipients = [];
+  try {
+    recipients = parseAddressList(text2(req.body?.to, 2e3));
+  } catch {
+    recipients = [];
+  }
+  const logged = investorId && recipients.length ? await noteSent(investorId, recipients, text2(req.body?.subject, 500)) : false;
+  res.json({ sent: true, logged });
+}));
+router4.post("/forward", protectedRoute(async (req, res, user) => {
+  const result = await forwardMessage(user.id, graphItemId(req.body?.id), req.body || {});
+  const investorId = req.body?.investorId ? numericId(req.body.investorId) : null;
+  const logged = await noteSent(investorId, result.to, text2(req.body?.subject, 500));
+  res.json({ sent: true, logged });
+}));
+function draftInput(body) {
+  return {
+    to: text2(body.to, 2e3),
+    cc: text2(body.cc, 2e3),
+    bcc: text2(body.bcc, 2e3),
+    subject: text2(body.subject, 500),
+    body: text2(body.body, 2e5),
+    attachments: Array.isArray(body.attachments) ? body.attachments.slice(0, 3) : [],
+    investorId: body.investorId ? numericId(body.investorId) : null,
+    replyMessageId: text2(body.replyMessageId, 2e3),
+    forwardMessageId: text2(body.forwardMessageId, 2e3)
+  };
+}
+router4.get("/drafts", protectedRoute(async (req, res, user) => {
+  const status = req.query.status === "outbox" ? "outbox" : "draft";
+  const rows = await listDrafts(user.id, status);
+  res.json({ drafts: rows.map((row) => publicDraft(row, false)) });
+}));
+router4.get("/drafts/:id", protectedRoute(async (req, res, user) => {
+  const row = await getDraft(user.id, numericId(req.params.id));
+  if (!row) throw new OutlookError(404, "Draft not found");
+  res.json({ draft: publicDraft(row, true) });
+}));
+router4.post("/drafts", protectedRoute(async (req, res, user) => {
+  const saved = await saveDraft(user.id, draftInput(req.body || {}));
+  res.status(201).json({ draft: publicDraft(saved, false) });
+}));
+router4.patch("/drafts/:id", protectedRoute(async (req, res, user) => {
+  const saved = await saveDraft(user.id, { id: numericId(req.params.id), ...draftInput(req.body || {}) });
+  if (!saved) throw new OutlookError(404, "Draft not found");
+  res.json({ draft: publicDraft(saved, false) });
+}));
+router4.delete("/drafts/:id", protectedRoute(async (req, res, user) => {
+  await deleteDraft(user.id, numericId(req.params.id));
+  res.json({ deleted: true });
+}));
+router4.post("/drafts/:id/send", protectedRoute(async (req, res, user) => {
+  const id2 = numericId(req.params.id);
+  const draft = await getDraft(user.id, id2);
+  if (!draft) throw new OutlookError(404, "Draft not found");
+  const payload = { to: draft.to, cc: draft.cc, bcc: draft.bcc, subject: draft.subject, body: draft.body, attachments: draft.attachments };
+  try {
+    let recipients = [];
+    if (draft.replyMessageId) await replyToMessage(user.id, draft.replyMessageId, payload);
+    else if (draft.forwardMessageId) recipients = (await forwardMessage(user.id, draft.forwardMessageId, payload)).to;
+    else recipients = (await sendNewMail(user.id, payload)).to;
+    await deleteDraft(user.id, id2);
+    const logged = recipients.length ? await noteSent(draft.investorId, recipients, draft.subject) : false;
+    res.json({ sent: true, logged });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Send failed";
+    await markDraft(user.id, id2, "outbox", message);
+    throw err;
+  }
+}));
+router4.get("/templates", protectedRoute(async (_req, res, user) => {
+  res.json({ templates: await listTemplates(user.id) });
+}));
+router4.post("/templates", protectedRoute(async (req, res, user) => {
+  const name = text2(req.body?.name, 120).trim();
+  if (!name) throw new OutlookError(400, "Template name is required");
+  const saved = await saveTemplate(user.id, { name, subject: text2(req.body?.subject, 500), body: text2(req.body?.body, 2e5) });
+  res.status(201).json({ template: saved });
+}));
+router4.patch("/templates/:id", protectedRoute(async (req, res, user) => {
+  const name = text2(req.body?.name, 120).trim();
+  if (!name) throw new OutlookError(400, "Template name is required");
+  const saved = await saveTemplate(user.id, { id: numericId(req.params.id), name, subject: text2(req.body?.subject, 500), body: text2(req.body?.body, 2e5) });
+  if (!saved) throw new OutlookError(404, "Template not found");
+  res.json({ template: saved });
+}));
+router4.delete("/templates/:id", protectedRoute(async (req, res, user) => {
+  await deleteTemplate(user.id, numericId(req.params.id));
+  res.json({ deleted: true });
+}));
+router4.get("/events", protectedRoute(async (req, res, user) => {
+  const start = isoQuery(req.query.start, /* @__PURE__ */ new Date());
+  const end = isoQuery(req.query.end, new Date(Date.now() + 7 * 24 * 60 * 60 * 1e3));
+  res.json({ events: await listEvents(user.id, start, end, timeZoneOf(req.query.timeZone)) });
+}));
+router4.post("/events", protectedRoute(async (req, res, user) => {
+  const notify = req.body?.notify === true;
+  const attendees = notify ? parseAddressList(text2(req.body?.attendees, 2e3)) : [];
+  const event = await saveEvent(user.id, {
+    subject: text2(req.body?.subject, 300),
+    body: text2(req.body?.body, 8e3),
+    start: localDateTime(req.body?.start),
+    end: localDateTime(req.body?.end),
+    timeZone: timeZoneOf(req.body?.timeZone),
+    location: text2(req.body?.location, 300),
+    attendees,
+    notify
+  });
+  res.status(201).json({ event });
+}));
+router4.patch("/events", protectedRoute(async (req, res, user) => {
+  const notify = req.body?.notify === true;
+  const attendees = notify ? parseAddressList(text2(req.body?.attendees, 2e3)) : [];
+  const event = await saveEvent(user.id, {
+    id: graphItemId(req.body?.id),
+    subject: text2(req.body?.subject, 300),
+    body: text2(req.body?.body, 8e3),
+    start: localDateTime(req.body?.start),
+    end: localDateTime(req.body?.end),
+    timeZone: timeZoneOf(req.body?.timeZone),
+    location: text2(req.body?.location, 300),
+    attendees,
+    notify
+  });
+  res.json({ event });
+}));
+router4.get("/records/:id", protectedRoute(async (req, res, user) => {
+  const investorId = numericId(req.params.id);
+  const context = await investorContext(investorId);
+  if (!context) throw new OutlookError(404, "Record not found");
+  const account = await getAccount(user.id);
+  if (!account) {
+    res.json({ connected: false, email: "", recordEmail: context.email, firm: context.firm, messages: [], meetings: [] });
+    return;
+  }
+  let messages = [];
+  if (context.emails.length) {
+    try {
+      messages = await searchMessages(user.id, context.emails);
+    } catch {
+      const rows = await messagesForEmails(user.id, context.emails);
+      messages = rows.map((row) => ({
+        id: row.graph_id,
+        conversationId: row.conversation_id,
+        subject: row.subject || "(no subject)",
+        preview: row.preview,
+        from: row.from_email,
+        fromName: row.from_name,
+        to: [],
+        receivedAt: row.received_at instanceof Date ? row.received_at.toISOString() : row.received_at || null,
+        hasAttachments: !!row.has_attachments,
+        isRead: !!row.is_read,
+        webLink: row.web_link
+      }));
+    }
+  }
+  const rangeStart = (/* @__PURE__ */ new Date()).toISOString();
+  const rangeEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1e3).toISOString();
+  let meetings = [];
+  try {
+    const events = await listEvents(user.id, rangeStart, rangeEnd, "UTC");
+    meetings = events.filter((event) => eventIncludes(participantBlob([event.organizer, ...event.attendees.map((item) => item.email)]), context.emails));
+  } catch {
+    const rows = await eventsForEmails(user.id, context.emails, rangeStart);
+    meetings = rows.map((row) => ({
+      id: row.graph_id,
+      subject: row.subject || "(no title)",
+      preview: row.preview,
+      location: row.location,
+      start: row.start_at instanceof Date ? row.start_at.toISOString() : row.start_at || null,
+      end: row.end_at instanceof Date ? row.end_at.toISOString() : row.end_at || null,
+      organizer: row.organizer_email,
+      webLink: row.web_link,
+      isAllDay: !!row.is_all_day
+    }));
+  }
+  res.json({
+    connected: true,
+    email: account.email,
+    recordEmail: context.email,
+    firm: context.firm,
+    messages,
+    meetings
+  });
+}));
+var outlook_default = router4;
+
+// src/routes/index.ts
+var router5 = (0, import_express6.Router)();
+var pinAuth2 = createCrmPinAuth(() => ({
+  ...crmAuthConfigFromEnv(),
   verifyUser: verifyUserCredentials
 }));
-router4.use(health_default);
-router4.use(auth_default);
-router4.use("/crm/session", pinAuth.router);
-router4.use("/crm", pinAuth.requirePin, crm_default);
-router4.use(["/investors", "/summary", "/kpis", "/reports", "/activity", "/team", "/calls", "/campaigns", "/whatsapp"], pinAuth.requirePin);
-router4.use(crm_default);
-var routes_default = router4;
+router5.use(health_default);
+router5.use(auth_default);
+router5.use("/integrations/outlook", outlook_default);
+router5.use("/crm/session", pinAuth2.router);
+router5.use("/crm", pinAuth2.requirePin, crm_default);
+router5.use(["/investors", "/summary", "/kpis", "/reports", "/activity", "/team", "/calls", "/campaigns", "/whatsapp"], pinAuth2.requirePin);
+router5.use(crm_default);
+var routes_default = router5;
 
 // src/app.ts
-var app = (0, import_express6.default)();
+var app = (0, import_express7.default)();
 app.set("trust proxy", 1);
 app.use(
   (0, import_pino_http.default)({
@@ -49106,8 +50852,8 @@ app.use(
   })
 );
 app.use((0, import_cookie_parser.default)());
-app.use(import_express6.default.json({ limit: "5mb" }));
-app.use(import_express6.default.urlencoded({ extended: true }));
+app.use(import_express7.default.json({ limit: "5mb" }));
+app.use(import_express7.default.urlencoded({ extended: true }));
 app.use(authMiddleware);
 app.use((_req, res, next) => {
   res.setHeader("Cache-Control", "no-store");
