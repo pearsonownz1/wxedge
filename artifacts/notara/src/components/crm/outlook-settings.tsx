@@ -70,11 +70,6 @@ export function OutlookSettings({ notice }: { notice: string }) {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <div>
-        <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">Settings</div>
-        <h1 className="font-display text-2xl font-bold text-slate-900">Email and calendar accounts</h1>
-      </div>
-
       {(noticeText || error) && (
         <div className={`rounded-lg border px-4 py-3 text-sm ${error ? "border-red-200 bg-red-50 text-red-800" : "border-emerald-200 bg-emerald-50 text-emerald-900"}`}>
           {error || noticeText}
