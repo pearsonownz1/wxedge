@@ -636,7 +636,7 @@ export function summary(
   }
 
   const reachedMeetingOrBeyond = investors.filter(i =>
-    ["Meeting set", "Proposal sent", "Contract review", "Closed"].includes(i.status) ||
+    ["Meeting set", "Proposal sent", "Contract review", "Closed", "Awaiting Gusto Setup"].includes(i.status) ||
     hasStatus(i, ["Meeting Set", "Meeting set", "Proposal sent", "Contract review", "Committed"])
   );
   const meetingToClosedRate = reachedMeetingOrBeyond.length > 0

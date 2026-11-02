@@ -9,6 +9,7 @@ import {
 } from '@workspace/api-client-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { useToast } from '@/hooks/use-toast';
+import { ContractButton } from '@/components/crm/contract-button';
 import { Copy, Trash2, PhoneCall, MessageSquare, Send, Plus } from 'lucide-react';
 import {
   STATUSES,
@@ -489,6 +490,7 @@ export function InvestorSheet({
                     <MessageSquare className="h-3.5 w-3.5" /> WhatsApp
                   </button>
                 )}
+                <ContractButton id={numId} />
                 <button
                   type="button"
                   data-testid="button-delete-investor"

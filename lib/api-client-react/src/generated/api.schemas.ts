@@ -100,6 +100,7 @@ export const InvestorInputStatus = {
   Meeting_set: 'Meeting set',
   Proposal_sent: 'Proposal sent',
   Contract_review: 'Contract review',
+  Awaiting_Gusto_Setup: 'Awaiting Gusto Setup',
   Closed: 'Closed',
 } as const;
 
@@ -167,6 +168,7 @@ export const InvestorUpdateStatus = {
   Meeting_set: 'Meeting set',
   Proposal_sent: 'Proposal sent',
   Contract_review: 'Contract review',
+  Awaiting_Gusto_Setup: 'Awaiting Gusto Setup',
   Closed: 'Closed',
 } as const;
 
@@ -241,6 +243,7 @@ export const InvestorStatus = {
   Meeting_set: 'Meeting set',
   Proposal_sent: 'Proposal sent',
   Contract_review: 'Contract review',
+  Awaiting_Gusto_Setup: 'Awaiting Gusto Setup',
   Closed: 'Closed',
 } as const;
 
@@ -373,6 +376,7 @@ export const ListInvestorsStatus = {
   Meeting_set: 'Meeting set',
   Proposal_sent: 'Proposal sent',
   Contract_review: 'Contract review',
+  Awaiting_Gusto_Setup: 'Awaiting Gusto Setup',
   Closed: 'Closed',
 } as const;
 
@@ -389,6 +393,7 @@ export const BrowserListInvestorsStatus = {
   Meeting_set: 'Meeting set',
   Proposal_sent: 'Proposal sent',
   Contract_review: 'Contract review',
+  Awaiting_Gusto_Setup: 'Awaiting Gusto Setup',
   Closed: 'Closed',
 } as const;
 

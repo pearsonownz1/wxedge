@@ -1,4 +1,4 @@
-export const STATUSES = ['New', 'Contacted', 'Meeting set', 'Proposal sent', 'Contract review', 'Closed'] as const;
+export const STATUSES = ['New', 'Contacted', 'Meeting set', 'Proposal sent', 'Contract review', 'Closed', 'Awaiting Gusto Setup'] as const;
 export type StageStatus = typeof STATUSES[number];
 export const CLIENT_TYPES = ['new lead', 'cold client', 'active client'] as const;
 export type ClientType = typeof CLIENT_TYPES[number];
@@ -30,6 +30,7 @@ export const STAGE_PROBABILITIES: Record<StageStatus, number> = {
   'Meeting set': 0.20,
   'Proposal sent': 0.50,
   'Contract review': 0.80,
+  'Awaiting Gusto Setup': 0.90,
   'Closed': 1.00,
 };
 
@@ -224,6 +225,7 @@ export const STATUS_TONE: Record<string, string> = {
   'Meeting set': 'bg-indigo-100 text-indigo-900 border border-indigo-300',
   'Proposal sent': 'bg-amber-100 text-amber-900 border border-amber-300',
   'Contract review': 'bg-purple-100 text-purple-900 border border-purple-300',
+  'Awaiting Gusto Setup': 'bg-amber-100 text-amber-900 border border-amber-300',
   'Closed': 'bg-emerald-100 text-emerald-950 border border-emerald-300',
 };
 

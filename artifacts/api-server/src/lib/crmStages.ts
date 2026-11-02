@@ -1,4 +1,4 @@
-export const STAGES = ["New", "Contacted", "Meeting set", "Proposal sent", "Contract review", "Closed"] as const;
+export const STAGES = ["New", "Contacted", "Meeting set", "Proposal sent", "Contract review", "Closed", "Awaiting Gusto Setup"] as const;
 export type Stage = typeof STAGES[number];
 
 export const STAGE_PROBABILITIES: Record<Stage, number> = {
@@ -7,6 +7,7 @@ export const STAGE_PROBABILITIES: Record<Stage, number> = {
   "Meeting set": 0.20,
   "Proposal sent": 0.50,
   "Contract review": 0.80,
+  "Awaiting Gusto Setup": 0.90,
   "Closed": 1.00,
 };
 
@@ -38,6 +39,8 @@ const aliases: Record<string, Stage> = {
   "contract review": "Contract review",
   contract: "Contract review",
   "contract sent": "Contract review",
+  "awaiting gusto setup": "Awaiting Gusto Setup",
+  gusto: "Awaiting Gusto Setup",
   closed: "Closed",
   won: "Closed",
   lost: "Closed",

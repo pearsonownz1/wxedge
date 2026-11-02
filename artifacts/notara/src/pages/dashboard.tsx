@@ -376,7 +376,7 @@ export default function Dashboard() {
     const avgDays = computedAvgDays ?? s?.avg_days_to_close ?? 0;
     const closedCount = rows.filter((i) => i.status === 'Closed').length;
     const meetingReached = rows.filter((i) =>
-      ['Meeting set', 'Proposal sent', 'Contract review', 'Closed'].includes(i.status),
+      ['Meeting set', 'Proposal sent', 'Contract review', 'Closed', 'Awaiting Gusto Setup'].includes(i.status),
     ).length;
     const convRate =
       s?.meeting_to_closed_rate ??
@@ -1020,7 +1020,7 @@ export default function Dashboard() {
                 </div>
               ) : nav === 'deals' && view === 'board' ? (
                 <div className="flex gap-3 overflow-x-auto pb-4">
-                  {STATUSES.map((st) => {
+                  {STATUSES.filter((st) => workspaceMode === 'experts' || st !== 'Awaiting Gusto Setup').map((st) => {
                     const col = rows.filter((i) => i.status === st);
                     const colVal = col.reduce((acc, i) => acc + parseDealValue((i as any).deal_value), 0);
                     return (

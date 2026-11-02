@@ -544,8 +544,8 @@ router.get("/campaigns", async (_req, res) => {
   for (const d of defaults) {
     const matching = investors.filter(i => i.expert_field === d.field);
     const contacted = matching.filter(i => i.status !== "New").length;
-    const meetings = matching.filter(i => ["Meeting set", "Proposal sent", "Contract review", "Closed"].includes(i.status)).length;
-    const proposals = matching.filter(i => ["Proposal sent", "Contract review", "Closed"].includes(i.status)).length;
+    const meetings = matching.filter(i => ["Meeting set", "Proposal sent", "Contract review", "Closed", "Awaiting Gusto Setup"].includes(i.status)).length;
+    const proposals = matching.filter(i => ["Proposal sent", "Contract review", "Closed", "Awaiting Gusto Setup"].includes(i.status)).length;
     const val = matching.reduce((acc, i) => acc + (Number.isFinite(Number(i.deal_value)) && Number(i.deal_value) >= 0 ? Number(i.deal_value) : 0), 0);
     campaignMap.set(d.name, {
       name: d.name,
