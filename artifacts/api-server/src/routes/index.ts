@@ -3,6 +3,7 @@ import healthRouter from "./health";
 import authRouter from "./auth";
 import crmRouter from "./crm";
 import contractsRouter from "./contracts";
+import outlookRouter from "./outlook";
 import { createCrmPinAuth } from "../lib/crmPin";
 import { verifyUserCredentials } from "../lib/crmData";
 import { getWhatsAppConfig, handleMetaWebhookEvents } from "../lib/whatsappCloud";
@@ -42,6 +43,7 @@ router.post(webhookPaths, async (req, res) => {
 
 router.use(healthRouter);
 router.use(authRouter);
+router.use("/integrations/outlook", outlookRouter);
 router.use("/crm/session", pinAuth.router);
 router.use("/crm", pinAuth.requirePin, contractsRouter);
 router.use("/crm", pinAuth.requirePin, crmRouter);

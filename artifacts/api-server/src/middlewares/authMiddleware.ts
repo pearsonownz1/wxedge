@@ -60,7 +60,13 @@ export async function authMiddleware(
     return this.user != null;
   } as Request['isAuthenticated'];
 
-  if (req.path.startsWith("/api/crm") || req.path.startsWith("/crm") || req.path.startsWith("/api/investors") || req.path.startsWith("/api/summary")) {
+  if (
+    req.path.startsWith("/api/crm") ||
+    req.path.startsWith("/crm") ||
+    req.path.startsWith("/api/investors") ||
+    req.path.startsWith("/api/summary") ||
+    req.path.startsWith("/api/integrations/outlook")
+  ) {
     next();
     return;
   }

@@ -18,6 +18,14 @@ const config = (): Config => ({
   apiKey: process.env.CRM_API_KEY,
 });
 
+export function crmAuthConfigFromEnv(): Config {
+  return {
+    pin: process.env.CRM_PIN || "123456",
+    signingSecret: process.env.SESSION_SECRET || process.env.SUPABASE_JWT_SECRET || "sellinghighs-crm-session-secret-2026",
+    apiKey: process.env.CRM_API_KEY || process.env.GROK_API_KEY || "sellinghighs-grok-key-2026",
+  };
+}
+
 export function hashPassword(password: string, salt = randomBytes(16).toString("hex")): string {
   const hash = createHmac("sha256", salt).update(password).digest("hex");
   return `${salt}:${hash}`;

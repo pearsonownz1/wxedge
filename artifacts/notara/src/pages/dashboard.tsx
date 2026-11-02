@@ -35,6 +35,9 @@ import {
   Check,
   Briefcase,
   GraduationCap,
+  Mail,
+  CalendarDays,
+  Settings,
 } from 'lucide-react';
 import {
   STATUSES,
@@ -65,6 +68,9 @@ import {
   fmtTs,
 } from '@/lib/crm';
 import { InvestorSheet } from '@/components/investor-sheet';
+import { EmailsPanel } from '@/components/crm/emails-panel';
+import { CalendarPanel } from '@/components/crm/calendar-panel';
+import { OutlookSettings } from '@/components/crm/outlook-settings';
 import {
   ReportsPanel,
   CampaignsPanel,
@@ -77,10 +83,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Splash } from '@/pages/login';
 
 const POLL = 30000;
-const sel = 'rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-900 focus:border-blue-600 focus:outline-none';
+const sel = 'h-9 rounded-[4px] border border-[#e4e7ec] bg-white px-2.5 text-[13px] text-[#0b1220] outline-none focus:border-[#1f5eff]';
 const isForbidden = (e: unknown) => (e as any)?.status === 403;
 
-type NavSection = 'overview' | 'contacts' | 'deals' | 'reports' | 'campaigns' | 'phone' | 'whatsapp' | 'team';
+type NavSection = 'overview' | 'contacts' | 'deals' | 'emails' | 'calendar' | 'reports' | 'campaigns' | 'phone' | 'whatsapp' | 'team' | 'settings';
 
 const Pill = ({ s }: { s: string }) => (
   <span className={`whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${STATUS_TONE[s] ?? 'bg-slate-100 text-slate-800'}`}>
@@ -259,10 +265,37 @@ export default function Dashboard() {
     return () => window.removeEventListener('gcs-crm-expert-types-updated', onTypesUpdated);
   }, []);
 
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        searchRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const outlook = params.get('outlook');
+    if (!outlook) return;
+    setNav('settings');
+    setOutlookNotice(outlook === 'connected' ? 'connected' : params.get('reason') || 'oauth_failed');
+    const url = new URL(window.location.href);
+    url.search = '';
+    window.history.replaceState({}, '', `${url.pathname}${url.hash}`);
+  }, []);
+
   const update = useBrowserUpdateInvestor();
   const importer = useBrowserImportInvestors();
   const [view, setView] = useState<'board' | 'table'>('board');
   const [q, setQ] = useState('');
+  const [navOpen, setNavOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const [mailCompose, setMailCompose] = useState<{ to: string; investorId: number; nonce: number } | null>(null);
+  const [outlookNotice, setOutlookNotice] = useState('');
   const [fs, setFs] = useState('');
   const [fct, setFct] = useState('');
   const [ff, setFf] = useState('');
@@ -514,60 +547,110 @@ export default function Dashboard() {
     [isExperts, list.data, expertTypesQuery.data, expertTypesVersion],
   );
 
-  const navItems: Array<{ id: NavSection; label: string; icon: any; badge?: string | number }> = [
-    { id: "overview", label: "Overview", icon: Home },
-    { id: "contacts", label: isExperts ? "Expert Directory" : "Contacts", icon: Users, badge: fieldRows.length },
-    { id: "deals", label: isExperts ? "Experts (Kanban)" : "Deals (Kanban)", icon: Kanban, badge: rows.length },
-    { id: "reports", label: isExperts ? "Recruitment Funnel" : "Reports & Forecast", icon: BarChart3 },
-    { id: "campaigns", label: isExperts ? "Expert Campaigns" : "Campaigns", icon: Send, badge: campaignsQuery.data?.length || 3 },
-    { id: "phone", label: "Dialer", icon: PhoneCall, badge: callsQuery.data?.length || 0 },
-    { id: "whatsapp", label: "WhatsApp", icon: MessageSquare, badge: whatsappQuery.data?.length || 0 },
-    { id: "team", label: "Team Workspaces", icon: UserCheck, badge: usersQuery.data?.length || 4 },
+  const signedInName = sessionData?.user?.name || 'Admin';
+  const signedInEmail = sessionData?.user?.email || '';
+  const signedInInitials = signedInName.split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase() || '').join('') || 'G';
+  const pageCopy: Record<NavSection, { title: string; subtitle: string }> = {
+    overview: { title: 'Overview', subtitle: isExperts ? 'Faculty pipeline and recruitment.' : 'Law firm pipeline and forecast.' },
+    contacts: { title: isExperts ? 'Expert Directory' : 'People', subtitle: isExperts ? 'Faculty contacts in this workspace.' : 'Contacts in this workspace.' },
+    deals: { title: isExperts ? 'Experts' : 'Deals', subtitle: isExperts ? 'Expert faculty on the board.' : 'Open deals on the board.' },
+    emails: { title: 'Emails', subtitle: 'Inbox, sent mail, drafts, and templates.' },
+    calendar: { title: 'Calendar', subtitle: 'Meetings from the connected calendar.' },
+    reports: { title: isExperts ? 'Recruitment Funnel' : 'Reports', subtitle: 'Forecast and stage conversion.' },
+    campaigns: { title: isExperts ? 'Expert Campaigns' : 'Campaigns', subtitle: 'Outbound activity by campaign.' },
+    phone: { title: 'Dialer', subtitle: 'Calls placed from this workspace.' },
+    whatsapp: { title: 'WhatsApp', subtitle: 'Messages with people in this workspace.' },
+    team: { title: 'Team', subtitle: 'Per-person workspaces and teammates.' },
+    settings: { title: 'Settings', subtitle: 'Email and calendar accounts.' },
+  };
+  const navGroups: Array<{ label: string; items: Array<{ id: NavSection; label: string; icon: any; badge?: string | number }> }> = [
+    {
+      label: 'Records',
+      items: [
+        { id: 'contacts', label: isExperts ? 'Expert Directory' : 'People', icon: Users, badge: fieldRows.length },
+        { id: 'deals', label: isExperts ? 'Experts' : 'Deals', icon: Kanban, badge: rows.length },
+      ],
+    },
+    {
+      label: 'Communication',
+      items: [
+        { id: 'emails', label: 'Emails', icon: Mail },
+        { id: 'calendar', label: 'Calendar', icon: CalendarDays },
+        { id: 'whatsapp', label: 'WhatsApp', icon: MessageSquare, badge: whatsappQuery.data?.length || 0 },
+        { id: 'phone', label: 'Dialer', icon: PhoneCall, badge: callsQuery.data?.length || 0 },
+      ],
+    },
+    {
+      label: 'Workspace',
+      items: [
+        { id: 'overview', label: 'Overview', icon: Home },
+        { id: 'reports', label: isExperts ? 'Recruitment Funnel' : 'Reports', icon: BarChart3 },
+        { id: 'campaigns', label: isExperts ? 'Expert Campaigns' : 'Campaigns', icon: Send, badge: campaignsQuery.data?.length || 3 },
+        { id: 'team', label: 'Team', icon: UserCheck, badge: usersQuery.data?.length || 4 },
+      ],
+    },
   ];
+  const renderNav = (item: { id: NavSection; label: string; icon: any; badge?: string | number }) => {
+    const Icon = item.icon;
+    const active = nav === item.id;
+    return (
+      <button
+        key={item.id}
+        type="button"
+        data-testid={`nav-${item.id}`}
+        onClick={() => { setNav(item.id); setNavOpen(false); }}
+        className={`flex w-full items-center gap-2.5 rounded-[4px] px-2.5 py-2 text-left text-sm ${active ? 'bg-[#eaf0ff] font-medium text-[#1f5eff]' : 'text-[#374151] hover:bg-white'}`}
+      >
+        <Icon className="size-[17px] shrink-0" strokeWidth={1.5} />
+        <span className="min-w-0 flex-1 truncate">{item.label}</span>
+        {item.badge !== undefined && (
+          <span className={`rounded-[9px] px-[7px] text-[11px] ${active ? 'bg-white text-[#1f5eff]' : 'bg-[#eef0f4] text-[#5b6474]'}`}>{item.badge}</span>
+        )}
+      </button>
+    );
+  };
 
   return (
-    <div className="flex min-h-[100dvh] bg-slate-50 text-slate-900">
-      <aside className="flex w-64 shrink-0 flex-col bg-[#1b2538] text-slate-200">
-        <div ref={workspaceMenuRef} className="relative border-b border-slate-700/70 p-3">
+    <div className="crm-app flex min-h-[100dvh] bg-[#f6f7f9] text-[#0b1220]">
+      {navOpen && <button type="button" aria-label="Close menu" className="fixed inset-0 z-30 bg-[#0b1220]/30 md:hidden" onClick={() => setNavOpen(false)} />}
+      <aside className={`${navOpen ? 'fixed inset-y-0 left-0 z-40 flex' : 'hidden'} w-[220px] shrink-0 flex-col border-r border-[#e4e7ec] bg-[#f4f6f8] px-3.5 py-4 md:static md:flex`}>
+        <div ref={workspaceMenuRef} className="relative pb-3">
           <button
             type="button"
             data-testid="workspace-dropdown-trigger"
             aria-expanded={workspaceMenuOpen}
             aria-haspopup="listbox"
             onClick={() => setWorkspaceMenuOpen((o) => !o)}
-            className="flex w-full items-center gap-2.5 rounded-xl border border-slate-700/90 bg-slate-800/80 px-3 py-2.5 text-left transition hover:border-blue-500/60 hover:bg-slate-800"
+            className="flex w-full items-center gap-2.5 rounded-[4px] border border-[#e4e7ec] bg-white px-2.5 py-2 text-left hover:border-[#1f5eff]"
           >
-            <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg font-bold text-white shadow ${isExperts ? "bg-purple-600" : "bg-blue-600"}`}>
-              {isExperts ? <GraduationCap className="h-5 w-5" /> : <Briefcase className="h-5 w-5" />}
+            <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-[4px] text-white ${isExperts ? 'bg-purple-600' : 'bg-[#1f5eff]'}`}>
+              {isExperts ? <GraduationCap className="h-4 w-4" strokeWidth={1.5} /> : <Briefcase className="h-4 w-4" strokeWidth={1.5} />}
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5">
-                <span className="truncate font-display text-sm font-bold text-white">GCS CRM</span>
-                <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${isExperts ? "bg-purple-500/25 text-purple-200" : "bg-blue-500/25 text-blue-200"}`}>
-                  {isExperts ? "Experts" : "Sales"}
+                <span className="truncate text-sm font-medium text-[#0b1220]">GCS CRM</span>
+                <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider ${isExperts ? 'bg-purple-100 text-purple-800' : 'bg-[#eaf0ff] text-[#1f5eff]'}`}>
+                  {isExperts ? 'Experts' : 'Sales'}
                 </span>
               </div>
-              <div className="truncate text-[11px] text-slate-300">
-                {isExperts ? "Experts Workspace (Faculty)" : "Sales Workspace (Law Firms)"}
+              <div className="truncate text-[11px] text-[#5b6474]">
+                {isExperts ? 'Experts Workspace (Faculty)' : 'Sales Workspace (Law Firms)'}
               </div>
             </div>
-            <ChevronDown className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${workspaceMenuOpen ? "rotate-180 text-white" : ""}`} />
+            <ChevronDown className={`h-4 w-4 shrink-0 text-[#5b6474] ${workspaceMenuOpen ? 'rotate-180' : ''}`} strokeWidth={1.5} />
           </button>
-
           {workspaceMenuOpen && (
             <div
               role="listbox"
               aria-label="Select Workspace"
               data-testid="workspace-dropdown-menu"
-              className="absolute left-3 right-3 top-[calc(100%-4px)] z-50 overflow-hidden rounded-xl border border-slate-700 bg-[#111827] p-1.5 shadow-2xl ring-1 ring-black/40"
+              className="absolute left-0 right-0 top-[calc(100%+4px)] z-50 overflow-hidden rounded-[4px] border border-[#e4e7ec] bg-white p-1.5 shadow-sm"
             >
-              <div className="px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                Switch Workspace
-              </div>
+              <div className="px-2.5 py-1.5 text-[11px] uppercase tracking-[0.06em] text-[#5b6474]">Switch Workspace</div>
               {WORKSPACE_OPTIONS.map((ws) => {
                 const active = workspaceMode === ws.id;
-                const count = ws.id === "sales" ? workspaceCounts.sales : workspaceCounts.experts;
-                const WsIcon = ws.id === "sales" ? Briefcase : GraduationCap;
+                const count = ws.id === 'sales' ? workspaceCounts.sales : workspaceCounts.experts;
+                const WsIcon = ws.id === 'sales' ? Briefcase : GraduationCap;
                 return (
                   <button
                     key={ws.id}
@@ -576,83 +659,81 @@ export default function Dashboard() {
                     aria-selected={active}
                     data-testid={`workspace-option-${ws.id}`}
                     onClick={() => setWorkspaceMode(ws.id)}
-                    className={`flex w-full items-start gap-2.5 rounded-lg px-2.5 py-2.5 text-left transition ${active ? "bg-blue-600/20 text-white" : "text-slate-300 hover:bg-slate-800/90 hover:text-white"}`}
+                    className={`flex w-full items-start gap-2.5 rounded-[4px] px-2.5 py-2 text-left ${active ? 'bg-[#eaf0ff] text-[#1f5eff]' : 'text-[#374151] hover:bg-[#f6f7f9]'}`}
                   >
-                    <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white ${ws.id === "sales" ? "bg-blue-600" : "bg-purple-600"}`}>
-                      <WsIcon className="h-4 w-4" />
+                    <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[4px] text-white ${ws.id === 'sales' ? 'bg-[#1f5eff]' : 'bg-purple-600'}`}>
+                      <WsIcon className="h-4 w-4" strokeWidth={1.5} />
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-1">
-                        <span className="text-xs font-bold text-white">{ws.fullLabel}</span>
-                        <span className="rounded-full bg-slate-800 px-2 py-0.5 font-mono-ui text-[10px] font-semibold text-slate-300">
-                          {count}
-                        </span>
+                        <span className="text-xs font-medium text-[#0b1220]">{ws.fullLabel}</span>
+                        <span className="rounded-[9px] bg-[#eef0f4] px-2 py-0.5 text-[10px] text-[#5b6474]">{count}</span>
                       </div>
-                      <div className="mt-0.5 text-[11px] leading-snug text-slate-400">{ws.subtitle}</div>
+                      <div className="mt-0.5 text-[11px] leading-snug text-[#5b6474]">{ws.subtitle}</div>
                     </div>
-                    {active && <Check className="mt-1 h-4 w-4 shrink-0 text-blue-400" />}
+                    {active && <Check className="mt-1 h-4 w-4 shrink-0 text-[#1f5eff]" strokeWidth={1.5} />}
                   </button>
                 );
               })}
             </div>
           )}
         </div>
-
-        <nav className="flex-1 space-y-1 p-2.5">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const active = nav === item.id;
-            return (
-              <button
-                key={item.id}
-                data-testid={`nav-${item.id}`}
-                onClick={() => setNav(item.id)}
-                className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition ${
-                  active ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                }`}
-              >
-                <span className="flex items-center gap-2.5">
-                  <Icon className="h-4 w-4 shrink-0" />
-                  <span>{item.label}</span>
-                </span>
-                {item.badge !== undefined && (
-                  <span
-                    className={`rounded-full px-2 py-0.5 font-mono-ui text-[11px] ${
-                      active ? 'bg-blue-700 text-white' : 'bg-slate-800 text-slate-300'
-                    }`}
-                  >
-                    {item.badge}
-                  </span>
-                )}
-              </button>
-            );
-          })}
+        <label className="mb-1 flex h-9 items-center justify-between rounded-[4px] border border-[#e4e7ec] bg-white px-2.5 text-[13px] text-[#5b6474]">
+          <span className="sr-only">Search records</span>
+          <input ref={searchRef} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search records…" className="w-full bg-transparent outline-none placeholder:text-[#5b6474]" />
+          <span className="text-[11px]">⌘K</span>
+        </label>
+        <nav className="flex-1 overflow-y-auto">
+          {navGroups.map((group) => (
+            <div key={group.label}>
+              <p className="mx-2 mt-[18px] mb-1.5 text-[11.5px] uppercase tracking-[0.06em] text-[#5b6474]">{group.label}</p>
+              <div className="space-y-0.5">{group.items.map(renderNav)}</div>
+            </div>
+          ))}
         </nav>
-
-        <div className="border-t border-slate-700/70 p-3 text-xs">
-          <div className="mb-2 flex items-center justify-between text-slate-400">
-            <span>Signed in</span>
-            <span className="font-semibold text-white">{sessionData?.user?.name || 'Admin'}</span>
+        <div className="mt-auto border-t border-[#e4e7ec] pt-2">
+          {renderNav({ id: 'settings', label: 'Settings', icon: Settings })}
+          <div className="relative">
+            <button type="button" aria-expanded={accountOpen} onClick={() => setAccountOpen((open) => !open)} className="flex w-full items-center gap-2.5 px-2 py-2 text-left text-[13.5px]">
+              <span className="inline-flex size-[30px] shrink-0 items-center justify-center rounded-full bg-[#eaf0ff] text-xs font-medium text-[#1f5eff]">{signedInInitials}</span>
+              <span className="min-w-0">
+                <span className="block truncate">{signedInName}</span>
+                <span className="block truncate text-xs text-[#5b6474]">{signedInEmail || 'Signed in'}</span>
+              </span>
+            </button>
+            {accountOpen && (
+              <div className="absolute bottom-full left-0 z-20 mb-2 w-52 rounded-[4px] border border-[#e4e7ec] bg-white p-1 text-sm shadow-sm">
+                <button type="button" onClick={logout} className="flex w-full items-center gap-2 rounded-[3px] px-3 py-2 text-left hover:bg-[#f6f7f9]">
+                  <LogOut className="size-[15px]" strokeWidth={1.5} /> Sign out
+                </button>
+              </div>
+            )}
           </div>
-          <button
-            onClick={logout}
-            className="flex w-full items-center justify-center gap-1.5 rounded-md border border-slate-700 bg-slate-800/70 px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-800 hover:text-white"
-          >
-            <LogOut className="h-3.5 w-3.5" /> Sign out
-          </button>
         </div>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex flex-wrap items-center gap-3 border-b bg-white px-6 py-3 shadow-xs">
+        <div className="flex items-center justify-between border-b border-[#e4e7ec] bg-white px-4 py-3 md:hidden">
+          <button type="button" className="text-sm font-medium" onClick={() => setNavOpen(true)}>Menu</button>
+          <span className="text-sm font-medium">GCS CRM</span>
+          <button type="button" className="text-sm text-[#5b6474]" onClick={logout}>Sign out</button>
+        </div>
+        <div className="min-w-0 flex-1 overflow-y-auto px-4 py-6 md:px-9 md:py-7">
+        <div className="mb-[18px] flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h1 className="text-[26px] font-medium tracking-[-0.6px]">{pageCopy[nav].title}</h1>
+            <p className="mt-1 text-sm text-[#5b6474]">{pageCopy[nav].subtitle}</p>
+          </div>
+        </div>
+        <header className="mb-[18px] flex flex-wrap items-center gap-2">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Workspace:</span>
+            <span className="text-[11.5px] uppercase tracking-[0.06em] text-[#5b6474]">Workspace</span>
             <select
               data-testid="select-workspace-mode"
               aria-label="Workspace mode"
               value={workspaceMode}
               onChange={(e) => setWorkspaceMode(e.target.value as WorkspaceMode)}
-              className={`${sel} font-semibold ${isExperts ? "border-purple-300 bg-purple-50/50 text-purple-950" : "border-blue-300 bg-blue-50/50 text-blue-950"}`}
+              className={sel}
             >
               <option value="sales">Sales Workspace ({workspaceCounts.sales} Law Firms)</option>
               <option value="experts">Experts Workspace ({workspaceCounts.experts} Professors)</option>
@@ -660,7 +741,7 @@ export default function Dashboard() {
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Member:</span>
+            <span className="text-[11.5px] uppercase tracking-[0.06em] text-[#5b6474]">Member</span>
             <select
               data-testid="select-workspace-owner"
               value={workspaceOwner}
@@ -677,22 +758,22 @@ export default function Dashboard() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              {isExperts ? "DISCIPLINE:" : "MARKET / REGION:"}
+            <span className="text-[11.5px] uppercase tracking-[0.06em] text-[#5b6474]">
+              {isExperts ? "Discipline" : "Market"}
             </span>
-            <div role="group" aria-label={isExperts ? "DISCIPLINE" : "MARKET / REGION"} className="flex flex-wrap rounded-lg border bg-slate-100 p-0.5">
+            <div role="group" aria-label={isExperts ? "DISCIPLINE" : "MARKET / REGION"} className="flex flex-wrap rounded-[4px] border border-[#e4e7ec] bg-white p-0.5">
               {activeFieldFilters.map(({ value, label }) => (
                 <button
                   key={value}
                   data-testid={`filter-field-${value}`}
                   aria-pressed={expertField === value}
                   onClick={() => setExpertField(value)}
-                  className={`rounded-md px-2.5 py-1 text-xs font-semibold transition ${
+                  className={`rounded-[3px] px-2.5 py-1 text-xs font-medium transition ${
                     expertField === value
                       ? isExperts
-                        ? "bg-purple-600 text-white shadow-xs"
-                        : "bg-blue-600 text-white shadow-xs"
-                      : "text-slate-600 hover:text-slate-900"
+                        ? "bg-purple-100 text-purple-800"
+                        : "bg-[#eaf0ff] text-[#1f5eff]"
+                      : "text-[#5b6474] hover:text-[#0b1220]"
                   }`}
                 >
                   {label}
@@ -752,28 +833,28 @@ export default function Dashboard() {
             <button
               data-testid="button-deduplicate"
               onClick={purgeDuplicates}
-              className="flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+              className="inline-flex h-9 items-center gap-1 rounded-[4px] border border-[#e4e7ec] bg-white px-3 text-[13px] font-medium text-[#0b1220] hover:bg-[#f6f7f9]"
             >
               <Sparkles className="h-3.5 w-3.5 text-blue-600" /> Remove Duplicates
             </button>
             <button
               data-testid="button-new"
               onClick={() => setOpen('new')}
-              className="flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-blue-700"
+              className="inline-flex h-10 items-center gap-1 rounded-[4px] bg-[#1f5eff] px-[18px] text-sm font-medium text-white hover:bg-[#1648cc]"
             >
               <Plus className="h-4 w-4" /> {isExperts ? "Add Expert" : "Add Deal"}
             </button>
             <button
               data-testid="button-import"
               onClick={() => setImp(true)}
-              className="flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+              className="inline-flex h-9 items-center gap-1 rounded-[4px] border border-[#e4e7ec] bg-white px-3 text-[13px] font-medium text-[#0b1220] hover:bg-[#f6f7f9]"
             >
               <Upload className="h-3.5 w-3.5" /> Import
             </button>
             <button
               data-testid="button-export"
               onClick={doExport}
-              className="flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+              className="inline-flex h-9 items-center gap-1 rounded-[4px] border border-[#e4e7ec] bg-white px-3 text-[13px] font-medium text-[#0b1220] hover:bg-[#f6f7f9]"
             >
               <Download className="h-3.5 w-3.5" /> Export
             </button>
@@ -781,8 +862,8 @@ export default function Dashboard() {
         </header>
 
         {/* Top Bar KPIs — Tailored to Sales vs. Experts Workspace */}
-        {isExperts ? (
-          <section className="grid grid-cols-1 gap-3 border-b bg-white px-6 py-4 sm:grid-cols-2 lg:grid-cols-4">
+        {nav !== 'emails' && nav !== 'calendar' && nav !== 'settings' && (isExperts ? (
+          <section className="mb-[22px] grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
             <div className="rounded-xl border border-purple-200 bg-purple-50/40 p-3.5">
               <div className="text-[11px] font-semibold uppercase tracking-wider text-purple-700">
                 1. Total Expert Faculty
@@ -829,10 +910,10 @@ export default function Dashboard() {
             </div>
           </section>
         ) : (
-        <section className="grid grid-cols-1 gap-3 border-b bg-white px-6 py-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3.5">
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-              1. Average Days to Close
+        <section className="mb-[22px] grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-[4px] border border-[#e4e7ec] bg-white p-[18px]">
+            <div className="text-[12.5px] font-medium text-[#5b6474]">
+              Average days to close
             </div>
             <div className="mt-1 font-display text-2xl font-bold text-slate-900" data-testid="kpi-avg-days-to-close">
               {kpiMetrics.avgDays} days
@@ -872,9 +953,12 @@ export default function Dashboard() {
             <div className="mt-0.5 text-[11px] text-emerald-700/80">Conversion from Meeting set to Closed</div>
           </div>
         </section>
-        )}
+        ))}
 
-        <main className="flex-1 p-6">
+        <main>
+          {nav === 'emails' && <EmailsPanel composeSeed={mailCompose} />}
+          {nav === 'calendar' && <CalendarPanel />}
+          {nav === 'settings' && <OutlookSettings notice={outlookNotice} />}
           {nav === 'overview' && (
             <div className="space-y-6">
               <div className="grid gap-6 lg:grid-cols-2">
@@ -1277,6 +1361,7 @@ export default function Dashboard() {
             />
           )}
         </main>
+        </div>
       </div>
 
       <InvestorSheet
@@ -1302,6 +1387,11 @@ export default function Dashboard() {
           setWaCardId(cardId);
           setWaPhone(phone);
           setNav('whatsapp');
+        }}
+        onComposeEmail={(address, id) => {
+          setMailCompose({ to: address, investorId: id, nonce: Date.now() });
+          setOpen(null);
+          setNav('emails');
         }}
       />
 
