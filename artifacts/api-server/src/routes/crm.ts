@@ -10,6 +10,8 @@ import {
   deleteInvestor,
   deleteUser,
   getInvestor,
+  addCustomExpertType,
+  listExpertTypes,
   listInvestors,
   listUsers,
   logOutboundActivity,
@@ -19,15 +21,23 @@ import {
   upsert,
 } from "../lib/crmData";
 import { exportCsv, importCsv } from "../lib/crmCsv";
+import {
+  ensureWhatsAppSchema,
+  fetchMetaPhoneStatus,
+  fetchMetaTemplates,
+  sendAndLogWhatsAppMessage,
+} from "../lib/whatsappCloud";
 import { logger } from "../lib/logger";
 
 const TELNYX_CONNECTION_ID = process.env.TELNYX_CONNECTION_ID || "3077013926030869814";
 const TELNYX_FROM_NUMBER = process.env.TELNYX_FROM_NUMBER || "+15619031414";
-export const EXPERT_FIELDS = ["Law Firms", "Chinese Law", "Indian Law"] as const;
+export const EXPERT_FIELDS = ["Law Firms", "Chinese Law", "Indian Law", "Dentistry", "Economics"] as const;
 export const EXPERT_FIELD_FILTERS = [
   { value: "Law Firms", label: "Law Firms" },
   { value: "Chinese Law", label: "Chinese Law" },
   { value: "Indian Law", label: "Indian Law" },
+  { value: "Dentistry", label: "Dentists" },
+  { value: "Economics", label: "Economists" },
   { value: "All", label: "All" },
 ] as const;
 
@@ -39,21 +49,27 @@ function id(value: string | string[]) {
   return n;
 }
 
+router.get("/expert-types", async (_req, res) => {
+  res.json(await listExpertTypes(pool));
+});
+
+router.post("/expert-types", async (req, res) => {
+  const name = req.body?.name ?? req.body?.expert_field;
+  const result = await transaction(client => addCustomExpertType(client, name));
+  res.status(201).json(result);
+});
+
 router.get("/summary", async (req, res) => {
-  const expertField = req.query.expert_field;
-  if (
-    expertField !== undefined &&
-    expertField !== "Law Firms" &&
-    expertField !== "Chinese Law" &&
-    expertField !== "Indian Law"
-  ) {
+  const expertField = typeof req.query.expert_field === "string" ? req.query.expert_field.trim() : undefined;
+  if (expertField !== undefined && (!expertField || expertField.length > 120)) {
     throw new CrmError("Invalid expert field");
   }
   const owner = typeof req.query.owner === "string" ? req.query.owner : undefined;
   const range = typeof req.query.range === "string" ? req.query.range : undefined;
   const from = typeof req.query.from === "string" ? req.query.from : undefined;
   const to = typeof req.query.to === "string" ? req.query.to : undefined;
-  res.json(summary(await listInvestors(pool), new Date(), expertField, { owner, range, from, to }));
+  const workspace = typeof req.query.workspace === "string" ? req.query.workspace : undefined;
+  res.json(summary(await listInvestors(pool), new Date(), expertField, { owner, range, from, to, workspace }));
 });
 
 router.get("/investors", async (req, res) => {
@@ -70,7 +86,7 @@ router.get("/investors/export", async (_req, res) => {
 router.post("/investors/import", async (req, res) => {
   const input = BrowserImportInvestorsBody.safeParse(req.body);
   if (!input.success) throw new CrmError("CSV text required");
-  res.json(await transaction(client => importCsv(client, input.data.csv)));
+  res.json(await transaction(client => importCsv(client, input.data.csv, input.data.default_expert_field)));
 });
 
 router.post("/investors/deduplicate", async (_req, res) => {
@@ -465,8 +481,9 @@ router.post("/calls/dial", async (req, res) => {
   res.status(201).json(created);
 });
 
-// WhatsApp Integration API
+// WhatsApp Integration API (Meta WhatsApp Cloud API)
 router.get("/whatsapp", async (req, res) => {
+  await ensureWhatsAppSchema(pool);
   const investorId = req.query.investor_id ? Number(req.query.investor_id) : null;
   const r = await pool.query(
     `SELECT w.*, i.data->>'firm' AS firm, i.data->>'name' AS contact_name
@@ -474,40 +491,24 @@ router.get("/whatsapp", async (req, res) => {
      LEFT JOIN crm_investors i ON i.id = w.investor_id
      WHERE ($1::int IS NULL OR w.investor_id = $1)
      ORDER BY w.created_at ASC, w.id ASC
-     LIMIT 200`,
+     LIMIT 300`,
     [investorId],
   );
   res.json(r.rows);
 });
 
-const handleWhatsAppSend = async (req: import("express").Request, res: import("express").Response) => {
-  const body = req.body || {};
-  const text = String(body.body || body.message || "").trim();
-  const phone = String(body.phone || body.to || "").trim();
-  const cardId = body.card_id || body.investor_id ? Number(body.card_id || body.investor_id) : undefined;
-  const sender = String(body.sender || "Guy").trim();
-  const direction = body.direction === "inbound" ? "inbound" : "outbound";
-  if (!text) throw new CrmError("WhatsApp message body is required", 400);
+router.get("/whatsapp/status", async (_req, res) => {
+  const status = await fetchMetaPhoneStatus();
+  res.json(status);
+});
 
-  const created = await transaction(async client => {
-    const ins = await client.query(
-      `INSERT INTO crm_whatsapp_messages(investor_id,phone,direction,body,sender)
-       VALUES($1,$2,$3,$4,$5)
-       RETURNING *`,
-      [cardId ?? null, phone || "+15619031414", direction, text, sender],
-    );
-    if (cardId) {
-      await logOutboundActivity(client, {
-        card_id: cardId,
-        event_type: direction === "inbound" ? "reply_received" : "whatsapp_sent",
-        subject: `WhatsApp ${direction === "inbound" ? "Reply" : "Message"} (${phone || "Direct"})`,
-        snippet: text,
-        campaign: body.campaign || "whatsapp-direct",
-        actor: sender,
-      });
-    }
-    return ins.rows[0];
-  });
+router.get("/whatsapp/templates", async (_req, res) => {
+  const result = await fetchMetaTemplates();
+  res.json(result);
+});
+
+const handleWhatsAppSend = async (req: import("express").Request, res: import("express").Response) => {
+  const created = await sendAndLogWhatsAppMessage(req.body || {});
   res.status(201).json(created);
 };
 router.post("/whatsapp", handleWhatsAppSend);
@@ -537,13 +538,15 @@ router.get("/campaigns", async (_req, res) => {
     { name: "law-firms-niw-q4", field: "Law Firms" },
     { name: "indian-law-eb2-partner", field: "Indian Law" },
     { name: "chinese-law-niw-outreach", field: "Chinese Law" },
+    { name: "dentistry-faculty-experts", field: "Dentistry" },
+    { name: "economics-phd-reviewers", field: "Economics" },
   ];
   for (const d of defaults) {
     const matching = investors.filter(i => i.expert_field === d.field);
     const contacted = matching.filter(i => i.status !== "New").length;
-    const meetings = matching.filter(i => ["Meeting set", "Proposal sent", "Contract review", "Closed"].includes(i.status)).length;
-    const proposals = matching.filter(i => ["Proposal sent", "Contract review", "Closed"].includes(i.status)).length;
-    const val = matching.reduce((acc, i) => acc + (Number(i.deal_value) || 2500), 0);
+    const meetings = matching.filter(i => ["Meeting set", "Proposal sent", "Contract review", "Closed", "Awaiting Gusto Setup"].includes(i.status)).length;
+    const proposals = matching.filter(i => ["Proposal sent", "Contract review", "Closed", "Awaiting Gusto Setup"].includes(i.status)).length;
+    const val = matching.reduce((acc, i) => acc + (Number.isFinite(Number(i.deal_value)) && Number(i.deal_value) >= 0 ? Number(i.deal_value) : 0), 0);
     campaignMap.set(d.name, {
       name: d.name,
       field: d.field,

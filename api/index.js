@@ -35,8 +35,8 @@ var require_ms = __commonJS({
   "../../node_modules/.pnpm/ms@2.1.3/node_modules/ms/index.js"(exports2, module2) {
     var s = 1e3;
     var m = s * 60;
-    var h = m * 60;
-    var d = h * 24;
+    var h2 = m * 60;
+    var d = h2 * 24;
     var w = d * 7;
     var y = d * 365.25;
     module2.exports = function(val, options) {
@@ -84,7 +84,7 @@ var require_ms = __commonJS({
         case "hrs":
         case "hr":
         case "h":
-          return n * h;
+          return n * h2;
         case "minutes":
         case "minute":
         case "mins":
@@ -112,8 +112,8 @@ var require_ms = __commonJS({
       if (msAbs >= d) {
         return Math.round(ms / d) + "d";
       }
-      if (msAbs >= h) {
-        return Math.round(ms / h) + "h";
+      if (msAbs >= h2) {
+        return Math.round(ms / h2) + "h";
       }
       if (msAbs >= m) {
         return Math.round(ms / m) + "m";
@@ -128,8 +128,8 @@ var require_ms = __commonJS({
       if (msAbs >= d) {
         return plural(ms, msAbs, d, "day");
       }
-      if (msAbs >= h) {
-        return plural(ms, msAbs, h, "hour");
+      if (msAbs >= h2) {
+        return plural(ms, msAbs, h2, "hour");
       }
       if (msAbs >= m) {
         return plural(ms, msAbs, m, "minute");
@@ -20694,27 +20694,27 @@ var require_router = __commonJS({
     var slice = Array.prototype.slice;
     var flatten = Array.prototype.flat;
     var methods = METHODS.map((method) => method.toLowerCase());
-    module2.exports = Router7;
+    module2.exports = Router8;
     module2.exports.Route = Route;
-    function Router7(options) {
-      if (!(this instanceof Router7)) {
-        return new Router7(options);
+    function Router8(options) {
+      if (!(this instanceof Router8)) {
+        return new Router8(options);
       }
       const opts = options || {};
-      function router6(req, res, next) {
-        router6.handle(req, res, next);
+      function router7(req, res, next) {
+        router7.handle(req, res, next);
       }
-      Object.setPrototypeOf(router6, this);
-      router6.caseSensitive = opts.caseSensitive;
-      router6.mergeParams = opts.mergeParams;
-      router6.params = {};
-      router6.strict = opts.strict;
-      router6.stack = [];
-      return router6;
+      Object.setPrototypeOf(router7, this);
+      router7.caseSensitive = opts.caseSensitive;
+      router7.mergeParams = opts.mergeParams;
+      router7.params = {};
+      router7.strict = opts.strict;
+      router7.stack = [];
+      return router7;
     }
-    Router7.prototype = function() {
+    Router8.prototype = function() {
     };
-    Router7.prototype.param = function param(name, fn) {
+    Router8.prototype.param = function param(name, fn) {
       if (!name) {
         throw new TypeError("argument name is required");
       }
@@ -20734,7 +20734,7 @@ var require_router = __commonJS({
       params.push(fn);
       return this;
     };
-    Router7.prototype.handle = function handle(req, res, callback) {
+    Router8.prototype.handle = function handle(req, res, callback) {
       if (!callback) {
         throw new TypeError("argument callback is required");
       }
@@ -20861,7 +20861,7 @@ var require_router = __commonJS({
         }
       }
     };
-    Router7.prototype.use = function use(handler) {
+    Router8.prototype.use = function use(handler) {
       let offset = 0;
       let path = "/";
       if (typeof handler !== "function") {
@@ -20894,7 +20894,7 @@ var require_router = __commonJS({
       }
       return this;
     };
-    Router7.prototype.route = function route(path) {
+    Router8.prototype.route = function route(path) {
       const route2 = new Route(path);
       const layer = new Layer(path, {
         sensitive: this.caseSensitive,
@@ -20909,7 +20909,7 @@ var require_router = __commonJS({
       return route2;
     };
     methods.concat("all").forEach(function(method) {
-      Router7.prototype[method] = function(path) {
+      Router8.prototype[method] = function(path) {
         const route = this.route(path);
         route[method].apply(route, slice.call(arguments, 1));
         return this;
@@ -21092,13 +21092,13 @@ var require_application = __commonJS({
     var compileTrust = require_utils3().compileTrust;
     var resolve = require("node:path").resolve;
     var once = require_once();
-    var Router7 = require_router();
+    var Router8 = require_router();
     var slice = Array.prototype.slice;
     var flatten = Array.prototype.flat;
     var app2 = exports2 = module2.exports = {};
     var trustProxyDefaultSymbol = "@@symbol:trust_proxy_default";
     app2.init = function init() {
-      var router6 = null;
+      var router7 = null;
       this.cache = /* @__PURE__ */ Object.create(null);
       this.engines = /* @__PURE__ */ Object.create(null);
       this.settings = /* @__PURE__ */ Object.create(null);
@@ -21107,13 +21107,13 @@ var require_application = __commonJS({
         configurable: true,
         enumerable: true,
         get: function getrouter() {
-          if (router6 === null) {
-            router6 = new Router7({
+          if (router7 === null) {
+            router7 = new Router8({
               caseSensitive: this.enabled("case sensitive routing"),
               strict: this.enabled("strict routing")
             });
           }
-          return router6;
+          return router7;
         }
       });
     };
@@ -21184,15 +21184,15 @@ var require_application = __commonJS({
       if (fns.length === 0) {
         throw new TypeError("app.use() requires a middleware function");
       }
-      var router6 = this.router;
+      var router7 = this.router;
       fns.forEach(function(fn2) {
         if (!fn2 || !fn2.handle || !fn2.set) {
-          return router6.use(path, fn2);
+          return router7.use(path, fn2);
         }
         debug(".use app under %s", path);
         fn2.mountpath = path;
         fn2.parent = this;
-        router6.use(path, function mounted_app(req, res, next) {
+        router7.use(path, function mounted_app(req, res, next) {
           var orig = req.app;
           fn2.handle(req, res, function(err) {
             Object.setPrototypeOf(req, orig.request);
@@ -23777,7 +23777,7 @@ var require_express = __commonJS({
     var EventEmitter = require("node:events").EventEmitter;
     var mixin = require_merge_descriptors();
     var proto = require_application();
-    var Router7 = require_router();
+    var Router8 = require_router();
     var req = require_request();
     var res = require_response();
     exports2 = module2.exports = createApplication;
@@ -23799,8 +23799,8 @@ var require_express = __commonJS({
     exports2.application = proto;
     exports2.request = req;
     exports2.response = res;
-    exports2.Route = Router7.Route;
-    exports2.Router = Router7;
+    exports2.Route = Router8.Route;
+    exports2.Router = Router8;
     exports2.json = bodyParser.json;
     exports2.raw = bodyParser.raw;
     exports2.static = require_serve_static();
@@ -33274,7 +33274,7 @@ var require_pino = __commonJS({
         messageKey,
         errorKey,
         nestedKey,
-        base,
+        base: base2,
         name,
         level,
         customLevels,
@@ -33313,11 +33313,11 @@ var require_pino = __commonJS({
         [formattersSym]: allFormatters
       });
       let chindings = "";
-      if (base !== null) {
+      if (base2 !== null) {
         if (name === void 0) {
-          chindings = coreChindings(base);
+          chindings = coreChindings(base2);
         } else {
-          chindings = coreChindings(Object.assign({}, base, { name }));
+          chindings = coreChindings(Object.assign({}, base2, { name }));
         }
       }
       const time3 = timestamp2 instanceof Function ? timestamp2 : timestamp2 ? epochTime2 : nullTime;
@@ -33639,7 +33639,7 @@ __export(app_exports, {
   default: () => app_default
 });
 module.exports = __toCommonJS(app_exports);
-var import_express7 = __toESM(require_express2(), 1);
+var import_express8 = __toESM(require_express2(), 1);
 var import_cookie_parser = __toESM(require_cookie_parser(), 1);
 
 // ../../node_modules/.pnpm/oauth4webapi@3.8.8/node_modules/oauth4webapi/build/index.js
@@ -33959,9 +33959,9 @@ function None() {
     body.set("client_id", client.client_id);
   };
 }
-var URLParse = URL.parse ? (url, base) => URL.parse(url, base) : (url, base) => {
+var URLParse = URL.parse ? (url, base2) => URL.parse(url, base2) : (url, base2) => {
   try {
-    return new URL(url, base);
+    return new URL(url, base2);
   } catch {
     return null;
   }
@@ -42564,6 +42564,21 @@ var crmCalls = pgTable("crm_calls", {
   metadata: jsonb("metadata").$type().default({}).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull()
 });
+var crmWhatsappMessages = pgTable("crm_whatsapp_messages", {
+  id: serial("id").primaryKey(),
+  investorId: integer("investor_id").references(() => crmInvestors.id),
+  phone: text("phone").notNull(),
+  direction: text("direction").default("outbound").notNull(),
+  body: text("body").notNull(),
+  sender: text("sender").default("Guy").notNull(),
+  waMessageId: text("wa_message_id"),
+  status: text("status").default("sent").notNull(),
+  messageType: text("message_type").default("text").notNull(),
+  templateName: text("template_name"),
+  errorMessage: text("error_message"),
+  metadata: jsonb("metadata").$type().default({}).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull()
+});
 var crmOutlookAccounts = pgTable("crm_outlook_accounts", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().unique(),
@@ -42637,15 +42652,6 @@ var crmEmailDrafts = pgTable("crm_email_drafts", {
   error: text("error").default("").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
-});
-var crmWhatsappMessages = pgTable("crm_whatsapp_messages", {
-  id: serial("id").primaryKey(),
-  investorId: integer("investor_id").references(() => crmInvestors.id),
-  phone: text("phone").notNull(),
-  direction: text("direction").default("outbound").notNull(),
-  body: text("body").notNull(),
-  sender: text("sender").default("Guy").notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull()
 });
 
 // ../../lib/db/src/index.ts
@@ -42832,7 +42838,7 @@ async function authMiddleware(req, res, next) {
 var import_pino_http = __toESM(require_logger(), 1);
 
 // src/routes/index.ts
-var import_express6 = __toESM(require_express2(), 1);
+var import_express7 = __toESM(require_express2(), 1);
 
 // src/routes/health.ts
 var import_express = __toESM(require_express2(), 1);
@@ -46366,23 +46372,23 @@ var ZodEffects = class extends ZodType {
     }
     if (effect.type === "transform") {
       if (ctx.common.async === false) {
-        const base = this._def.schema._parseSync({
+        const base2 = this._def.schema._parseSync({
           data: ctx.data,
           path: ctx.path,
           parent: ctx
         });
-        if (!isValid(base))
+        if (!isValid(base2))
           return INVALID;
-        const result = effect.transform(base.value, checkCtx);
+        const result = effect.transform(base2.value, checkCtx);
         if (result instanceof Promise) {
           throw new Error(`Asynchronous transform encountered during synchronous parse operation. Use .parseAsync instead.`);
         }
         return { status: status.value, value: result };
       } else {
-        return this._def.schema._parseAsync({ data: ctx.data, path: ctx.path, parent: ctx }).then((base) => {
-          if (!isValid(base))
+        return this._def.schema._parseAsync({ data: ctx.data, path: ctx.path, parent: ctx }).then((base2) => {
+          if (!isValid(base2))
             return INVALID;
-          return Promise.resolve(effect.transform(base.value, checkCtx)).then((result) => ({
+          return Promise.resolve(effect.transform(base2.value, checkCtx)).then((result) => ({
             status: status.value,
             value: result
           }));
@@ -46790,7 +46796,7 @@ var ExchangeMobileAuthorizationCodeResponse = objectType({
   "token": stringType()
 });
 var ListInvestorsQueryParams = objectType({
-  "status": enumType(["New", "Contacted", "Meeting set", "Proposal sent", "Contract review", "Closed"]).optional()
+  "status": enumType(["New", "Contacted", "Meeting set", "Proposal sent", "Contract review", "Closed", "Awaiting Gusto Setup"]).optional()
 });
 var listInvestorsResponseFitScoreMax = 5;
 var ListInvestorsResponseItem = objectType({
@@ -46813,7 +46819,7 @@ var ListInvestorsResponseItem = objectType({
   "notes": stringType(),
   "investor_type": enumType(["STANDARD", "PREMIUM"]),
   "fit_score": numberType().min(1).max(listInvestorsResponseFitScoreMax),
-  "status": enumType(["New", "Contacted", "Meeting set", "Proposal sent", "Contract review", "Closed"]),
+  "status": enumType(["New", "Contacted", "Meeting set", "Proposal sent", "Contract review", "Closed", "Awaiting Gusto Setup"]),
   "id": numberType(),
   "created_at": stringType(),
   "updated_at": stringType(),
@@ -46823,7 +46829,7 @@ var ListInvestorsResponseItem = objectType({
     "message": stringType(),
     "kind": stringType()
   })),
-  "expert_field": enumType(["Law Firms", "Chinese Law", "Indian Law"]),
+  "expert_field": stringType().min(1).max(120),
   "lead_source": stringType().optional(),
   "deal_value": unionType([numberType(), stringType()]).optional(),
   "expected_close_date": stringType().optional(),
@@ -46854,15 +46860,16 @@ var UpsertInvestorBody = objectType({
   "notes": stringType().optional(),
   "investor_type": enumType(["STANDARD", "PREMIUM"]).optional(),
   "fit_score": numberType().min(1).max(upsertInvestorBodyFitScoreMax).optional(),
-  "status": enumType(["New", "Contacted", "Meeting set", "Proposal sent", "Contract review", "Closed"]).optional(),
-  "expert_field": enumType(["Law Firms", "Chinese Law", "Indian Law"]).optional(),
+  "status": enumType(["New", "Contacted", "Meeting set", "Proposal sent", "Contract review", "Closed", "Awaiting Gusto Setup"]).optional(),
+  "expert_field": stringType().min(1).max(120).optional(),
   "lead_source": stringType().optional(),
   "deal_value": unionType([numberType(), stringType()]).optional(),
   "expected_close_date": stringType().optional(),
   "owner": stringType().optional(),
   "client_type": enumType(["new lead", "cold client", "active client", ""]).optional(),
   "type": enumType(["new lead", "cold client", "active client", ""]).optional(),
-  "phone": stringType().optional()
+  "phone": stringType().optional(),
+  "created_at": stringType().optional()
 });
 var upsertInvestorResponseFitScoreMax = 5;
 var UpsertInvestorResponse = objectType({
@@ -46885,7 +46892,7 @@ var UpsertInvestorResponse = objectType({
   "notes": stringType(),
   "investor_type": enumType(["STANDARD", "PREMIUM"]),
   "fit_score": numberType().min(1).max(upsertInvestorResponseFitScoreMax),
-  "status": enumType(["New", "Contacted", "Meeting set", "Proposal sent", "Contract review", "Closed"]),
+  "status": enumType(["New", "Contacted", "Meeting set", "Proposal sent", "Contract review", "Closed", "Awaiting Gusto Setup"]),
   "id": numberType(),
   "created_at": stringType(),
   "updated_at": stringType(),
@@ -46895,7 +46902,7 @@ var UpsertInvestorResponse = objectType({
     "message": stringType(),
     "kind": stringType()
   })),
-  "expert_field": enumType(["Law Firms", "Chinese Law", "Indian Law"]),
+  "expert_field": stringType().min(1).max(120),
   "lead_source": stringType().optional(),
   "deal_value": unionType([numberType(), stringType()]).optional(),
   "expected_close_date": stringType().optional(),
@@ -46905,7 +46912,7 @@ var UpsertInvestorResponse = objectType({
   "phone": stringType().optional()
 });
 var BrowserListInvestorsQueryParams = objectType({
-  "status": enumType(["New", "Contacted", "Meeting set", "Proposal sent", "Contract review", "Closed"]).optional()
+  "status": enumType(["New", "Contacted", "Meeting set", "Proposal sent", "Contract review", "Closed", "Awaiting Gusto Setup"]).optional()
 });
 var browserListInvestorsResponseFitScoreMax = 5;
 var BrowserListInvestorsResponseItem = objectType({
@@ -46928,7 +46935,7 @@ var BrowserListInvestorsResponseItem = objectType({
   "notes": stringType(),
   "investor_type": enumType(["STANDARD", "PREMIUM"]),
   "fit_score": numberType().min(1).max(browserListInvestorsResponseFitScoreMax),
-  "status": enumType(["New", "Contacted", "Meeting set", "Proposal sent", "Contract review", "Closed"]),
+  "status": enumType(["New", "Contacted", "Meeting set", "Proposal sent", "Contract review", "Closed", "Awaiting Gusto Setup"]),
   "id": numberType(),
   "created_at": stringType(),
   "updated_at": stringType(),
@@ -46938,7 +46945,7 @@ var BrowserListInvestorsResponseItem = objectType({
     "message": stringType(),
     "kind": stringType()
   })),
-  "expert_field": enumType(["Law Firms", "Chinese Law", "Indian Law"]),
+  "expert_field": stringType().min(1).max(120),
   "lead_source": stringType().optional(),
   "deal_value": unionType([numberType(), stringType()]).optional(),
   "expected_close_date": stringType().optional(),
@@ -46969,15 +46976,16 @@ var BrowserUpsertInvestorBody = objectType({
   "notes": stringType().optional(),
   "investor_type": enumType(["STANDARD", "PREMIUM"]).optional(),
   "fit_score": numberType().min(1).max(browserUpsertInvestorBodyFitScoreMax).optional(),
-  "status": enumType(["New", "Contacted", "Meeting set", "Proposal sent", "Contract review", "Closed"]).optional(),
-  "expert_field": enumType(["Law Firms", "Chinese Law", "Indian Law"]).optional(),
+  "status": enumType(["New", "Contacted", "Meeting set", "Proposal sent", "Contract review", "Closed", "Awaiting Gusto Setup"]).optional(),
+  "expert_field": stringType().min(1).max(120).optional(),
   "lead_source": stringType().optional(),
   "deal_value": unionType([numberType(), stringType()]).optional(),
   "expected_close_date": stringType().optional(),
   "owner": stringType().optional(),
   "client_type": enumType(["new lead", "cold client", "active client", ""]).optional(),
   "type": enumType(["new lead", "cold client", "active client", ""]).optional(),
-  "phone": stringType().optional()
+  "phone": stringType().optional(),
+  "created_at": stringType().optional()
 });
 var browserUpsertInvestorResponseFitScoreMax = 5;
 var BrowserUpsertInvestorResponse = objectType({
@@ -47000,7 +47008,7 @@ var BrowserUpsertInvestorResponse = objectType({
   "notes": stringType(),
   "investor_type": enumType(["STANDARD", "PREMIUM"]),
   "fit_score": numberType().min(1).max(browserUpsertInvestorResponseFitScoreMax),
-  "status": enumType(["New", "Contacted", "Meeting set", "Proposal sent", "Contract review", "Closed"]),
+  "status": enumType(["New", "Contacted", "Meeting set", "Proposal sent", "Contract review", "Closed", "Awaiting Gusto Setup"]),
   "id": numberType(),
   "created_at": stringType(),
   "updated_at": stringType(),
@@ -47010,7 +47018,7 @@ var BrowserUpsertInvestorResponse = objectType({
     "message": stringType(),
     "kind": stringType()
   })),
-  "expert_field": enumType(["Law Firms", "Chinese Law", "Indian Law"]),
+  "expert_field": stringType().min(1).max(120),
   "lead_source": stringType().optional(),
   "deal_value": unionType([numberType(), stringType()]).optional(),
   "expected_close_date": stringType().optional(),
@@ -47043,7 +47051,7 @@ var GetInvestorResponse = objectType({
   "notes": stringType(),
   "investor_type": enumType(["STANDARD", "PREMIUM"]),
   "fit_score": numberType().min(1).max(getInvestorResponseFitScoreMax),
-  "status": enumType(["New", "Contacted", "Meeting set", "Proposal sent", "Contract review", "Closed"]),
+  "status": enumType(["New", "Contacted", "Meeting set", "Proposal sent", "Contract review", "Closed", "Awaiting Gusto Setup"]),
   "id": numberType(),
   "created_at": stringType(),
   "updated_at": stringType(),
@@ -47053,7 +47061,7 @@ var GetInvestorResponse = objectType({
     "message": stringType(),
     "kind": stringType()
   })),
-  "expert_field": enumType(["Law Firms", "Chinese Law", "Indian Law"]),
+  "expert_field": stringType().min(1).max(120),
   "lead_source": stringType().optional(),
   "deal_value": unionType([numberType(), stringType()]).optional(),
   "expected_close_date": stringType().optional(),
@@ -47086,15 +47094,16 @@ var UpdateInvestorBody = objectType({
   "notes": stringType().optional(),
   "investor_type": enumType(["STANDARD", "PREMIUM"]).optional(),
   "fit_score": numberType().min(1).max(updateInvestorBodyFitScoreMax).optional(),
-  "status": enumType(["New", "Contacted", "Meeting set", "Proposal sent", "Contract review", "Closed"]).optional(),
-  "expert_field": enumType(["Law Firms", "Chinese Law", "Indian Law"]).optional(),
+  "status": enumType(["New", "Contacted", "Meeting set", "Proposal sent", "Contract review", "Closed", "Awaiting Gusto Setup"]).optional(),
+  "expert_field": stringType().min(1).max(120).optional(),
   "lead_source": stringType().optional(),
   "deal_value": unionType([numberType(), stringType()]).optional(),
   "expected_close_date": stringType().optional(),
   "owner": stringType().optional(),
   "client_type": enumType(["new lead", "cold client", "active client", ""]).optional(),
   "type": enumType(["new lead", "cold client", "active client", ""]).optional(),
-  "phone": stringType().optional()
+  "phone": stringType().optional(),
+  "created_at": stringType().optional()
 });
 var updateInvestorResponseFitScoreMax = 5;
 var UpdateInvestorResponse = objectType({
@@ -47117,7 +47126,7 @@ var UpdateInvestorResponse = objectType({
   "notes": stringType(),
   "investor_type": enumType(["STANDARD", "PREMIUM"]),
   "fit_score": numberType().min(1).max(updateInvestorResponseFitScoreMax),
-  "status": enumType(["New", "Contacted", "Meeting set", "Proposal sent", "Contract review", "Closed"]),
+  "status": enumType(["New", "Contacted", "Meeting set", "Proposal sent", "Contract review", "Closed", "Awaiting Gusto Setup"]),
   "id": numberType(),
   "created_at": stringType(),
   "updated_at": stringType(),
@@ -47127,7 +47136,7 @@ var UpdateInvestorResponse = objectType({
     "message": stringType(),
     "kind": stringType()
   })),
-  "expert_field": enumType(["Law Firms", "Chinese Law", "Indian Law"]),
+  "expert_field": stringType().min(1).max(120),
   "lead_source": stringType().optional(),
   "deal_value": unionType([numberType(), stringType()]).optional(),
   "expected_close_date": stringType().optional(),
@@ -47160,7 +47169,7 @@ var BrowserGetInvestorResponse = objectType({
   "notes": stringType(),
   "investor_type": enumType(["STANDARD", "PREMIUM"]),
   "fit_score": numberType().min(1).max(browserGetInvestorResponseFitScoreMax),
-  "status": enumType(["New", "Contacted", "Meeting set", "Proposal sent", "Contract review", "Closed"]),
+  "status": enumType(["New", "Contacted", "Meeting set", "Proposal sent", "Contract review", "Closed", "Awaiting Gusto Setup"]),
   "id": numberType(),
   "created_at": stringType(),
   "updated_at": stringType(),
@@ -47170,7 +47179,7 @@ var BrowserGetInvestorResponse = objectType({
     "message": stringType(),
     "kind": stringType()
   })),
-  "expert_field": enumType(["Law Firms", "Chinese Law", "Indian Law"]),
+  "expert_field": stringType().min(1).max(120),
   "lead_source": stringType().optional(),
   "deal_value": unionType([numberType(), stringType()]).optional(),
   "expected_close_date": stringType().optional(),
@@ -47203,15 +47212,16 @@ var BrowserUpdateInvestorBody = objectType({
   "notes": stringType().optional(),
   "investor_type": enumType(["STANDARD", "PREMIUM"]).optional(),
   "fit_score": numberType().min(1).max(browserUpdateInvestorBodyFitScoreMax).optional(),
-  "status": enumType(["New", "Contacted", "Meeting set", "Proposal sent", "Contract review", "Closed"]).optional(),
-  "expert_field": enumType(["Law Firms", "Chinese Law", "Indian Law"]).optional(),
+  "status": enumType(["New", "Contacted", "Meeting set", "Proposal sent", "Contract review", "Closed", "Awaiting Gusto Setup"]).optional(),
+  "expert_field": stringType().min(1).max(120).optional(),
   "lead_source": stringType().optional(),
   "deal_value": unionType([numberType(), stringType()]).optional(),
   "expected_close_date": stringType().optional(),
   "owner": stringType().optional(),
   "client_type": enumType(["new lead", "cold client", "active client", ""]).optional(),
   "type": enumType(["new lead", "cold client", "active client", ""]).optional(),
-  "phone": stringType().optional()
+  "phone": stringType().optional(),
+  "created_at": stringType().optional()
 });
 var browserUpdateInvestorResponseFitScoreMax = 5;
 var BrowserUpdateInvestorResponse = objectType({
@@ -47234,7 +47244,7 @@ var BrowserUpdateInvestorResponse = objectType({
   "notes": stringType(),
   "investor_type": enumType(["STANDARD", "PREMIUM"]),
   "fit_score": numberType().min(1).max(browserUpdateInvestorResponseFitScoreMax),
-  "status": enumType(["New", "Contacted", "Meeting set", "Proposal sent", "Contract review", "Closed"]),
+  "status": enumType(["New", "Contacted", "Meeting set", "Proposal sent", "Contract review", "Closed", "Awaiting Gusto Setup"]),
   "id": numberType(),
   "created_at": stringType(),
   "updated_at": stringType(),
@@ -47244,7 +47254,7 @@ var BrowserUpdateInvestorResponse = objectType({
     "message": stringType(),
     "kind": stringType()
   })),
-  "expert_field": enumType(["Law Firms", "Chinese Law", "Indian Law"]),
+  "expert_field": stringType().min(1).max(120),
   "lead_source": stringType().optional(),
   "deal_value": unionType([numberType(), stringType()]).optional(),
   "expected_close_date": stringType().optional(),
@@ -47281,7 +47291,7 @@ var AppendActivityResponse = objectType({
   "notes": stringType(),
   "investor_type": enumType(["STANDARD", "PREMIUM"]),
   "fit_score": numberType().min(1).max(appendActivityResponseFitScoreMax),
-  "status": enumType(["New", "Contacted", "Meeting set", "Proposal sent", "Contract review", "Closed"]),
+  "status": enumType(["New", "Contacted", "Meeting set", "Proposal sent", "Contract review", "Closed", "Awaiting Gusto Setup"]),
   "id": numberType(),
   "created_at": stringType(),
   "updated_at": stringType(),
@@ -47291,7 +47301,7 @@ var AppendActivityResponse = objectType({
     "message": stringType(),
     "kind": stringType()
   })),
-  "expert_field": enumType(["Law Firms", "Chinese Law", "Indian Law"]),
+  "expert_field": stringType().min(1).max(120),
   "lead_source": stringType().optional(),
   "deal_value": unionType([numberType(), stringType()]).optional(),
   "expected_close_date": stringType().optional(),
@@ -47328,7 +47338,7 @@ var BrowserAppendActivityResponse = objectType({
   "notes": stringType(),
   "investor_type": enumType(["STANDARD", "PREMIUM"]),
   "fit_score": numberType().min(1).max(browserAppendActivityResponseFitScoreMax),
-  "status": enumType(["New", "Contacted", "Meeting set", "Proposal sent", "Contract review", "Closed"]),
+  "status": enumType(["New", "Contacted", "Meeting set", "Proposal sent", "Contract review", "Closed", "Awaiting Gusto Setup"]),
   "id": numberType(),
   "created_at": stringType(),
   "updated_at": stringType(),
@@ -47338,7 +47348,7 @@ var BrowserAppendActivityResponse = objectType({
     "message": stringType(),
     "kind": stringType()
   })),
-  "expert_field": enumType(["Law Firms", "Chinese Law", "Indian Law"]),
+  "expert_field": stringType().min(1).max(120),
   "lead_source": stringType().optional(),
   "deal_value": unionType([numberType(), stringType()]).optional(),
   "expected_close_date": stringType().optional(),
@@ -47348,7 +47358,7 @@ var BrowserAppendActivityResponse = objectType({
   "phone": stringType().optional()
 });
 var GetSummaryQueryParams = objectType({
-  "expert_field": enumType(["Law Firms", "Chinese Law", "Indian Law"]).optional().describe("Restrict summary metrics to this field; records without a field count as Dentistry. Omit for all experts.")
+  "expert_field": stringType().min(1).max(120).optional().describe("Restrict summary metrics to this field; records without a field count as Dentistry. Omit for all experts.")
 });
 var GetSummaryResponse = objectType({
   "total": numberType(),
@@ -47360,7 +47370,7 @@ var GetSummaryResponse = objectType({
   "followups_due_today": numberType()
 });
 var BrowserGetSummaryQueryParams = objectType({
-  "expert_field": enumType(["Law Firms", "Chinese Law", "Indian Law"]).optional().describe("Restrict summary metrics to this field; records without a field count as Dentistry. Omit for all experts.")
+  "expert_field": stringType().min(1).max(120).optional().describe("Restrict summary metrics to this field; records without a field count as Dentistry. Omit for all experts.")
 });
 var BrowserGetSummaryResponse = objectType({
   "total": numberType(),
@@ -47372,14 +47382,16 @@ var BrowserGetSummaryResponse = objectType({
   "followups_due_today": numberType()
 });
 var ImportInvestorsBody = objectType({
-  "csv": stringType().min(1)
+  "csv": stringType().min(1),
+  "default_expert_field": stringType().optional()
 });
 var ImportInvestorsResponse = objectType({
   "created": numberType(),
   "updated": numberType()
 });
 var BrowserImportInvestorsBody = objectType({
-  "csv": stringType().min(1)
+  "csv": stringType().min(1),
+  "default_expert_field": stringType().optional()
 });
 var BrowserImportInvestorsResponse = objectType({
   "created": numberType(),
@@ -47766,17 +47778,17 @@ function createCrmPinAuth(getConfig = config) {
     }
     next();
   };
-  const router6 = (0, import_express3.Router)();
-  router6.get("/", (req, res) => {
+  const router7 = (0, import_express3.Router)();
+  router7.get("/", (req, res) => {
     const user = getSessionUser(req);
-    const base = { signed_in: validSession(req), configured: !!signingKey() };
+    const base2 = { signed_in: validSession(req), configured: !!signingKey() };
     if (user) {
-      res.json({ ...base, user });
+      res.json({ ...base2, user });
       return;
     }
-    res.json(base);
+    res.json(base2);
   });
-  router6.post("/", sameOrigin, async (req, res) => {
+  router7.post("/", sameOrigin, async (req, res) => {
     const { pin, verifyUser } = getConfig();
     const key = signingKey();
     const now = Date.now();
@@ -47830,22 +47842,23 @@ function createCrmPinAuth(getConfig = config) {
     res.cookie(COOKIE, `${payload}.${sign(payload, key)}`, { ...cookieOptions(req), maxAge: LIFETIME_MS });
     res.json({ signed_in: true, configured: true });
   });
-  router6.delete("/", sameOrigin, (req, res) => {
+  router7.delete("/", sameOrigin, (req, res) => {
     res.clearCookie(COOKIE, cookieOptions(req));
     res.clearCookie(USER_COOKIE, cookieOptions(req));
     res.json({ signed_in: false, configured: !!signingKey() });
   });
-  return { router: router6, requirePin, getSessionUser };
+  return { router: router7, requirePin, getSessionUser };
 }
 
 // src/lib/crmStages.ts
-var STAGES = ["New", "Contacted", "Meeting set", "Proposal sent", "Contract review", "Closed"];
+var STAGES = ["New", "Contacted", "Meeting set", "Proposal sent", "Contract review", "Closed", "Awaiting Gusto Setup"];
 var STAGE_PROBABILITIES = {
   "New": 0.05,
   "Contacted": 0.1,
   "Meeting set": 0.2,
   "Proposal sent": 0.5,
   "Contract review": 0.8,
+  "Awaiting Gusto Setup": 0.9,
   "Closed": 1
 };
 var aliases = {
@@ -47876,6 +47889,8 @@ var aliases = {
   "contract review": "Contract review",
   contract: "Contract review",
   "contract sent": "Contract review",
+  "awaiting gusto setup": "Awaiting Gusto Setup",
+  gusto: "Awaiting Gusto Setup",
   closed: "Closed",
   won: "Closed",
   lost: "Closed",
@@ -47913,6 +47928,43 @@ function nextStageForEvent(currentStage, eventType) {
 // src/lib/crmData.ts
 var STATUSES = [...STAGES];
 var CLIENT_TYPES = ["new lead", "cold client", "active client"];
+var SALES_FIELDS = ["Law Firms", "Chinese Law", "Indian Law"];
+var DEFAULT_EXPERT_DISCIPLINES = [
+  "Dentistry",
+  "Economics",
+  "Computer Science & AI",
+  "Medicine & Healthcare",
+  "Biotechnology & Life Sciences",
+  "Engineering",
+  "Finance & Business",
+  "Data Science & Analytics",
+  "Cybersecurity",
+  "Public Health",
+  "Education",
+  "Law & Policy"
+];
+function isSalesField(field) {
+  const f = (field || "Law Firms").trim();
+  return SALES_FIELDS.includes(f);
+}
+function normalizeExpertFieldValue(value) {
+  const raw = typeof value === "string" ? value.trim() : "";
+  if (!raw || raw.length > 120) {
+    throw fieldError("expert_field", value, "expert_field must be Law Firms, Chinese Law, Indian Law, Dentistry, Economics, or a valid discipline name");
+  }
+  const lower = raw.toLowerCase();
+  if (lower === "law_firms" || lower === "brazilian law" || lower === "brazil") {
+    throw fieldError("expert_field", value, "expert_field must be Dentistry, Economics, Law Firms, Chinese Law or Indian Law");
+  }
+  if (lower === "law firms") return "Law Firms";
+  if (lower === "chinese law") return "Chinese Law";
+  if (lower === "indian law") return "Indian Law";
+  if (lower === "dentistry" || lower === "dentists") return "Dentistry";
+  if (lower === "economics" || lower === "economists") return "Economics";
+  const matchedBuiltIn = DEFAULT_EXPERT_DISCIPLINES.find((d) => d.toLowerCase() === lower);
+  if (matchedBuiltIn) return matchedBuiltIn;
+  return raw;
+}
 var FIELDS = [
   "name",
   "firm",
@@ -47977,9 +48029,10 @@ function normalizeLinkedIn(value) {
   if (!["https:", "http:"].includes(url.protocol) || !/^(www\.)?linkedin\.com$/i.test(url.hostname) || !url.pathname.replace(/\/+$/, "")) throw fieldError("linkedin_url", value, "Use a linkedin.com profile URL");
   return `https://www.linkedin.com${url.pathname.toLowerCase().replace(/\/+$/, "")}`;
 }
-function parseDealValueNumber(raw, fallbackCheckSize, investorType) {
+function parseDealValueNumber(raw, fallbackCheckSize, _investorType) {
+  if (raw === 0 || raw === "0") return 0;
   if (typeof raw === "number" && Number.isFinite(raw) && raw >= 0) return raw;
-  if (typeof raw === "string" && raw.trim()) {
+  if (typeof raw === "string" && raw.trim() !== "") {
     const cleaned = raw.replace(/[$,\s]/g, "");
     const n = Number(cleaned);
     if (Number.isFinite(n) && n >= 0) return n;
@@ -47988,10 +48041,10 @@ function parseDealValueNumber(raw, fallbackCheckSize, investorType) {
     const m = fallbackCheckSize.replace(/,/g, "").match(/\d+(?:\.\d+)?/);
     if (m) {
       const n = Number(m[0]);
-      if (Number.isFinite(n) && n > 0) return n;
+      if (Number.isFinite(n) && n >= 0) return n;
     }
   }
-  return investorType === "PREMIUM" ? 4500 : 2500;
+  return 0;
 }
 function extractPhoneFromRecord(data) {
   if (typeof data.phone === "string" && data.phone.trim()) return data.phone.trim();
@@ -48026,9 +48079,24 @@ function validateInput(raw) {
       }
     }
   }
+  if (data.expert_field !== void 0) {
+    data.expert_field = normalizeExpertFieldValue(data.expert_field);
+  }
   for (const key of ["last_contacted_date", "next_follow_up_date", "expected_close_date"]) {
     const date2 = data[key];
     if (date2 && (!/^\d{4}-\d{2}-\d{2}$/.test(date2) || Number.isNaN(Date.parse(date2)) || new Date(date2).toISOString().slice(0, 10) !== date2)) throw fieldError(key, date2, `${key} must be YYYY-MM-DD`);
+  }
+  if (data.created_at !== void 0) {
+    const rawCreated = String(data.created_at).trim();
+    if (!rawCreated) {
+      delete data.created_at;
+    } else {
+      const datePart = rawCreated.slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(datePart) || Number.isNaN(Date.parse(datePart)) || (/* @__PURE__ */ new Date(`${datePart}T00:00:00.000Z`)).toISOString().slice(0, 10) !== datePart) {
+        throw fieldError("created_at", data.created_at, "created_at must be YYYY-MM-DD");
+      }
+      data.created_at = datePart;
+    }
   }
   if (data.type !== void 0 && data.client_type === void 0) {
     data.client_type = data.type;
@@ -48093,8 +48161,8 @@ async function getInvestor(client, id2) {
     type: clientType,
     phone,
     id: row.id,
-    created_at: row.created_at.toISOString(),
-    updated_at: row.updated_at.toISOString(),
+    created_at: typeof rawData.created_at === "string" && /^\d{4}-\d{2}-\d{2}/.test(rawData.created_at.trim()) ? `${rawData.created_at.trim().slice(0, 10)}T12:00:00.000Z` : row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at),
+    updated_at: row.updated_at instanceof Date ? row.updated_at.toISOString() : String(row.updated_at),
     activity_log: a.rows
   };
 }
@@ -48138,7 +48206,7 @@ async function listInvestors(client, status, owner) {
         type: clientType,
         phone,
         id: row.id,
-        created_at: row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at),
+        created_at: typeof rawData.created_at === "string" && /^\d{4}-\d{2}-\d{2}/.test(rawData.created_at.trim()) ? `${rawData.created_at.trim().slice(0, 10)}T12:00:00.000Z` : row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at),
         updated_at: row.updated_at instanceof Date ? row.updated_at.toISOString() : String(row.updated_at),
         activity_log: row.activity_log || []
       };
@@ -48170,26 +48238,6 @@ async function deleteInvestor(client, id2) {
 }
 async function deduplicateInvestors(client) {
   const deletedIds = [];
-  try {
-    const legacyRows = await client.query(
-      "SELECT id FROM crm_investors WHERE coalesce(data->>'expert_field', '') NOT IN ('Law Firms', 'Chinese Law', 'Indian Law') ORDER BY id"
-    );
-    if (legacyRows.rows.length > 0) {
-      await client.query("DELETE FROM crm_activities WHERE investor_id IN (SELECT id FROM crm_investors WHERE coalesce(data->>'expert_field', '') NOT IN ('Law Firms', 'Chinese Law', 'Indian Law'))");
-      try {
-        await client.query("DELETE FROM crm_calls WHERE investor_id IN (SELECT id FROM crm_investors WHERE coalesce(data->>'expert_field', '') NOT IN ('Law Firms', 'Chinese Law', 'Indian Law'))");
-      } catch {
-      }
-      try {
-        await client.query("DELETE FROM crm_whatsapp_messages WHERE investor_id IN (SELECT id FROM crm_investors WHERE coalesce(data->>'expert_field', '') NOT IN ('Law Firms', 'Chinese Law', 'Indian Law'))");
-      } catch {
-      }
-      await client.query("DELETE FROM crm_investors WHERE coalesce(data->>'expert_field', '') NOT IN ('Law Firms', 'Chinese Law', 'Indian Law')");
-      for (const r of legacyRows.rows) deletedIds.push(Number(r.id));
-    }
-    await client.query("DELETE FROM crm_campaigns WHERE field NOT IN ('Law Firms', 'Chinese Law', 'Indian Law', 'All')");
-  } catch {
-  }
   for (const [keepId, dupId] of KNOWN_DUPLICATE_PAIRS) {
     const check = await client.query("SELECT id, data FROM crm_investors WHERE id IN ($1, $2) ORDER BY id", [keepId, dupId]);
     if (check.rows.length === 2) {
@@ -48249,7 +48297,7 @@ async function upsert(client, raw, id2) {
     fit_score: 3,
     status: "New",
     lead_source: "Outbound",
-    deal_value: 2500,
+    deal_value: 0,
     expected_close_date: "",
     owner: "Guy",
     client_type: "new lead",
@@ -48264,6 +48312,12 @@ async function upsert(client, raw, id2) {
     const r = await client.query("INSERT INTO crm_investors(email_key,linkedin_key,data) VALUES($1,$2,$3::jsonb) RETURNING id", payload);
     id2 = r.rows[0].id;
   } else await client.query("UPDATE crm_investors SET email_key=$1,linkedin_key=$2,data=$3::jsonb,updated_at=NOW() WHERE id=$4", [...payload, id2]);
+  if (input.created_at && /^\d{4}-\d{2}-\d{2}$/.test(input.created_at)) {
+    try {
+      await client.query("UPDATE crm_investors SET created_at=$1::timestamptz WHERE id=$2", [`${input.created_at}T12:00:00.000Z`, id2]);
+    } catch {
+    }
+  }
   await activity(client, id2, created ? "Investor created" : `Updated: ${Object.keys(input).join(", ")}`, created ? "created" : "updated");
   if (old?.status !== data.status) await activity(client, id2, `${old?.status ?? "New record"} \u2192 ${data.status}`, `status:${data.status}`);
   return { investor: await getInvestor(client, id2), created };
@@ -48345,6 +48399,11 @@ async function logOutboundActivity(client, raw) {
   return getInvestor(client, investorId);
 }
 function summary(investors, now = /* @__PURE__ */ new Date(), expertField, filters) {
+  if (filters?.workspace === "sales") {
+    investors = investors.filter((i) => isSalesField(i.expert_field));
+  } else if (filters?.workspace === "experts") {
+    investors = investors.filter((i) => !isSalesField(i.expert_field));
+  }
   if (expertField) investors = investors.filter((i) => (i.expert_field || "Law Firms") === expertField);
   if (filters?.owner && filters.owner.trim() && filters.owner.trim().toLowerCase() !== "all") {
     const targetOwner = filters.owner.trim().toLowerCase();
@@ -48395,18 +48454,30 @@ function summary(investors, now = /* @__PURE__ */ new Date(), expertField, filte
   if (closedDeals.length > 0) {
     const daysList = closedDeals.map((i) => {
       const c = Date.parse(i.created_at || "");
-      const u = Date.parse(i.updated_at || "");
-      if (!Number.isNaN(c) && !Number.isNaN(u) && u >= c) {
-        return Math.max(1, Math.round((u - c) / (1e3 * 60 * 60 * 24)));
+      const closedAct = [...i.activity_log || []].reverse().find((a) => a.kind === "status:Closed");
+      const closeDateStr = i.expected_close_date && /^\d{4}-\d{2}-\d{2}$/.test(i.expected_close_date) ? `${i.expected_close_date}T12:00:00.000Z` : closedAct?.timestamp || i.updated_at || "";
+      const u = Date.parse(closeDateStr);
+      if (!Number.isNaN(c) && !Number.isNaN(u)) {
+        return Math.max(0, Math.round((u - c) / (1e3 * 60 * 60 * 24)));
       }
-      return 14;
+      return 0;
     });
     avgDaysToClose = Math.round(daysList.reduce((a, b) => a + b, 0) / daysList.length * 10) / 10;
   } else {
-    avgDaysToClose = 18;
+    const withDates = investors.filter((i) => i.created_at && i.expected_close_date && /^\d{4}-\d{2}-\d{2}$/.test(i.expected_close_date));
+    if (withDates.length > 0) {
+      const daysList = withDates.map((i) => {
+        const c = Date.parse(i.created_at || "");
+        const u = Date.parse(`${i.expected_close_date}T12:00:00.000Z`);
+        return !Number.isNaN(c) && !Number.isNaN(u) ? Math.max(0, Math.round((u - c) / (1e3 * 60 * 60 * 24))) : 0;
+      });
+      avgDaysToClose = Math.round(daysList.reduce((a, b) => a + b, 0) / daysList.length * 10) / 10;
+    } else {
+      avgDaysToClose = 0;
+    }
   }
   const reachedMeetingOrBeyond = investors.filter(
-    (i) => ["Meeting set", "Proposal sent", "Contract review", "Closed"].includes(i.status) || hasStatus(i, ["Meeting Set", "Meeting set", "Proposal sent", "Contract review", "Committed"])
+    (i) => ["Meeting set", "Proposal sent", "Contract review", "Closed", "Awaiting Gusto Setup"].includes(i.status) || hasStatus(i, ["Meeting Set", "Meeting set", "Proposal sent", "Contract review", "Committed"])
   );
   const meetingToClosedRate = reachedMeetingOrBeyond.length > 0 ? Math.round(closedDeals.length / reachedMeetingOrBeyond.length * 1e3) / 10 : 0;
   const totalCount = Math.max(investors.length, 1);
@@ -48475,8 +48546,20 @@ async function ensureCrmTablesAndDefaults(client) {
       direction TEXT NOT NULL DEFAULT 'outbound',
       body TEXT NOT NULL,
       sender TEXT NOT NULL DEFAULT 'Guy',
+      wa_message_id TEXT,
+      status TEXT NOT NULL DEFAULT 'sent',
+      message_type TEXT NOT NULL DEFAULT 'text',
+      template_name TEXT,
+      error_message TEXT,
+      metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+    ALTER TABLE crm_whatsapp_messages ADD COLUMN IF NOT EXISTS wa_message_id TEXT;
+    ALTER TABLE crm_whatsapp_messages ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'sent';
+    ALTER TABLE crm_whatsapp_messages ADD COLUMN IF NOT EXISTS message_type TEXT NOT NULL DEFAULT 'text';
+    ALTER TABLE crm_whatsapp_messages ADD COLUMN IF NOT EXISTS template_name TEXT;
+    ALTER TABLE crm_whatsapp_messages ADD COLUMN IF NOT EXISTS error_message TEXT;
+    ALTER TABLE crm_whatsapp_messages ADD COLUMN IF NOT EXISTS metadata JSONB NOT NULL DEFAULT '{}'::jsonb;
   `);
   const existingUsers = await client.query("SELECT count(*)::int AS n FROM crm_users");
   if ((existingUsers.rows[0]?.n ?? 0) === 0) {
@@ -48588,6 +48671,61 @@ async function deleteUser(client, userId) {
   if (!r.rows[0]) throw new CrmError("User not found", 404);
   return { deleted: true, id: userId };
 }
+async function listExpertTypes(client) {
+  const customSet = /* @__PURE__ */ new Set();
+  try {
+    const uRes = await client.query("SELECT workspace_settings FROM crm_users");
+    for (const row of uRes.rows) {
+      const arr = row.workspace_settings?.custom_expert_types;
+      if (Array.isArray(arr)) {
+        for (const item of arr) {
+          if (typeof item === "string" && item.trim() && !isSalesField(item.trim())) {
+            customSet.add(item.trim());
+          }
+        }
+      }
+    }
+  } catch {
+  }
+  try {
+    const iRes = await client.query("SELECT DISTINCT data->>'expert_field' AS expert_field FROM crm_investors WHERE data->>'expert_field' IS NOT NULL");
+    for (const row of iRes.rows) {
+      const f = typeof row.expert_field === "string" ? row.expert_field.trim() : "";
+      if (f && !isSalesField(f)) {
+        customSet.add(f);
+      }
+    }
+  } catch {
+  }
+  const all = Array.from(/* @__PURE__ */ new Set([...DEFAULT_EXPERT_DISCIPLINES, ...Array.from(customSet)]));
+  const customOnly = Array.from(customSet).filter((x) => !DEFAULT_EXPERT_DISCIPLINES.includes(x));
+  return {
+    expert_types: all,
+    custom_expert_types: customOnly,
+    sales_fields: [...SALES_FIELDS]
+  };
+}
+async function addCustomExpertType(client, rawName) {
+  const cleaned = normalizeExpertFieldValue(rawName);
+  if (isSalesField(cleaned)) {
+    return listExpertTypes(client);
+  }
+  try {
+    await ensureCrmTablesAndDefaults(client);
+    const uRes = await client.query("SELECT id, workspace_settings FROM crm_users ORDER BY id ASC LIMIT 1 FOR UPDATE");
+    if (uRes.rows[0]) {
+      const ws = uRes.rows[0].workspace_settings || {};
+      const existing = Array.isArray(ws.custom_expert_types) ? ws.custom_expert_types.map(String) : [];
+      if (!existing.some((x) => x.toLowerCase() === cleaned.toLowerCase())) {
+        existing.push(cleaned);
+      }
+      const nextWs = { ...ws, custom_expert_types: existing };
+      await client.query("UPDATE crm_users SET workspace_settings=$1::jsonb, updated_at=NOW() WHERE id=$2", [JSON.stringify(nextWs), uRes.rows[0].id]);
+    }
+  } catch {
+  }
+  return listExpertTypes(client);
+}
 
 // src/lib/crmCsv.ts
 function parseCsv(text3) {
@@ -48634,14 +48772,12 @@ function parseCsv(text3) {
   if (row.some((v) => v !== "")) rows.push(row);
   return rows;
 }
-function csvExpertField(value) {
-  const field = value.trim().toLowerCase();
-  if (!field || field === "law firms") return "Law Firms";
-  if (field === "chinese law") return "Chinese Law";
-  if (field === "indian law") return "Indian Law";
-  throw fieldError("expert_field", value, "expert_field must be Law Firms, Chinese Law or Indian Law");
+function csvExpertField(value, defaultField = "Law Firms") {
+  const field = value.trim();
+  if (!field) return normalizeExpertFieldValue(defaultField || "Law Firms");
+  return normalizeExpertFieldValue(field);
 }
-async function importCsv(client, text3) {
+async function importCsv(client, text3, defaultExpertField) {
   const rows = parseCsv(text3);
   if (rows.length < 2) throw new CrmError("CSV must contain headers and at least one investor");
   if (rows.length > 5001) throw new CrmError("Import at most 5,000 investors at once");
@@ -48661,7 +48797,7 @@ async function importCsv(client, text3) {
   const duplicate = headers2.find((header, index2) => headers2.indexOf(header) !== index2);
   if (duplicate !== void 0) throw new CrmError(`CSV row 1: Duplicate CSV header ${JSON.stringify(duplicate)}`, 400, { row: 1, field: duplicate, value: duplicate });
   if (!headers2.includes("name")) throw new CrmError("CSV row 1: CSV needs a name column", 400, { row: 1, field: "name" });
-  const unknown = headers2.filter((h) => ![...FIELDS, "activity_log", "id", "created_at", "updated_at"].includes(h));
+  const unknown = headers2.filter((h2) => ![...FIELDS, "activity_log", "id", "created_at", "updated_at"].includes(h2));
   if (unknown.length) throw new CrmError(`CSV row 1: Unknown CSV headers: ${unknown.join(", ")}`, 400, { row: 1, field: unknown[0], value: unknown[0] });
   let created = 0, updated = 0;
   for (let i = 1; i < rows.length; i++) {
@@ -48673,6 +48809,8 @@ async function importCsv(client, text3) {
           if (key === "fit_score") input[key] = Number(rows[i][j]);
           else if (key === "deal_value") input[key] = rows[i][j].trim() === "" ? void 0 : Number(rows[i][j].replace(/[$,\s]/g, ""));
           else input[key] = rows[i][j];
+        } else if (key === "created_at" && rows[i][j].trim()) {
+          input.created_at = rows[i][j].trim();
         }
       });
       if (input.fit_score === 0) delete input.fit_score;
@@ -48688,7 +48826,13 @@ async function importCsv(client, text3) {
         }
       }
       if (input.investor_type === "") delete input.investor_type;
-      if (typeof input.expert_field === "string") input.expert_field = csvExpertField(input.expert_field);
+      if (typeof input.expert_field === "string") {
+        if (input.expert_field.trim()) input.expert_field = csvExpertField(input.expert_field, defaultExpertField || "Law Firms");
+        else if (defaultExpertField?.trim()) input.expert_field = csvExpertField(defaultExpertField);
+        else delete input.expert_field;
+      } else if (defaultExpertField?.trim()) {
+        input.expert_field = csvExpertField(defaultExpertField);
+      }
       const result = await upsert(client, input);
       result.created ? created++ : updated++;
       if (typeof originalStage === "string" && originalStage.trim() && originalStage !== input.status) {
@@ -48725,7 +48869,7 @@ function exportCsv(investors) {
     if (/^[\t\r ]*[=+\-@]/.test(value)) value = "'" + value;
     return `"${value.replace(/"/g, '""')}"`;
   };
-  return [headers2.join(","), ...investors.map((i) => headers2.map((h) => quote(h === "activity_log" ? JSON.stringify(i.activity_log) : i[h])).join(","))].join("\r\n") + "\r\n";
+  return [headers2.join(","), ...investors.map((i) => headers2.map((h2) => quote(h2 === "activity_log" ? JSON.stringify(i.activity_log) : i[h2])).join(","))].join("\r\n") + "\r\n";
 }
 
 // src/lib/logger.ts
@@ -48739,6 +48883,392 @@ var logger = (0, import_pino.default)({
   ]
 });
 
+// src/lib/whatsappCloud.ts
+var GRAPH_VERSION = "v22.0";
+function getWhatsAppConfig() {
+  const accessToken = (process.env.WHATSAPP_ACCESS_TOKEN || "").trim();
+  const phoneNumberId = (process.env.WHATSAPP_PHONE_NUMBER_ID || "1456028954250856").trim();
+  const businessAccountId = (process.env.WHATSAPP_BUSINESS_ACCOUNT_ID || "1114165708261816").trim();
+  const appId = (process.env.WHATSAPP_APP_ID || "4523049234602869").trim();
+  const fromNumber = (process.env.WHATSAPP_FROM_NUMBER || "+1 555-157-8377").trim();
+  const verifyToken = (process.env.WHATSAPP_VERIFY_TOKEN || "gcs_whatsapp_verify_2026").trim();
+  return {
+    accessToken,
+    phoneNumberId,
+    businessAccountId,
+    appId,
+    fromNumber,
+    verifyToken,
+    configured: Boolean(accessToken && phoneNumberId)
+  };
+}
+function normalizeWhatsAppDigits(rawPhone) {
+  const digits = String(rawPhone || "").replace(/\D/g, "");
+  if (!digits) return "";
+  if (digits.length === 10) return `1${digits}`;
+  return digits;
+}
+function formatE164Phone(rawPhone) {
+  const digits = normalizeWhatsAppDigits(rawPhone);
+  return digits ? `+${digits}` : String(rawPhone || "").trim();
+}
+var schemaMigrated = false;
+async function ensureWhatsAppSchema(client = pool) {
+  if (schemaMigrated) return;
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS crm_whatsapp_messages (
+        id SERIAL PRIMARY KEY,
+        investor_id INTEGER REFERENCES crm_investors(id) ON DELETE SET NULL,
+        phone TEXT NOT NULL,
+        direction TEXT NOT NULL DEFAULT 'outbound',
+        body TEXT NOT NULL,
+        sender TEXT NOT NULL DEFAULT 'Guy',
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+      ALTER TABLE crm_whatsapp_messages ADD COLUMN IF NOT EXISTS wa_message_id TEXT;
+      ALTER TABLE crm_whatsapp_messages ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'sent';
+      ALTER TABLE crm_whatsapp_messages ADD COLUMN IF NOT EXISTS message_type TEXT NOT NULL DEFAULT 'text';
+      ALTER TABLE crm_whatsapp_messages ADD COLUMN IF NOT EXISTS template_name TEXT;
+      ALTER TABLE crm_whatsapp_messages ADD COLUMN IF NOT EXISTS error_message TEXT;
+      ALTER TABLE crm_whatsapp_messages ADD COLUMN IF NOT EXISTS metadata JSONB NOT NULL DEFAULT '{}'::jsonb;
+    `);
+    schemaMigrated = true;
+  } catch (err) {
+    logger.warn({ err }, "Could not run ensureWhatsAppSchema");
+  }
+}
+async function findInvestorIdByPhone(client, rawPhone) {
+  const digits = normalizeWhatsAppDigits(rawPhone);
+  const last10 = digits.slice(-10);
+  if (last10.length < 7) return null;
+  try {
+    const r = await client.query(
+      `SELECT id FROM crm_investors
+       WHERE regexp_replace(coalesce(data->>'phone','') || ' ' || coalesce(data->>'notes',''), '[^0-9]', '', 'g') LIKE $1
+       ORDER BY id ASC LIMIT 1`,
+      [`%${last10}%`]
+    );
+    if (r.rows[0]?.id) return Number(r.rows[0].id);
+  } catch {
+  }
+  return null;
+}
+async function fetchMetaPhoneStatus() {
+  const cfg = getWhatsAppConfig();
+  const baseStatus = {
+    configured: cfg.configured,
+    app_id: cfg.appId,
+    phone_number_id: cfg.phoneNumberId,
+    business_account_id: cfg.businessAccountId,
+    display_phone_number: cfg.fromNumber,
+    verified_name: "Test Number",
+    quality_rating: "UNKNOWN",
+    code_verification_status: "UNKNOWN",
+    name_status: "UNKNOWN",
+    webhook_url: "https://crm.gcs.org/api/whatsapp/webhook",
+    verify_token: cfg.verifyToken,
+    graph_version: GRAPH_VERSION,
+    live_connected: false,
+    error: null
+  };
+  if (!cfg.configured) {
+    return { ...baseStatus, error: "WHATSAPP_ACCESS_TOKEN is not configured" };
+  }
+  try {
+    const url = `https://graph.facebook.com/${GRAPH_VERSION}/${encodeURIComponent(cfg.phoneNumberId)}?fields=id,display_phone_number,verified_name,quality_rating,code_verification_status,name_status`;
+    const resp = await fetch(url, {
+      headers: { Authorization: `Bearer ${cfg.accessToken}` }
+    });
+    const data = await resp.json();
+    if (!resp.ok) {
+      return {
+        ...baseStatus,
+        error: data?.error?.message || `Meta Graph API HTTP ${resp.status}`
+      };
+    }
+    return {
+      ...baseStatus,
+      display_phone_number: data.display_phone_number || cfg.fromNumber,
+      verified_name: data.verified_name || "Meta WhatsApp Business",
+      quality_rating: data.quality_rating || "GREEN",
+      code_verification_status: data.code_verification_status || "VERIFIED",
+      name_status: data.name_status || "APPROVED",
+      live_connected: true
+    };
+  } catch (err) {
+    return {
+      ...baseStatus,
+      error: err instanceof Error ? err.message : "Failed to connect to Meta Graph API"
+    };
+  }
+}
+async function fetchMetaTemplates() {
+  const cfg = getWhatsAppConfig();
+  if (!cfg.configured) {
+    return { templates: [], error: "WHATSAPP_ACCESS_TOKEN is not configured" };
+  }
+  try {
+    const url = `https://graph.facebook.com/${GRAPH_VERSION}/${encodeURIComponent(cfg.businessAccountId)}/message_templates?fields=id,name,status,language,category,components&limit=100`;
+    const resp = await fetch(url, {
+      headers: { Authorization: `Bearer ${cfg.accessToken}` }
+    });
+    const data = await resp.json();
+    if (!resp.ok) {
+      return {
+        templates: [],
+        error: data?.error?.message || `Meta Graph API HTTP ${resp.status}`
+      };
+    }
+    return {
+      templates: Array.isArray(data.data) ? data.data : [],
+      error: null
+    };
+  } catch (err) {
+    return {
+      templates: [],
+      error: err instanceof Error ? err.message : "Failed to fetch message templates"
+    };
+  }
+}
+async function sendAndLogWhatsAppMessage(raw) {
+  await ensureWhatsAppSchema(pool);
+  const cfg = getWhatsAppConfig();
+  const direction = raw.direction === "inbound" ? "inbound" : "outbound";
+  const mode = raw.mode || (raw.template_name ? "template" : "text");
+  const templateName = (raw.template_name || "").trim();
+  const templateLang = (raw.template_language || "en_US").trim();
+  const templateParams = Array.isArray(raw.template_params) ? raw.template_params.map((x) => String(x ?? "").trim()).filter(Boolean) : [];
+  const rawPhone = String(raw.phone || raw.to || "").trim();
+  if (!rawPhone) {
+    throw new CrmError("Recipient WhatsApp phone number is required", 400);
+  }
+  const toDigits = normalizeWhatsAppDigits(rawPhone);
+  if (!toDigits || toDigits.length < 8) {
+    throw new CrmError("Valid WhatsApp phone number with country/area code is required (e.g. +14078021717)", 400);
+  }
+  const e164Phone = `+${toDigits}`;
+  const sender = String(raw.sender || "Guy").trim() || "Guy";
+  let textBody = String(raw.body || raw.message || "").trim();
+  if (mode === "template") {
+    if (!templateName) {
+      throw new CrmError("Template name is required when sending a WhatsApp template", 400);
+    }
+    if (!textBody) {
+      const preview = (raw.template_body_preview || "").trim();
+      textBody = preview ? `[Template: ${templateName}] ${preview}` : `[Template: ${templateName} (${templateLang})]${templateParams.length ? ` Params: ${templateParams.join(", ")}` : ""}`;
+    }
+  } else if (!textBody) {
+    throw new CrmError("WhatsApp message body is required", 400);
+  }
+  let waMessageId = null;
+  let deliveryStatus = direction === "inbound" ? "received" : "logged";
+  let errorMessage = null;
+  let metaResponse = {};
+  if (direction === "outbound" && mode !== "log_only") {
+    if (!cfg.configured) {
+      throw new CrmError("WhatsApp Cloud API token is not configured on the server", 500);
+    }
+    const graphPayload = {
+      messaging_product: "whatsapp",
+      recipient_type: "individual",
+      to: toDigits
+    };
+    if (mode === "template") {
+      const templateObj = {
+        name: templateName,
+        language: { code: templateLang }
+      };
+      if (templateParams.length > 0) {
+        templateObj.components = [
+          {
+            type: "body",
+            parameters: templateParams.map((p) => ({ type: "text", text: p }))
+          }
+        ];
+      }
+      graphPayload.type = "template";
+      graphPayload.template = templateObj;
+    } else {
+      graphPayload.type = "text";
+      graphPayload.text = {
+        preview_url: true,
+        body: textBody
+      };
+    }
+    const url = `https://graph.facebook.com/${GRAPH_VERSION}/${encodeURIComponent(cfg.phoneNumberId)}/messages`;
+    const resp = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${cfg.accessToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(graphPayload)
+    });
+    const respJson = await resp.json().catch(() => ({}));
+    metaResponse = respJson;
+    if (!resp.ok) {
+      const apiErrMsg = respJson?.error?.error_user_msg || respJson?.error?.message || `Meta WhatsApp Cloud API error (HTTP ${resp.status})`;
+      errorMessage = apiErrMsg;
+      deliveryStatus = "failed";
+      await transaction(async (client) => {
+        let cardId = raw.card_id || raw.investor_id ? Number(raw.card_id || raw.investor_id) : null;
+        if (!cardId) cardId = await findInvestorIdByPhone(client, e164Phone);
+        await client.query(
+          `INSERT INTO crm_whatsapp_messages(investor_id,phone,direction,body,sender,wa_message_id,status,message_type,template_name,error_message,metadata)
+           VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb)`,
+          [
+            cardId,
+            e164Phone,
+            direction,
+            textBody,
+            sender,
+            null,
+            "failed",
+            mode === "template" ? "template" : "text",
+            mode === "template" ? templateName : null,
+            errorMessage,
+            JSON.stringify({ graph_error: respJson?.error || respJson })
+          ]
+        );
+      });
+      throw new CrmError(apiErrMsg, resp.status >= 400 && resp.status < 500 ? resp.status : 502);
+    }
+    waMessageId = respJson?.messages?.[0]?.id || null;
+    deliveryStatus = respJson?.messages?.[0]?.message_status || "accepted";
+  }
+  const created = await transaction(async (client) => {
+    let cardId = raw.card_id || raw.investor_id ? Number(raw.card_id || raw.investor_id) : null;
+    if (!cardId) {
+      cardId = await findInvestorIdByPhone(client, e164Phone);
+    }
+    const ins = await client.query(
+      `INSERT INTO crm_whatsapp_messages(investor_id,phone,direction,body,sender,wa_message_id,status,message_type,template_name,error_message,metadata)
+       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb)
+       RETURNING *`,
+      [
+        cardId ?? null,
+        e164Phone,
+        direction,
+        textBody,
+        sender,
+        waMessageId,
+        deliveryStatus,
+        mode === "template" ? "template" : "text",
+        mode === "template" ? templateName : null,
+        errorMessage,
+        JSON.stringify({
+          meta: metaResponse,
+          from_phone_number_id: cfg.phoneNumberId,
+          waba_id: cfg.businessAccountId
+        })
+      ]
+    );
+    if (cardId) {
+      await logOutboundActivity(client, {
+        card_id: cardId,
+        event_type: direction === "inbound" ? "reply_received" : "whatsapp_sent",
+        subject: mode === "template" ? `WhatsApp Template (${templateName}) to ${e164Phone}` : `WhatsApp ${direction === "inbound" ? "Reply" : "Message"} (${e164Phone})`,
+        snippet: textBody,
+        campaign: raw.campaign || "whatsapp-cloud",
+        actor: sender
+      });
+    }
+    return ins.rows[0];
+  });
+  return created;
+}
+async function handleMetaWebhookEvents(payload) {
+  await ensureWhatsAppSchema(pool);
+  const entries = Array.isArray(payload?.entry) ? payload.entry : [];
+  let processedMessages = 0;
+  let processedStatuses = 0;
+  for (const entry of entries) {
+    const changes = Array.isArray(entry?.changes) ? entry.changes : [];
+    for (const change of changes) {
+      const value = change?.value || {};
+      const statuses = Array.isArray(value?.statuses) ? value.statuses : [];
+      for (const st of statuses) {
+        const wamid = String(st?.id || "").trim();
+        const statusVal = String(st?.status || "").trim();
+        if (!wamid || !statusVal) continue;
+        const errObj = Array.isArray(st?.errors) && st.errors[0] ? st.errors[0] : null;
+        const errText = errObj ? `${errObj.title || errObj.message || "Delivery error"} (code ${errObj.code ?? ""})` : null;
+        await pool.query(
+          `UPDATE crm_whatsapp_messages
+           SET status = $1,
+               error_message = COALESCE($2, error_message),
+               metadata = metadata || $3::jsonb
+           WHERE wa_message_id = $4`,
+          [statusVal, errText, JSON.stringify({ last_status_event: st }), wamid]
+        );
+        processedStatuses++;
+      }
+      const contacts = Array.isArray(value?.contacts) ? value.contacts : [];
+      const profileNameByWaId = /* @__PURE__ */ new Map();
+      for (const c of contacts) {
+        const waId = String(c?.wa_id || "").trim();
+        const pName = String(c?.profile?.name || "").trim();
+        if (waId && pName) profileNameByWaId.set(waId, pName);
+      }
+      const messages = Array.isArray(value?.messages) ? value.messages : [];
+      for (const msg of messages) {
+        const wamid = String(msg?.id || "").trim();
+        const fromRaw = String(msg?.from || "").trim();
+        if (!fromRaw) continue;
+        const e164Phone = formatE164Phone(fromRaw);
+        const senderName = profileNameByWaId.get(fromRaw) || e164Phone;
+        const msgType = String(msg?.type || "text").trim();
+        let textBody = "";
+        if (msgType === "text") {
+          textBody = String(msg?.text?.body || "").trim();
+        } else if (msgType === "button") {
+          textBody = String(msg?.button?.text || msg?.button?.payload || "[Button Reply]").trim();
+        } else if (msgType === "interactive") {
+          textBody = String(
+            msg?.interactive?.button_reply?.title || msg?.interactive?.list_reply?.title || "[Interactive Reply]"
+          ).trim();
+        } else {
+          textBody = `[${msgType.toUpperCase()} message received]`;
+        }
+        if (!textBody) textBody = "[WhatsApp message]";
+        if (wamid) {
+          const dup = await pool.query("SELECT id FROM crm_whatsapp_messages WHERE wa_message_id = $1 LIMIT 1", [wamid]);
+          if (dup.rows[0]) continue;
+        }
+        await transaction(async (client) => {
+          const cardId = await findInvestorIdByPhone(client, e164Phone);
+          await client.query(
+            `INSERT INTO crm_whatsapp_messages(investor_id,phone,direction,body,sender,wa_message_id,status,message_type,metadata)
+             VALUES($1,$2,'inbound',$3,$4,$5,'received',$6,$7::jsonb)`,
+            [
+              cardId,
+              e164Phone,
+              textBody,
+              senderName,
+              wamid || null,
+              msgType,
+              JSON.stringify({ webhook_message: msg })
+            ]
+          );
+          if (cardId) {
+            await logOutboundActivity(client, {
+              card_id: cardId,
+              event_type: "reply_received",
+              subject: `WhatsApp Reply from ${senderName} (${e164Phone})`,
+              snippet: textBody,
+              campaign: "whatsapp-inbound",
+              actor: senderName
+            });
+          }
+        });
+        processedMessages++;
+      }
+    }
+  }
+  return { processed_messages: processedMessages, processed_statuses: processedStatuses };
+}
+
 // src/routes/crm.ts
 var TELNYX_CONNECTION_ID = process.env.TELNYX_CONNECTION_ID || "3077013926030869814";
 var TELNYX_FROM_NUMBER = process.env.TELNYX_FROM_NUMBER || "+15619031414";
@@ -48748,16 +49278,25 @@ function id(value) {
   if (!Number.isSafeInteger(n) || n <= 0) throw new CrmError("Invalid investor id");
   return n;
 }
+router3.get("/expert-types", async (_req, res) => {
+  res.json(await listExpertTypes(pool));
+});
+router3.post("/expert-types", async (req, res) => {
+  const name = req.body?.name ?? req.body?.expert_field;
+  const result = await transaction((client) => addCustomExpertType(client, name));
+  res.status(201).json(result);
+});
 router3.get("/summary", async (req, res) => {
-  const expertField = req.query.expert_field;
-  if (expertField !== void 0 && expertField !== "Law Firms" && expertField !== "Chinese Law" && expertField !== "Indian Law") {
+  const expertField = typeof req.query.expert_field === "string" ? req.query.expert_field.trim() : void 0;
+  if (expertField !== void 0 && (!expertField || expertField.length > 120)) {
     throw new CrmError("Invalid expert field");
   }
   const owner = typeof req.query.owner === "string" ? req.query.owner : void 0;
   const range = typeof req.query.range === "string" ? req.query.range : void 0;
   const from = typeof req.query.from === "string" ? req.query.from : void 0;
   const to = typeof req.query.to === "string" ? req.query.to : void 0;
-  res.json(summary(await listInvestors(pool), /* @__PURE__ */ new Date(), expertField, { owner, range, from, to }));
+  const workspace = typeof req.query.workspace === "string" ? req.query.workspace : void 0;
+  res.json(summary(await listInvestors(pool), /* @__PURE__ */ new Date(), expertField, { owner, range, from, to, workspace }));
 });
 router3.get("/investors", async (req, res) => {
   const status = req.query.status;
@@ -48771,7 +49310,7 @@ router3.get("/investors/export", async (_req, res) => {
 router3.post("/investors/import", async (req, res) => {
   const input = BrowserImportInvestorsBody.safeParse(req.body);
   if (!input.success) throw new CrmError("CSV text required");
-  res.json(await transaction((client) => importCsv(client, input.data.csv)));
+  res.json(await transaction((client) => importCsv(client, input.data.csv, input.data.default_expert_field)));
 });
 router3.post("/investors/deduplicate", async (_req, res) => {
   res.json(await transaction((client) => deduplicateInvestors(client)));
@@ -49032,9 +49571,9 @@ router3.post("/calls/hangup", async (req, res) => {
       }
     } catch {
     }
-    for (const cid of idsToHangup) {
+    for (const cid2 of idsToHangup) {
       try {
-        const hResp = await fetch(`https://api.telnyx.com/v2/calls/${encodeURIComponent(cid)}/actions/hangup`, {
+        const hResp = await fetch(`https://api.telnyx.com/v2/calls/${encodeURIComponent(cid2)}/actions/hangup`, {
           method: "POST",
           headers: {
             Authorization: `Bearer ${apiKey}`,
@@ -49042,7 +49581,7 @@ router3.post("/calls/hangup", async (req, res) => {
           },
           body: JSON.stringify({})
         });
-        if (hResp.ok) hungUp.push(cid);
+        if (hResp.ok) hungUp.push(cid2);
       } catch {
       }
     }
@@ -49117,6 +49656,7 @@ router3.post("/calls/dial", async (req, res) => {
   res.status(201).json(created);
 });
 router3.get("/whatsapp", async (req, res) => {
+  await ensureWhatsAppSchema(pool);
   const investorId = req.query.investor_id ? Number(req.query.investor_id) : null;
   const r = await pool.query(
     `SELECT w.*, i.data->>'firm' AS firm, i.data->>'name' AS contact_name
@@ -49124,38 +49664,21 @@ router3.get("/whatsapp", async (req, res) => {
      LEFT JOIN crm_investors i ON i.id = w.investor_id
      WHERE ($1::int IS NULL OR w.investor_id = $1)
      ORDER BY w.created_at ASC, w.id ASC
-     LIMIT 200`,
+     LIMIT 300`,
     [investorId]
   );
   res.json(r.rows);
 });
+router3.get("/whatsapp/status", async (_req, res) => {
+  const status = await fetchMetaPhoneStatus();
+  res.json(status);
+});
+router3.get("/whatsapp/templates", async (_req, res) => {
+  const result = await fetchMetaTemplates();
+  res.json(result);
+});
 var handleWhatsAppSend = async (req, res) => {
-  const body = req.body || {};
-  const text3 = String(body.body || body.message || "").trim();
-  const phone = String(body.phone || body.to || "").trim();
-  const cardId = body.card_id || body.investor_id ? Number(body.card_id || body.investor_id) : void 0;
-  const sender = String(body.sender || "Guy").trim();
-  const direction = body.direction === "inbound" ? "inbound" : "outbound";
-  if (!text3) throw new CrmError("WhatsApp message body is required", 400);
-  const created = await transaction(async (client) => {
-    const ins = await client.query(
-      `INSERT INTO crm_whatsapp_messages(investor_id,phone,direction,body,sender)
-       VALUES($1,$2,$3,$4,$5)
-       RETURNING *`,
-      [cardId ?? null, phone || "+15619031414", direction, text3, sender]
-    );
-    if (cardId) {
-      await logOutboundActivity(client, {
-        card_id: cardId,
-        event_type: direction === "inbound" ? "reply_received" : "whatsapp_sent",
-        subject: `WhatsApp ${direction === "inbound" ? "Reply" : "Message"} (${phone || "Direct"})`,
-        snippet: text3,
-        campaign: body.campaign || "whatsapp-direct",
-        actor: sender
-      });
-    }
-    return ins.rows[0];
-  });
+  const created = await sendAndLogWhatsAppMessage(req.body || {});
   res.status(201).json(created);
 };
 router3.post("/whatsapp", handleWhatsAppSend);
@@ -49166,14 +49689,16 @@ router3.get("/campaigns", async (_req, res) => {
   const defaults2 = [
     { name: "law-firms-niw-q4", field: "Law Firms" },
     { name: "indian-law-eb2-partner", field: "Indian Law" },
-    { name: "chinese-law-niw-outreach", field: "Chinese Law" }
+    { name: "chinese-law-niw-outreach", field: "Chinese Law" },
+    { name: "dentistry-faculty-experts", field: "Dentistry" },
+    { name: "economics-phd-reviewers", field: "Economics" }
   ];
   for (const d of defaults2) {
     const matching = investors.filter((i) => i.expert_field === d.field);
     const contacted = matching.filter((i) => i.status !== "New").length;
-    const meetings = matching.filter((i) => ["Meeting set", "Proposal sent", "Contract review", "Closed"].includes(i.status)).length;
-    const proposals = matching.filter((i) => ["Proposal sent", "Contract review", "Closed"].includes(i.status)).length;
-    const val = matching.reduce((acc, i) => acc + (Number(i.deal_value) || 2500), 0);
+    const meetings = matching.filter((i) => ["Meeting set", "Proposal sent", "Contract review", "Closed", "Awaiting Gusto Setup"].includes(i.status)).length;
+    const proposals = matching.filter((i) => ["Proposal sent", "Contract review", "Closed", "Awaiting Gusto Setup"].includes(i.status)).length;
+    const val = matching.reduce((acc, i) => acc + (Number.isFinite(Number(i.deal_value)) && Number(i.deal_value) >= 0 ? Number(i.deal_value) : 0), 0);
     campaignMap.set(d.name, {
       name: d.name,
       field: d.field,
@@ -49225,9 +49750,49 @@ router3.use((err, req, res, next) => {
 });
 var crm_default = router3;
 
+// src/routes/contracts.ts
+var import_express5 = __toESM(require_express2(), 1);
+var router4 = (0, import_express5.Router)();
+var B = "crm-contracts";
+var base = () => `${process.env.SUPABASE_URL}/storage/v1`;
+var h = () => ({ Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`, apikey: String(process.env.SUPABASE_SERVICE_ROLE_KEY), "Content-Type": "application/json" });
+var cid = (v) => {
+  const n = Number(v);
+  if (!Number.isInteger(n) || n <= 0) throw new Error("bad id");
+  return n;
+};
+router4.get("/investors/:id/contract", async (req, res) => {
+  try {
+    const id2 = cid(req.params.id);
+    const r = await fetch(`${base()}/object/list/${B}`, { method: "POST", headers: h(), body: JSON.stringify({ prefix: `${id2}/`, limit: 20, sortBy: { column: "created_at", order: "desc" } }) });
+    const files = (await r.json()).filter((f2) => f2?.name && f2.id);
+    if (!files.length) return res.json({ contract: null });
+    const f = files[0];
+    const s = await fetch(`${base()}/object/sign/${B}/${id2}/${encodeURIComponent(f.name)}`, { method: "POST", headers: h(), body: JSON.stringify({ expiresIn: 3600 }) });
+    const sj = await s.json();
+    res.json({ contract: { name: f.name.replace(/^\d+-/, ""), url: `${base()}${sj.signedURL}` } });
+  } catch (e2) {
+    res.status(500).json({ error: "Contract lookup failed" });
+  }
+});
+router4.post("/investors/:id/contract/upload-url", async (req, res) => {
+  try {
+    const id2 = cid(req.params.id);
+    const name = String(req.body?.filename || "contract.pdf").replace(/[^\w.\- ]+/g, "_").slice(0, 120);
+    const path = `${id2}/${Date.now()}-${name}`;
+    const r = await fetch(`${base()}/object/upload/sign/${B}/${path.split("/").map(encodeURIComponent).join("/")}`, { method: "POST", headers: h(), body: "{}" });
+    const j = await r.json();
+    if (!j.url) return res.status(500).json({ error: "Could not create upload URL" });
+    res.json({ uploadUrl: `${base()}${j.url}` });
+  } catch {
+    res.status(500).json({ error: "Upload URL failed" });
+  }
+});
+var contracts_default = router4;
+
 // src/routes/outlook.ts
 var import_node_crypto3 = require("node:crypto");
-var import_express5 = __toESM(require_express2(), 1);
+var import_express6 = __toESM(require_express2(), 1);
 
 // src/lib/outlookLogic.ts
 var import_node_crypto2 = require("node:crypto");
@@ -49511,11 +50076,6 @@ function ensureOutlookSchema() {
   return schemaReady;
 }
 async function createOutlookSchema() {
-  try {
-    await ensureCrmTablesAndDefaults({ query: pool.query.bind(pool) });
-  } catch (err) {
-    logger.warn({ message: err instanceof Error ? err.message : "ensure failed" }, "outlook continued without crm table ensure");
-  }
   const statements = [
     `CREATE TABLE IF NOT EXISTS crm_outlook_accounts (
       id SERIAL PRIMARY KEY,
@@ -50370,7 +50930,7 @@ async function forwardMessage(userId, messageId, input) {
 
 // src/routes/outlook.ts
 var pinAuth = createCrmPinAuth(() => crmAuthConfigFromEnv());
-var router4 = (0, import_express5.Router)();
+var router5 = (0, import_express6.Router)();
 var manualSyncAt = /* @__PURE__ */ new Map();
 function redirectHome(req, res, query) {
   const proto = (req.get("x-forwarded-proto") || req.protocol || "https").split(",")[0].trim();
@@ -50488,7 +51048,7 @@ async function noteSent(investorId, to, subject) {
     return false;
   }
 }
-router4.get("/callback", async (req, res) => {
+router5.get("/callback", async (req, res) => {
   try {
     if (req.query.error) {
       redirectHome(req, res, "outlook=error&reason=denied");
@@ -50508,7 +51068,7 @@ router4.get("/callback", async (req, res) => {
     redirectHome(req, res, "outlook=error&reason=oauth_failed");
   }
 });
-router4.get("/cron", async (req, res) => {
+router5.get("/cron", async (req, res) => {
   try {
     if (!process.env.CRON_SECRET || process.env.CRON_SECRET.length < 16) {
       res.status(503).json({ error: "Set CRON_SECRET to a random string of at least 16 characters" });
@@ -50534,7 +51094,7 @@ router4.get("/cron", async (req, res) => {
     handleError(err, res);
   }
 });
-router4.get("/connect", (req, res) => {
+router5.get("/connect", (req, res) => {
   pinAuth.requirePin(req, res, async () => {
     try {
       const user = pinAuth.getSessionUser(req);
@@ -50556,7 +51116,7 @@ router4.get("/connect", (req, res) => {
     }
   });
 });
-router4.get("/account", protectedRoute(async (_req, res, user) => {
+router5.get("/account", protectedRoute(async (_req, res, user) => {
   const configError = outlookConfigError();
   const account = await getAccount(user.id);
   res.json({
@@ -50570,25 +51130,25 @@ router4.get("/account", protectedRoute(async (_req, res, user) => {
     lastSyncError: account?.lastSyncError || ""
   });
 }));
-router4.patch("/account", protectedRoute(async (req, res, user) => {
+router5.patch("/account", protectedRoute(async (req, res, user) => {
   if (typeof req.body?.autoCreatePeople !== "boolean") throw new OutlookError(400, "autoCreatePeople must be true or false");
   const account = await getAccount(user.id);
   if (!account) throw new OutlookError(409, "Connect Outlook first", "not_connected");
   await setAutoCreate(user.id, req.body.autoCreatePeople);
   res.json({ autoCreatePeople: req.body.autoCreatePeople });
 }));
-router4.post("/disconnect", protectedRoute(async (_req, res, user) => {
+router5.post("/disconnect", protectedRoute(async (_req, res, user) => {
   await deleteAccount(user.id);
   res.json({ connected: false });
 }));
-router4.post("/sync", protectedRoute(async (_req, res, user) => {
+router5.post("/sync", protectedRoute(async (_req, res, user) => {
   const last = manualSyncAt.get(user.id) || 0;
   if (Date.now() - last < 15e3) throw new OutlookError(429, "Wait a few seconds before syncing again");
   manualSyncAt.set(user.id, Date.now());
   const result = await syncOutlookUser(user.id);
   res.json(result);
 }));
-router4.get("/counts", protectedRoute(async (_req, res, user) => {
+router5.get("/counts", protectedRoute(async (_req, res, user) => {
   const local = await localCounts(user.id);
   const account = await getAccount(user.id);
   if (!account) {
@@ -50602,29 +51162,29 @@ router4.get("/counts", protectedRoute(async (_req, res, user) => {
     res.json({ connected: true, inbox: 0, sent: 0, unread: 0, ...local });
   }
 }));
-router4.get("/messages", protectedRoute(async (req, res, user) => {
+router5.get("/messages", protectedRoute(async (req, res, user) => {
   const folder = req.query.folder === "sent" ? "sent" : "inbox";
   res.json({ messages: await listFolderMessages(user.id, folder) });
 }));
-router4.get("/message", protectedRoute(async (req, res, user) => {
+router5.get("/message", protectedRoute(async (req, res, user) => {
   res.json(await readMessage(user.id, graphItemId(req.query.id)));
 }));
-router4.get("/attachments", protectedRoute(async (req, res, user) => {
+router5.get("/attachments", protectedRoute(async (req, res, user) => {
   res.json({ attachments: await listAttachments(user.id, graphItemId(req.query.id)) });
 }));
-router4.get("/attachment", protectedRoute(async (req, res, user) => {
+router5.get("/attachment", protectedRoute(async (req, res, user) => {
   const file = await downloadAttachment(user.id, graphItemId(req.query.messageId), graphItemId(req.query.attachmentId));
   res.setHeader("Content-Type", file.contentType);
   res.setHeader("Content-Disposition", `attachment; filename="${safeFileName(file.name)}"`);
   res.send(file.bytes);
 }));
-router4.post("/send", protectedRoute(async (req, res, user) => {
+router5.post("/send", protectedRoute(async (req, res, user) => {
   const result = await sendNewMail(user.id, req.body || {});
   const investorId = req.body?.investorId ? numericId(req.body.investorId) : null;
   const logged = await noteSent(investorId, result.to, result.subject);
   res.json({ sent: true, logged });
 }));
-router4.post("/reply", protectedRoute(async (req, res, user) => {
+router5.post("/reply", protectedRoute(async (req, res, user) => {
   await replyToMessage(user.id, graphItemId(req.body?.id), req.body || {});
   const investorId = req.body?.investorId ? numericId(req.body.investorId) : null;
   let recipients = [];
@@ -50636,7 +51196,7 @@ router4.post("/reply", protectedRoute(async (req, res, user) => {
   const logged = investorId && recipients.length ? await noteSent(investorId, recipients, text2(req.body?.subject, 500)) : false;
   res.json({ sent: true, logged });
 }));
-router4.post("/forward", protectedRoute(async (req, res, user) => {
+router5.post("/forward", protectedRoute(async (req, res, user) => {
   const result = await forwardMessage(user.id, graphItemId(req.body?.id), req.body || {});
   const investorId = req.body?.investorId ? numericId(req.body.investorId) : null;
   const logged = await noteSent(investorId, result.to, text2(req.body?.subject, 500));
@@ -50655,30 +51215,30 @@ function draftInput(body) {
     forwardMessageId: text2(body.forwardMessageId, 2e3)
   };
 }
-router4.get("/drafts", protectedRoute(async (req, res, user) => {
+router5.get("/drafts", protectedRoute(async (req, res, user) => {
   const status = req.query.status === "outbox" ? "outbox" : "draft";
   const rows = await listDrafts(user.id, status);
   res.json({ drafts: rows.map((row) => publicDraft(row, false)) });
 }));
-router4.get("/drafts/:id", protectedRoute(async (req, res, user) => {
+router5.get("/drafts/:id", protectedRoute(async (req, res, user) => {
   const row = await getDraft(user.id, numericId(req.params.id));
   if (!row) throw new OutlookError(404, "Draft not found");
   res.json({ draft: publicDraft(row, true) });
 }));
-router4.post("/drafts", protectedRoute(async (req, res, user) => {
+router5.post("/drafts", protectedRoute(async (req, res, user) => {
   const saved = await saveDraft(user.id, draftInput(req.body || {}));
   res.status(201).json({ draft: publicDraft(saved, false) });
 }));
-router4.patch("/drafts/:id", protectedRoute(async (req, res, user) => {
+router5.patch("/drafts/:id", protectedRoute(async (req, res, user) => {
   const saved = await saveDraft(user.id, { id: numericId(req.params.id), ...draftInput(req.body || {}) });
   if (!saved) throw new OutlookError(404, "Draft not found");
   res.json({ draft: publicDraft(saved, false) });
 }));
-router4.delete("/drafts/:id", protectedRoute(async (req, res, user) => {
+router5.delete("/drafts/:id", protectedRoute(async (req, res, user) => {
   await deleteDraft(user.id, numericId(req.params.id));
   res.json({ deleted: true });
 }));
-router4.post("/drafts/:id/send", protectedRoute(async (req, res, user) => {
+router5.post("/drafts/:id/send", protectedRoute(async (req, res, user) => {
   const id2 = numericId(req.params.id);
   const draft = await getDraft(user.id, id2);
   if (!draft) throw new OutlookError(404, "Draft not found");
@@ -50697,32 +51257,32 @@ router4.post("/drafts/:id/send", protectedRoute(async (req, res, user) => {
     throw err;
   }
 }));
-router4.get("/templates", protectedRoute(async (_req, res, user) => {
+router5.get("/templates", protectedRoute(async (_req, res, user) => {
   res.json({ templates: await listTemplates(user.id) });
 }));
-router4.post("/templates", protectedRoute(async (req, res, user) => {
+router5.post("/templates", protectedRoute(async (req, res, user) => {
   const name = text2(req.body?.name, 120).trim();
   if (!name) throw new OutlookError(400, "Template name is required");
   const saved = await saveTemplate(user.id, { name, subject: text2(req.body?.subject, 500), body: text2(req.body?.body, 2e5) });
   res.status(201).json({ template: saved });
 }));
-router4.patch("/templates/:id", protectedRoute(async (req, res, user) => {
+router5.patch("/templates/:id", protectedRoute(async (req, res, user) => {
   const name = text2(req.body?.name, 120).trim();
   if (!name) throw new OutlookError(400, "Template name is required");
   const saved = await saveTemplate(user.id, { id: numericId(req.params.id), name, subject: text2(req.body?.subject, 500), body: text2(req.body?.body, 2e5) });
   if (!saved) throw new OutlookError(404, "Template not found");
   res.json({ template: saved });
 }));
-router4.delete("/templates/:id", protectedRoute(async (req, res, user) => {
+router5.delete("/templates/:id", protectedRoute(async (req, res, user) => {
   await deleteTemplate(user.id, numericId(req.params.id));
   res.json({ deleted: true });
 }));
-router4.get("/events", protectedRoute(async (req, res, user) => {
+router5.get("/events", protectedRoute(async (req, res, user) => {
   const start = isoQuery(req.query.start, /* @__PURE__ */ new Date());
   const end = isoQuery(req.query.end, new Date(Date.now() + 7 * 24 * 60 * 60 * 1e3));
   res.json({ events: await listEvents(user.id, start, end, timeZoneOf(req.query.timeZone)) });
 }));
-router4.post("/events", protectedRoute(async (req, res, user) => {
+router5.post("/events", protectedRoute(async (req, res, user) => {
   const notify = req.body?.notify === true;
   const attendees = notify ? parseAddressList(text2(req.body?.attendees, 2e3)) : [];
   const event = await saveEvent(user.id, {
@@ -50737,7 +51297,7 @@ router4.post("/events", protectedRoute(async (req, res, user) => {
   });
   res.status(201).json({ event });
 }));
-router4.patch("/events", protectedRoute(async (req, res, user) => {
+router5.patch("/events", protectedRoute(async (req, res, user) => {
   const notify = req.body?.notify === true;
   const attendees = notify ? parseAddressList(text2(req.body?.attendees, 2e3)) : [];
   const event = await saveEvent(user.id, {
@@ -50753,7 +51313,7 @@ router4.patch("/events", protectedRoute(async (req, res, user) => {
   });
   res.json({ event });
 }));
-router4.get("/records/:id", protectedRoute(async (req, res, user) => {
+router5.get("/records/:id", protectedRoute(async (req, res, user) => {
   const investorId = numericId(req.params.id);
   const context = await investorContext(investorId);
   if (!context) throw new OutlookError(404, "Record not found");
@@ -50812,25 +51372,49 @@ router4.get("/records/:id", protectedRoute(async (req, res, user) => {
     meetings
   });
 }));
-var outlook_default = router4;
+var outlook_default = router5;
 
 // src/routes/index.ts
-var router5 = (0, import_express6.Router)();
+var router6 = (0, import_express7.Router)();
 var pinAuth2 = createCrmPinAuth(() => ({
-  ...crmAuthConfigFromEnv(),
+  pin: process.env.CRM_PIN || "123456",
+  signingSecret: process.env.SESSION_SECRET || process.env.SUPABASE_JWT_SECRET || "sellinghighs-crm-session-secret-2026",
+  apiKey: process.env.CRM_API_KEY || process.env.GROK_API_KEY || "sellinghighs-grok-key-2026",
   verifyUser: verifyUserCredentials
 }));
-router5.use(health_default);
-router5.use(auth_default);
-router5.use("/integrations/outlook", outlook_default);
-router5.use("/crm/session", pinAuth2.router);
-router5.use("/crm", pinAuth2.requirePin, crm_default);
-router5.use(["/investors", "/summary", "/kpis", "/reports", "/activity", "/team", "/calls", "/campaigns", "/whatsapp"], pinAuth2.requirePin);
-router5.use(crm_default);
-var routes_default = router5;
+var webhookPaths = ["/whatsapp/webhook", "/webhooks/whatsapp", "/crm/whatsapp/webhook"];
+router6.get(webhookPaths, (req, res) => {
+  const mode = String(req.query["hub.mode"] || "").trim();
+  const token = String(req.query["hub.verify_token"] || "").trim();
+  const challenge = String(req.query["hub.challenge"] || "");
+  const cfg = getWhatsAppConfig();
+  if (mode === "subscribe" && token && token === cfg.verifyToken) {
+    res.status(200).type("text/plain").send(challenge);
+    return;
+  }
+  res.status(403).json({ error: "Invalid verify token" });
+});
+router6.post(webhookPaths, async (req, res) => {
+  try {
+    const result = await handleMetaWebhookEvents(req.body || {});
+    res.status(200).json({ ok: true, ...result });
+  } catch (err) {
+    logger.error({ err }, "Failed processing Meta WhatsApp webhook event");
+    res.status(200).json({ ok: false });
+  }
+});
+router6.use(health_default);
+router6.use(auth_default);
+router6.use("/integrations/outlook", outlook_default);
+router6.use("/crm/session", pinAuth2.router);
+router6.use("/crm", pinAuth2.requirePin, contracts_default);
+router6.use("/crm", pinAuth2.requirePin, crm_default);
+router6.use(["/investors", "/summary", "/kpis", "/reports", "/activity", "/team", "/calls", "/campaigns", "/whatsapp"], pinAuth2.requirePin);
+router6.use(crm_default);
+var routes_default = router6;
 
 // src/app.ts
-var app = (0, import_express7.default)();
+var app = (0, import_express8.default)();
 app.set("trust proxy", 1);
 app.use(
   (0, import_pino_http.default)({
@@ -50852,8 +51436,8 @@ app.use(
   })
 );
 app.use((0, import_cookie_parser.default)());
-app.use(import_express7.default.json({ limit: "5mb" }));
-app.use(import_express7.default.urlencoded({ extended: true }));
+app.use(import_express8.default.json({ limit: "5mb" }));
+app.use(import_express8.default.urlencoded({ extended: true }));
 app.use(authMiddleware);
 app.use((_req, res, next) => {
   res.setHeader("Cache-Control", "no-store");

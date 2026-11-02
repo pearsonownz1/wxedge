@@ -22,13 +22,41 @@ test('Field filtering defaults legacy records to Law Firms and filters law segme
 });
 
 test('New law firm defaults follow the selected field, and CSV includes expert_field', () => {
-  assert.deepEqual(EXPERT_FIELDS, ['Law Firms', 'Chinese Law', 'Indian Law']);
-  assert.deepEqual(EXPERT_FIELD_FILTERS.find(field => field.value === 'Law Firms'), { value: 'Law Firms', label: 'Law Firms' });
+  assert.deepEqual(EXPERT_FIELDS, ['Law Firms', 'Chinese Law', 'Indian Law', 'Dentistry', 'Economics']);
+  assert.deepEqual(EXPERT_FIELD_FILTERS.find(field => field.value === 'Law Firms'), { value: 'Law Firms', label: 'Brazil' });
   assert.deepEqual(EXPERT_FIELD_FILTERS.find(field => field.value === 'Chinese Law'), { value: 'Chinese Law', label: 'Chinese Law' });
   assert.deepEqual(EXPERT_FIELD_FILTERS.find(field => field.value === 'Indian Law'), { value: 'Indian Law', label: 'Indian Law' });
   assert.equal(defaultExpertFieldFor('Law Firms'), 'Law Firms');
   assert.equal(defaultExpertFieldFor('Chinese Law'), 'Chinese Law');
   assert.equal(defaultExpertFieldFor('Indian Law'), 'Indian Law');
   assert.equal(defaultExpertFieldFor('All'), 'Law Firms');
+  assert.equal(defaultExpertFieldFor('All', 'experts'), 'Dentistry');
   assert.ok(TEMPLATE_CSV.trim().split(',').includes('expert_field'));
+});
+
+import { fmtCurrency, parseDealValue, workspaceOfRecord, getAvailableExpertDisciplines } from './crm';
+
+test('Deal size supports $0 without reverting to $2,500, and custom expert types route to experts workspace', () => {
+  assert.equal(parseDealValue(0), 0);
+  assert.equal(parseDealValue('0'), 0);
+  assert.equal(parseDealValue('$0'), 0);
+  assert.equal(fmtCurrency(0), '$0');
+  assert.equal(fmtCurrency('0'), '$0');
+  assert.equal(fmtCurrency(2500), '$2,500');
+
+  assert.equal(workspaceOfRecord({ expert_field: 'Law Firms' }), 'sales');
+  assert.equal(workspaceOfRecord({ expert_field: 'Chinese Law' }), 'sales');
+  assert.equal(workspaceOfRecord({ expert_field: 'Indian Law' }), 'sales');
+  assert.equal(workspaceOfRecord({ expert_field: 'Dentistry' }), 'experts');
+  assert.equal(workspaceOfRecord({ expert_field: 'Civil Engineering' }), 'experts');
+  assert.equal(workspaceOfRecord({ expert_field: 'Computer Science & AI' }), 'experts');
+
+  const disciplines = getAvailableExpertDisciplines([
+    { expert_field: 'Law Firms' },
+    { expert_field: 'Custom Robotics' },
+  ]);
+  assert.ok(!disciplines.includes('Law Firms'));
+  assert.ok(disciplines.includes('Dentistry'));
+  assert.ok(disciplines.includes('Economics'));
+  assert.ok(disciplines.includes('Custom Robotics'));
 });

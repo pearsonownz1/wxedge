@@ -6,10 +6,12 @@
  * OpenAPI spec version: 1.0.0
  */
 
-export type GetSummaryExpertField = typeof GetSummaryExpertField[keyof typeof GetSummaryExpertField];
+export type GetSummaryExpertField = typeof GetSummaryExpertField[keyof typeof GetSummaryExpertField] | (string & {});
 
 
 export const GetSummaryExpertField = {
+  Dentistry: 'Dentistry',
+  Economics: 'Economics',
   Law_Firms: 'Law Firms',
   Chinese_Law: 'Chinese Law',
   Indian_Law: 'Indian Law',

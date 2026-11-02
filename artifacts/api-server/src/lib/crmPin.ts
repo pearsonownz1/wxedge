@@ -18,7 +18,6 @@ const config = (): Config => ({
   apiKey: process.env.CRM_API_KEY,
 });
 
-// Same fallbacks the CRM session issuer uses, so Outlook can read that cookie.
 export function crmAuthConfigFromEnv(): Config {
   return {
     pin: process.env.CRM_PIN || "123456",

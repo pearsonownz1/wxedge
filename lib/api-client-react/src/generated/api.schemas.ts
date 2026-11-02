@@ -100,13 +100,16 @@ export const InvestorInputStatus = {
   Meeting_set: 'Meeting set',
   Proposal_sent: 'Proposal sent',
   Contract_review: 'Contract review',
+  Awaiting_Gusto_Setup: 'Awaiting Gusto Setup',
   Closed: 'Closed',
 } as const;
 
-export type InvestorInputExpertField = typeof InvestorInputExpertField[keyof typeof InvestorInputExpertField];
+export type InvestorInputExpertField = typeof InvestorInputExpertField[keyof typeof InvestorInputExpertField] | (string & {});
 
 
 export const InvestorInputExpertField = {
+  Dentistry: 'Dentistry',
+  Economics: 'Economics',
   Law_Firms: 'Law Firms',
   Chinese_Law: 'Chinese Law',
   Indian_Law: 'Indian Law',
@@ -145,6 +148,7 @@ export interface InvestorInput {
   client_type?: 'new lead' | 'cold client' | 'active client' | '';
   type?: 'new lead' | 'cold client' | 'active client' | '';
   phone?: string;
+  created_at?: string;
 }
 
 export type InvestorUpdateInvestorType = typeof InvestorUpdateInvestorType[keyof typeof InvestorUpdateInvestorType];
@@ -164,13 +168,16 @@ export const InvestorUpdateStatus = {
   Meeting_set: 'Meeting set',
   Proposal_sent: 'Proposal sent',
   Contract_review: 'Contract review',
+  Awaiting_Gusto_Setup: 'Awaiting Gusto Setup',
   Closed: 'Closed',
 } as const;
 
-export type InvestorUpdateExpertField = typeof InvestorUpdateExpertField[keyof typeof InvestorUpdateExpertField];
+export type InvestorUpdateExpertField = typeof InvestorUpdateExpertField[keyof typeof InvestorUpdateExpertField] | (string & {});
 
 
 export const InvestorUpdateExpertField = {
+  Dentistry: 'Dentistry',
+  Economics: 'Economics',
   Law_Firms: 'Law Firms',
   Chinese_Law: 'Chinese Law',
   Indian_Law: 'Indian Law',
@@ -209,6 +216,7 @@ export interface InvestorUpdate {
   client_type?: 'new lead' | 'cold client' | 'active client' | '';
   type?: 'new lead' | 'cold client' | 'active client' | '';
   phone?: string;
+  created_at?: string;
 }
 
 export interface Activity {
@@ -235,13 +243,16 @@ export const InvestorStatus = {
   Meeting_set: 'Meeting set',
   Proposal_sent: 'Proposal sent',
   Contract_review: 'Contract review',
+  Awaiting_Gusto_Setup: 'Awaiting Gusto Setup',
   Closed: 'Closed',
 } as const;
 
-export type InvestorExpertField = typeof InvestorExpertField[keyof typeof InvestorExpertField];
+export type InvestorExpertField = typeof InvestorExpertField[keyof typeof InvestorExpertField] | (string & {});
 
 
 export const InvestorExpertField = {
+  Dentistry: 'Dentistry',
+  Economics: 'Economics',
   Law_Firms: 'Law Firms',
   Chinese_Law: 'Chinese Law',
   Indian_Law: 'Indian Law',
@@ -322,6 +333,7 @@ export interface Summary {
 export interface CsvInput {
   /** @minLength 1 */
   csv: string;
+  default_expert_field?: string;
 }
 
 export interface ImportResult {
@@ -364,6 +376,7 @@ export const ListInvestorsStatus = {
   Meeting_set: 'Meeting set',
   Proposal_sent: 'Proposal sent',
   Contract_review: 'Contract review',
+  Awaiting_Gusto_Setup: 'Awaiting Gusto Setup',
   Closed: 'Closed',
 } as const;
 
@@ -380,6 +393,7 @@ export const BrowserListInvestorsStatus = {
   Meeting_set: 'Meeting set',
   Proposal_sent: 'Proposal sent',
   Contract_review: 'Contract review',
+  Awaiting_Gusto_Setup: 'Awaiting Gusto Setup',
   Closed: 'Closed',
 } as const;
 
@@ -391,10 +405,12 @@ from?: string;
 to?: string;
 };
 
-export type GetSummaryExpertField = typeof GetSummaryExpertField[keyof typeof GetSummaryExpertField];
+export type GetSummaryExpertField = typeof GetSummaryExpertField[keyof typeof GetSummaryExpertField] | (string & {});
 
 
 export const GetSummaryExpertField = {
+  Dentistry: 'Dentistry',
+  Economics: 'Economics',
   Law_Firms: 'Law Firms',
   Chinese_Law: 'Chinese Law',
   Indian_Law: 'Indian Law',
@@ -408,10 +424,12 @@ from?: string;
 to?: string;
 };
 
-export type BrowserGetSummaryExpertField = typeof BrowserGetSummaryExpertField[keyof typeof BrowserGetSummaryExpertField];
+export type BrowserGetSummaryExpertField = typeof BrowserGetSummaryExpertField[keyof typeof BrowserGetSummaryExpertField] | (string & {});
 
 
 export const BrowserGetSummaryExpertField = {
+  Dentistry: 'Dentistry',
+  Economics: 'Economics',
   Law_Firms: 'Law Firms',
   Chinese_Law: 'Chinese Law',
   Indian_Law: 'Indian Law',

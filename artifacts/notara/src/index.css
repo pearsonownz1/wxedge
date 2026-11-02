@@ -435,14 +435,11 @@
 
 .font-display{font-family:var(--app-font-serif)}
 .font-mono-ui{font-family:var(--app-font-mono)}
-
-/* CredPronto customer dashboard. Visual only: system type, 4px radius, primary blue. */
 .font-bold,
 .font-semibold,
 .font-extrabold,
 .font-display {
   font-weight: 500;
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Inter, ui-sans-serif, system-ui, sans-serif;
 }
 .rounded-xl,
 .rounded-lg,
@@ -457,7 +454,5 @@
 .text-blue-600,
 .text-blue-700,
 .text-blue-900 { color: #1f5eff; }
-.border-blue-200,
-.border-blue-600 { border-color: #e4e7ec; }
 @keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 .rise{animation:rise .35s ease both}

@@ -1,6 +1,4 @@
 import { pool } from "@workspace/db";
-import { ensureCrmTablesAndDefaults } from "./crmData";
-import { logger } from "./logger";
 import type { StoredEvent, StoredMessage } from "./outlookLogic";
 
 export type OutlookAccount = {
@@ -46,11 +44,6 @@ export function ensureOutlookSchema(): Promise<void> {
 }
 
 async function createOutlookSchema() {
-  try {
-    await ensureCrmTablesAndDefaults({ query: pool.query.bind(pool) });
-  } catch (err) {
-    logger.warn({ message: err instanceof Error ? err.message : "ensure failed" }, "outlook continued without crm table ensure");
-  }
   const statements = [
     `CREATE TABLE IF NOT EXISTS crm_outlook_accounts (
       id SERIAL PRIMARY KEY,

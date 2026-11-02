@@ -66,8 +66,8 @@ export function PinGate({ children }: { children: ReactNode }) {
         <div className="flex items-center gap-2.5">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600 font-bold text-white shadow">SH</div>
           <div>
-            <div className="font-display text-xl font-bold tracking-tight">SellingHighs CRM</div>
-            <div className="text-[11px] text-blue-200/80">SellingHighs CRM — Law Firm Pipeline</div>
+            <div className="font-display text-xl font-bold tracking-tight">GCS CRM</div>
+            <div className="text-[11px] text-blue-200/80">GCS CRM — Law Firms & Experts Pipeline</div>
           </div>
         </div>
         <div>
@@ -81,14 +81,14 @@ export function PinGate({ children }: { children: ReactNode }) {
             Sign in with your team account password to access your personal pipeline dashboard, conversion funnel, weighted revenue forecast, and call intelligence.
           </p>
         </div>
-        <p className="font-mono-ui text-xs text-slate-400">SellingHighs CRM · Multi-User Team Workspaces</p>
+        <p className="font-mono-ui text-xs text-slate-400">GCS CRM · Multi-User Team Workspaces</p>
       </div>
 
       <div className="flex items-center justify-center bg-slate-50 p-8">
         <form onSubmit={login} className="rise w-full max-w-md rounded-xl border bg-white p-8 shadow-sm">
           <div className="mb-6 flex items-center justify-between">
             <div>
-              <h1 className="font-display text-2xl font-bold text-slate-900">Sign in to SellingHighs</h1>
+              <h1 className="font-display text-2xl font-bold text-slate-900">Sign in to GCS CRM</h1>
               <p className="mt-1 text-xs text-slate-500">Choose Team Password or Quick PIN authentication</p>
             </div>
           </div>

@@ -9,4 +9,5 @@
 export interface CsvInput {
   /** @minLength 1 */
   csv: string;
+  default_expert_field?: string;
 }

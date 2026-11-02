@@ -15,5 +15,6 @@ export const InvestorStatus = {
   Meeting_set: 'Meeting set',
   Proposal_sent: 'Proposal sent',
   Contract_review: 'Contract review',
+  Awaiting_Gusto_Setup: 'Awaiting Gusto Setup',
   Closed: 'Closed',
 } as const;
